@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="description" content="KOR HVAC — commercial heating, cooling and mechanical contractor serving New York, New Jersey and the Northeast. Installation, service, maintenance and 24/7 emergency service.">
+<title>KOR HVAC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Unbounded:wght@800&display=swap">
+<style>
+/* Layout: Plaza-style restraint — full video hero, then a pale striped page with centered light headings, a framed photo triptych, small uppercase section labels and thin type; black, white and greys only */
+:root {
+  --ink: #111111;
+  --text: #3A3A3A;
+  --mute: #7A7A7A;
+  --line: #E1E1E1;
+  --bg: #FFFFFF;
+  --stripe: rgba(0,0,0,.028);
+  --sans: "Open Sans", "Helvetica Neue", Arial, sans-serif;
+  --mark: "Unbounded", "Arial Black", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.75; font-weight: 400; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: #fff; }
+a { color: inherit; }
+:focus-visible { outline: 1px solid var(--ink); outline-offset: 4px; }
+img { display: block; max-width: 100%; }
+h1, h2, h3 { margin: 0; font-weight: 300; color: var(--ink); text-wrap: balance; }
+p { margin: 0; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+.narrow { max-width: 760px; }
+.label { display: block; text-align: center; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--ink); margin-bottom: 44px; }
+.link-u { text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 2px; }
+
+/* Header */
+header { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 50; color: #fff; transition: background .35s, color .35s, box-shadow .35s; }
+header.solid { background: #fff; color: var(--ink); box-shadow: 0 1px 0 var(--line); }
+header.solid .logo { color: var(--ink); }
+header.solid .logo svg circle:first-child { stroke: var(--ink); }
+header.solid .logo svg circle:last-child { fill: var(--ink); }
+.tabs { display: flex; align-items: center; gap: 30px; font-size: 14px; }
+.tabs a { text-decoration: none; color: inherit; opacity: .85; padding-block: 4px; border-bottom: 1px solid transparent; }
+.tabs a:hover { opacity: 1; }
+.tabs a.on { opacity: 1; border-color: currentColor; }
+@media (max-width: 1120px) { .tabs { display: none; } }
+@media (min-width: 1121px) { .menu-btn#openMenu { display: none; } }
+.bar { display: flex; align-items: center; justify-content: space-between; padding-block: 20px; }
+.logo { display: flex; align-items: center; gap: 2px; text-decoration: none; line-height: 1; color: #fff; }
+.logo .k { font-family: var(--mark); font-weight: 800; font-size: 21px; }
+.logo svg { width: 18px; height: 18px; }
+.logo .h { font-size: 11px; font-weight: 600; letter-spacing: .38em; margin-left: 11px; }
+.menu-btn { background: none; border: 0; color: inherit; cursor: pointer; padding: 8px; margin-right: -8px; display: flex; }
+.overlay { position: fixed; inset: 0; z-index: 70; background: #fff; color: var(--ink); display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top, 0px) + 20px) max(24px, env(safe-area-inset-right, 0px)) 40px max(24px, env(safe-area-inset-left, 0px)); }
+.overlay[hidden] { display: none; }
+.overlay .top { display: flex; justify-content: flex-end; }
+.overlay nav { margin: auto 0; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.overlay nav a { text-decoration: none; font-size: clamp(26px, 4vw, 38px); font-weight: 300; color: var(--ink); }
+.overlay nav a:hover { color: var(--mute); }
+.overlay .contact-line { text-align: center; font-size: 14px; color: var(--mute); }
+
+/* Hero */
+.hero { position: relative; height: clamp(560px, 100svh, 1000px); background: #9a9a9a url(hero.jpg) center/cover; color: #fff; overflow: hidden; display: flex; align-items: center; justify-content: center; text-align: center; }
+.hero video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero .tint { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.28) 0%, rgba(0,0,0,.18) 40%, rgba(0,0,0,.32) 100%); }
+.hero h1 { text-shadow: 0 1px 18px rgba(0,0,0,.35); }
+@media (prefers-reduced-motion: reduce) { .hero video { display: none; } }
+.hero .copy { position: relative; display: flex; flex-direction: column; align-items: center; gap: 22px; padding-inline: 24px; }
+.hero h1 { color: #fff; font-size: clamp(34px, 4.6vw, 54px); line-height: 1.2; font-weight: 300; }
+.hero .copy a { color: #fff; font-size: 15px; }
+.scroll { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .3em; color: rgba(255,255,255,.75); text-decoration: none; }
+.scroll svg { width: 28px; height: 14px; }
+
+/* Views */
+.view[hidden] { display: none; }
+.pagehead { padding-top: calc(env(safe-area-inset-top, 0px) + 150px); padding-bottom: 10px; text-align: center; }
+.pagehead h1 { font-size: clamp(32px, 4.4vw, 50px); font-weight: 300; }
+.pagehead p { margin: 16px auto 0; max-width: 560px; color: var(--mute); font-size: 16px; }
+.more-link { display: flex; justify-content: center; margin-top: 60px; }
+.more-link a { font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; text-decoration: none; color: var(--ink); border: 1px solid var(--ink); padding: 14px 34px; }
+.more-link a:hover { background: var(--ink); color: #fff; }
+/* Page body with faint vertical stripes */
+.page { background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), var(--stripe) calc(25% - 1px) 25%); }
+section { padding-block: 110px; }
+@media (max-width: 700px) { section { padding-block: 76px; } }
+
+/* Intro */
+.intro h2 { text-align: center; font-size: clamp(22px, 2.6vw, 28px); line-height: 1.45; max-width: 640px; margin: 0 auto; }
+.lead { max-width: 680px; margin: 26px auto 0; text-align: center; font-size: 17px; line-height: 1.75; color: var(--text); }
+.health { margin-top: 90px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 56px; align-items: start; border-top: 1px solid var(--line); padding-top: 60px; }
+.health .label { display: block; margin-bottom: 14px; text-align: left; }
+.health h3 { font-size: clamp(24px, 2.6vw, 30px); font-weight: 300; line-height: 1.3; }
+.health p + p { margin-top: 14px; }
+.health ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.health li { padding-left: 18px; position: relative; }
+.health li::before { content: ""; position: absolute; left: 0; top: .75em; width: 8px; height: 1px; background: var(--ink); }
+@media (max-width: 760px) { .health { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+.stats { margin: 56px auto 0; max-width: 860px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.stats div { padding: 26px 10px; text-align: center; }
+.stats div + div { border-left: 1px solid var(--line); }
+.stats b { display: block; font-size: clamp(26px, 3vw, 34px); font-weight: 300; color: var(--ink); }
+.stats span { display: block; margin-top: 4px; font-size: 13px; color: var(--mute); }
+@media (max-width: 640px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stats div:nth-child(3) { border-left: 0; } .stats div:nth-child(n+3) { border-top: 1px solid var(--line); } }
+.home-block { margin-top: 100px; border-top: 1px solid var(--line); padding-top: 60px; }
+.home-block .head { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }
+.home-block .head .label { margin: 0; text-align: left; }
+.home-block .head a { font-size: 14px; color: var(--ink); }
+.svc3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px 48px; }
+.svc3 .n { font-size: 13px; color: var(--mute); letter-spacing: .1em; }
+.svc3 img, .cols img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; margin-bottom: 18px; }
+.band { margin-top: 100px; position: relative; }
+.band img { width: 100%; aspect-ratio: 21 / 8; object-fit: cover; display: block; }
+.band figcaption { margin-top: 10px; font-size: 13px; color: var(--mute); }
+.health-img { grid-column: 1 / -1; width: 100%; aspect-ratio: 21 / 9; object-fit: cover; display: block; }
+.duo { margin-top: 60px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.duo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
+@media (max-width: 560px) { .band img { aspect-ratio: 4 / 3; } .health-img { aspect-ratio: 4 / 3; } .duo { grid-template-columns: minmax(0, 1fr); } }
+.svc3 h3 { font-size: 19px; margin-top: 8px; }
+.svc3 p { margin-top: 8px; font-size: 15px; }
+@media (max-width: 860px) { .svc3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .svc3 { grid-template-columns: minmax(0, 1fr); } }
+.feat { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 48px; }
+.feat li { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.feat b { display: block; font-weight: 400; color: var(--ink); }
+.feat small { display: block; margin-top: 3px; color: var(--mute); font-size: 13px; }
+@media (max-width: 860px) { .feat { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .feat { grid-template-columns: minmax(0, 1fr); } }
+.cta { margin-top: 100px; background: #F4F4F3; padding: 64px 32px; text-align: center; }
+.cta h3 { font-size: clamp(24px, 2.8vw, 32px); font-weight: 300; }
+.cta p { margin: 12px auto 0; max-width: 520px; color: var(--text); }
+.cta .more-link { margin-top: 30px; }
+.trip { margin: 64px auto 0; border: 1px solid var(--line); padding: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; background: #fff; }
+.trip img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+@media (max-width: 640px) { .trip { grid-template-columns: minmax(0, 1fr); } .trip img { aspect-ratio: 4 / 3; } }
+.pillars { margin-top: 70px; display: grid; gap: 40px; }
+.pillars h3 { font-size: 20px; }
+.pillars p { margin-top: 8px; }
+
+/* Lists */
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px 64px; }
+.cols h3 { font-size: 20px; }
+.cols p { margin-top: 8px; }
+@media (max-width: 700px) { .cols { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
+
+/* Projects */
+.filters { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 26px; margin: 0 0 50px; font-size: 14px; }
+.filters button { font: inherit; background: none; border: 0; padding: 2px 0; color: var(--mute); cursor: pointer; border-bottom: 1px solid transparent; }
+.filters button.on { color: var(--ink); border-color: var(--ink); }
+.pgroup { padding: 30px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 250px) minmax(0, 1fr); gap: 30px; }
+.pgroup:last-child { border-bottom: 1px solid var(--line); }
+.pgroup h3 { font-size: 20px; }
+.pgroup .n { font-size: 13px; color: var(--mute); margin-top: 4px; }
+.plist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 32px; }
+.plist li { min-width: 0; }
+.plist b { display: block; font-weight: 400; color: var(--ink); font-size: 16px; }
+.plist small { font-size: 13px; color: var(--mute); }
+@media (max-width: 800px) { .pgroup { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+@media (max-width: 520px) { .plist { grid-template-columns: minmax(0, 1fr); } }
+
+/* Areas */
+.areas dl { margin: 0 auto; max-width: 980px; }
+.areas dl > div { padding: 26px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 32px; }
+.areas dl > div:last-child { border-bottom: 1px solid var(--line); }
+.areas dt { color: var(--ink); font-size: 18px; }
+.areas dd { margin: 0; color: var(--text); line-height: 1.9; }
+@media (max-width: 640px) { .areas dl > div { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
+
+/* Contact */
+.contact { text-align: center; }
+.contact h2 { font-size: clamp(24px, 3vw, 32px); }
+.contact .lines { margin-top: 22px; display: flex; flex-direction: column; gap: 4px; color: var(--ink); font-size: 16px; }
+.contact .lines span { user-select: all; }
+.cards { margin: 10px auto 0; max-width: 960px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; }
+.cards > div { padding: 30px 28px; }
+.cards > div + div { border-left: 1px solid var(--line); }
+.cards h3 { font-size: 13px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
+.cards p { margin-top: 10px; font-size: 15px; color: var(--text); }
+.cards a { display: inline-block; margin-top: 12px; color: var(--ink); font-size: 16px; }
+.phone-big { display: inline-block; margin-top: 18px; font-size: clamp(26px, 3vw, 34px); font-weight: 300; color: var(--ink); text-decoration: none; }
+@media (max-width: 760px) { .cards { grid-template-columns: minmax(0, 1fr); } .cards > div + div { border-left: 0; border-top: 1px solid var(--line); } }
+.steps { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; }
+.steps .n { font-size: 13px; color: var(--mute); letter-spacing: .1em; }
+.steps h3 { font-size: 18px; margin-top: 6px; }
+.steps p { margin-top: 6px; font-size: 15px; }
+@media (max-width: 700px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+.drop { border: 1px dashed #BDBDBD; padding: 26px; text-align: center; color: var(--mute); font-size: 14px; cursor: pointer; display: block; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.drop:hover { border-color: var(--ink); color: var(--ink); }
+.drop input { display: none; }
+.files { margin-top: 8px; font-size: 13px; color: var(--text); }
+.tabs a.cta-tab { border: 1px solid currentColor; padding: 7px 14px; opacity: 1; }
+.tabs a.cta-tab.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+header:not(.solid) .tabs a.cta-tab.on { background: #fff; color: var(--ink); }
+.myreq, .board { max-width: 960px; margin: 70px auto 0; }
+.myreq h2, .board h2 { font-size: 22px; font-weight: 300; margin-bottom: 18px; }
+.rq { border-top: 1px solid var(--line); padding: 18px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 20px; }
+.rq:last-child { border-bottom: 1px solid var(--line); }
+.rq b { font-weight: 600; color: var(--ink); }
+.rq .meta { font-size: 13px; color: var(--mute); }
+.rq .desc { grid-column: 1 / -1; font-size: 15px; }
+.pill { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px; border: 1px solid var(--line); white-space: nowrap; align-self: start; }
+.pill.New { border-color: #C0392B; color: #C0392B; }
+.pill.Scheduled { border-color: #1F5FA8; color: #1F5FA8; }
+.pill.In-progress { border-color: #B26A00; color: #B26A00; }
+.pill.Completed { border-color: #2E7D32; color: #2E7D32; }
+.pill.Emergency { background: #C0392B; color: #fff; border-color: #C0392B; }
+.ctrl { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+.ctrl input, .ctrl select { font-size: 14px; }
+.ctrl button { font: inherit; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; background: var(--ink); color: #fff; border: 0; padding: 8px 12px; cursor: pointer; }
+@media (max-width: 760px) { .ctrl { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.bfilters { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 20px; font-size: 14px; }
+.bfilters button { background: none; border: 0; padding: 4px 0; font: inherit; color: var(--mute); cursor: pointer; border-bottom: 1px solid transparent; }
+.bfilters button.on { color: var(--ink); border-color: var(--ink); }
+.empty { color: var(--mute); padding: 24px 0; border-top: 1px solid var(--line); }
+form { margin: 56px auto 0; max-width: 680px; text-align: left; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 32px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.full { grid-column: 1 / -1; }
+label { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+input, select, textarea { font: inherit; font-size: 16px; padding: 8px 0; border: 0; border-bottom: 1px solid #BDBDBD; background: transparent; color: var(--ink); border-radius: 0; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: none; border-bottom-color: var(--ink); }
+textarea { resize: vertical; min-height: 90px; }
+.form-foot { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 10px; }
+.send { font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; background: var(--ink); color: #fff; border: 1px solid var(--ink); padding: 14px 40px; cursor: pointer; }
+.send:hover { background: #fff; color: var(--ink); }
+.note { font-size: 13px; color: var(--mute); text-align: center; }
+@media (max-width: 520px) { form { grid-template-columns: minmax(0, 1fr); } }
+
+footer { background: #F4F4F3; color: var(--mute); font-size: 13px; padding-block: 44px; border-top: 1px solid var(--line); }
+footer .wrap { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; }
+footer nav { display: flex; gap: 22px; flex-wrap: wrap; }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+
+
+<header id="hdr">
+  <div class="wrap bar">
+    <a class="logo" href="#home" aria-label="KOR HVAC home">
+      <span class="k">K</span>
+      <svg viewBox="0 0 128 128" aria-hidden="true"><circle cx="64" cy="64" r="51" fill="none" stroke="#FFFFFF" stroke-width="26"/><circle cx="64" cy="64" r="15" fill="#FFFFFF"/></svg>
+      <span class="k">R</span>
+      <span class="h">HVAC</span>
+    </a>
+    <nav class="tabs" aria-label="Main">
+      <a href="#services" data-v="services">Services</a>
+      <a href="#projects" data-v="projects">Projects</a>
+      <a href="#areas" data-v="areas">Service Areas</a>
+      <a href="#about" data-v="about">About</a>
+      <a href="#contact" data-v="contact">Contact</a>
+      <a href="#schedule" data-v="schedule" class="cta-tab">Schedule Service</a>
+    </nav>
+    <button class="menu-btn" id="openMenu" aria-label="Open menu" aria-controls="menu" aria-expanded="false">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><line x1="3" y1="9" x2="23" y2="9"/><line x1="3" y1="17" x2="23" y2="17"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="overlay" id="menu" hidden>
+  <div class="top"><button class="menu-btn" id="closeMenu" aria-label="Close menu"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><line x1="5" y1="5" x2="21" y2="21"/><line x1="21" y1="5" x2="5" y2="21"/></svg></button></div>
+  <nav aria-label="Main">
+    <a href="#services">Services</a>
+    <a href="#projects">Projects</a>
+    <a href="#areas">Service Areas</a>
+    <a href="#about">About</a>
+    <a href="#contact">Contact</a>
+    <a href="#schedule">Schedule Service</a>
+  </nav>
+  <p class="contact-line"><a href="tel:+13477446665" style="color:inherit">(347) 744-6665</a> · <a href="mailto:info@korhvac.com" style="color:inherit">info@korhvac.com</a></p>
+</div>
+
+<main id="top">
+  <div class="view" data-view="home">
+  <section class="hero" style="padding:0">
+    <video src="hero.mp4" poster="hero.jpg" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+    <div class="tint" aria-hidden="true"></div>
+    <div class="copy">
+      <h1>Built Around<br>the Core</h1>
+      <a class="link-u" href="#about">Who We Are</a>
+    </div>
+    <a class="scroll" href="#welcome" aria-label="Scroll to content">
+      <svg viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M1 1 L14 13 L27 1"/></svg>
+      SCROLL
+    </a>
+  </section>
+  <div class="page">
+    <section id="welcome" class="intro">
+      <div class="wrap">
+        <h2>Welcome to KOR HVAC, a commercial heating, cooling and mechanical contractor serving New York, New Jersey and the Northeast</h2>
+        <p class="lead">We install, service and maintain the systems that keep buildings running: rooftop units, chillers, cooling towers, boilers and the ductwork that ties them together. Our customers are nursing homes, building owners, property managers and general contractors who need a mechanical partner they can call, trust and count on to finish the job right.</p>
+        <div class="stats">
+          <div><b>20+</b><span>Years in the field</span></div>
+          <div><b>40+</b><span>Projects completed</span></div>
+          <div><b>7</b><span>States served</span></div>
+          <div><b>24/7</b><span>Emergency service</span></div>
+        </div>
+        <div class="trip">
+          <img src="img/trip1.jpg" alt="Rooftop mechanical equipment beside a glass office building" loading="lazy">
+          <img src="img/trip2.jpg" alt="Air handling unit and ductwork on a commercial rooftop" loading="lazy">
+          <img src="img/trip3.jpg" alt="Mechanical room piping and valves" loading="lazy">
+        </div>
+        <div class="more-link"><a href="#about">About KOR HVAC</a></div>
+        <div class="home-block">
+          <div class="head"><span class="label">What We Do</span><a href="#services">All services</a></div>
+          <div class="svc3">
+            <div><img src="img/s-install.jpg" alt="VRF condensing units on a commercial rooftop" loading="lazy"><div class="n">01</div><h3>Installation &amp; Replacement</h3><p>Rooftop units, chillers, cooling towers, boilers, VRF and heat pumps, from crane pick to startup.</p></div>
+            <div><img src="img/s-service.jpg" alt="Technician working on refrigerant lines" loading="lazy"><div class="n">02</div><h3>Service &amp; Repair</h3><p>Technicians who find the real problem and explain it in a written report after every visit.</p></div>
+            <div><img src="img/s-maint.jpg" alt="Technicians servicing rooftop units" loading="lazy"><div class="n">03</div><h3>Preventive Maintenance</h3><p>Scheduled plans that cut down on emergency calls and keep records ready for inspectors.</p></div>
+            <div><img src="img/s-duct.jpg" alt="Technician installing overhead ductwork" loading="lazy"><div class="n">04</div><h3>Ductwork &amp; Ventilation</h3><p>Ductwork, dampers, louvers and insulation for new systems, renovations and replacements.</p></div>
+            <div><img src="img/s-emerg.jpg" alt="Pumps and piping in a mechanical room" loading="lazy"><div class="n">05</div><h3>Emergency Service</h3><p>Day or night, when the heat or cooling goes down, our team answers.</p></div>
+            <div><img src="img/s-rebate.jpg" alt="High-efficiency heat pump units" loading="lazy"><div class="n">06</div><h3>Rebates &amp; Efficiency</h3><p>Equipment upgrades through utility rebate programs that help lower the cost.</p></div>
+          </div>
+        </div>
+        <div class="health">
+          <img class="health-img" src="img/health.jpg" alt="Air handling unit in a bright atrium" loading="lazy">
+          <div>
+            <span class="label">Healthcare &amp; Senior Living</span>
+            <h3>In a nursing home, heating and cooling isn’t about comfort. It’s about the residents.</h3>
+          </div>
+          <div>
+            <p>A large part of our work is in nursing homes, rehabilitation centers and care facilities. We know that an elderly resident can’t sit through a heat wave or a cold night while a part is on order, and that administrators answer to families, inspectors and the state.</p>
+            <p>So we plan around the people in the building:</p>
+            <ul>
+              <li>Shutdowns scheduled with the facility, with temporary heating or cooling when it’s needed</li>
+              <li>Crews who are respectful and careful around residents and staff</li>
+              <li>Preventive maintenance and clear records ready for surveys and inspections</li>
+              <li>Priority emergency response, day or night</li>
+              <li>Equipment upgrades through utility rebate programs that help stretch tight budgets</li>
+            </ul>
+          </div>
+        </div>
+        <figure class="band" style="margin-left:0;margin-right:0"><img src="img/band.jpg" alt="Cooling tower fans from above" loading="lazy"></figure>
+        <div class="home-block" style="margin-top:80px">
+          <div class="head"><span class="label">Selected Projects</span><a href="#projects">All projects</a></div>
+          <ul class="feat">
+            <li><b>Complete Care at Barn Hill</b><small>Nursing home · Newton, NJ</small></li>
+            <li><b>Morristown Post Acute</b><small>Nursing home · Morristown, NJ</small></li>
+            <li><b>Bazalel Nursing Home</b><small>Nursing home · Far Rockaway, NY</small></li>
+            <li><b>26 Broadway, 26th Floor</b><small>Office · Manhattan, NY</small></li>
+            <li><b>Harry Winston, 580 Fifth Ave</b><small>Retail · Manhattan, NY</small></li>
+            <li><b>Claremont Nursing Home</b><small>Nursing home · Carlisle, PA</small></li>
+          </ul>
+        </div>
+        <div class="cta">
+          <h3>Have a building that needs attention?</h3>
+          <p>Whether it’s a unit that won’t keep up, an aging boiler or a full replacement, tell us about it and we’ll take a look.</p>
+          <div class="more-link"><a href="#schedule">Schedule Service</a></div>
+        </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  </div>
+  <div class="view" data-view="about" hidden><div class="page">
+      <div class="pagehead wrap"><h1>About KOR HVAC</h1><p>A commercial mechanical contractor for the buildings people depend on every day: nursing homes, offices, schools and apartment buildings across the Northeast.</p></div>
+    <section style="padding-top:60px"><div class="wrap">
+        <div class="narrow" style="margin:0 auto">
+          <p class="lead" style="text-align:left;margin:0">KOR HVAC was built by people who have spent their careers in the field. After more than twenty years of working on boilers, chillers and rooftop equipment, we know that good mechanical work comes down to a few simple things: show up, look closely, explain it honestly and stand behind the work.</p>
+          <p class="lead" style="text-align:left;margin:18px 0 0">We work with building owners, facility managers and general contractors across the Northeast, and with many of the region’s nursing homes and care facilities, where we’ve built long relationships by being the team that answers the phone.</p>
+        </div>
+        <div class="duo narrow" style="margin:50px auto 0"><img src="img/about1.jpg" alt="Insulated piping in a mechanical room" loading="lazy"><img src="img/about2.jpg" alt="Valves in a boiler room" loading="lazy"></div>
+        <div class="pillars narrow" style="margin:60px auto 0">
+          <div><h3>Experience on the Job</h3><p>More than twenty years on rooftops, in mechanical rooms and in boiler rooms. We’ve installed and serviced everything from a single split system to multi-ton chillers and cooling towers. We look at the equipment ourselves and tell you plainly what we find, even when the answer is a repair instead of a replacement.</p></div>
+          <div><h3>Everything in Writing</h3><p>Every job starts with a site visit and a written proposal that spells out scope, equipment, exclusions, schedule and price. When there’s more than one way to solve a problem, we lay out the options side by side so you can decide with the full picture.</p></div>
+          <div><h3>We Stay With You</h3><p>The job isn’t finished when the unit is set. We handle startup, testing and balancing coordination, and closeout paperwork, then stay on as your service team with preventive maintenance and around-the-clock emergency response.</p></div>
+      </div></section>
+    <section id="serve">
+      <div class="wrap">
+        <span class="label">Who We Serve</span>
+        <div class="cols">
+          <div><h3>Healthcare &amp; Senior Living</h3><p>Nursing homes, rehabilitation centers and medical offices, where indoor temperature is a matter of resident health and a failed unit can’t wait until Monday. We work around residents and staff, plan shutdowns carefully, and know the inspection and documentation these buildings require.</p></div>
+          <div><h3>Commercial Buildings</h3><p>Office buildings, retail, labs, houses of worship and mixed-use properties. We replace aging rooftop units, upgrade controls and keep tenants comfortable, often while the building stays open.</p></div>
+          <div><h3>General Contractors</h3><p>A mechanical subcontractor that bids accurately, shows up on schedule and coordinates with the other trades. Clear submittals, organized crews and complete closeout documents.</p></div>
+          <div><h3>Multifamily &amp; Residential</h3><p>Apartment buildings, condominiums and high-end residences, from central plant boilers to individual units, with crews that respect the people who live there.</p></div>
+        </div>
+      </div>
+    </section>
+  </div></div>
+  <div class="view" data-view="services" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Services</h1><p>From a single rooftop unit to a full central plant, we install, repair and maintain the mechanical systems that keep your building comfortable, safe and running.</p></div>
+    <section style="padding-top:60px">
+      <div class="wrap">
+        <div class="cols">
+          <div><img src="img/s-install.jpg" alt="VRF condensing units on a commercial rooftop" loading="lazy"><h3>Installation &amp; Replacement</h3><p>When equipment reaches the end of its life, we replace it with as little disruption as possible. We install rooftop units, chillers, cooling towers, boilers, VRF and split systems, heat pumps and make-up air units, and we manage the whole job: rigging and crane picks, curb adapters, piping, electrical coordination, startup and testing.</p></div>
+          <div><img src="img/s-service.jpg" alt="Technician working on refrigerant lines" loading="lazy"><h3>Service &amp; Repair</h3><p>When something stops working, our technicians come prepared to find the real cause, not just treat the symptom. We work on compressors, heat exchangers, fans and motors, controls and refrigerant systems, and after every visit you receive a written report explaining what we found and what we did.</p></div>
+          <div><img src="img/s-maint.jpg" alt="Technicians servicing rooftop units" loading="lazy"><h3>Preventive Maintenance</h3><p>Regular maintenance is the simplest way to avoid breakdowns. Our preventive maintenance plans are built around your equipment and schedule, and include filter and belt changes, coil cleaning, refrigerant and combustion checks, and seasonal startups, with records kept ready for inspections.</p></div>
+          <div><img src="img/s-duct.jpg" alt="Technician installing overhead ductwork" loading="lazy"><h3>Ductwork &amp; Ventilation</h3><p>We install and modify sheet metal ductwork, fire and smoke dampers, louvers, diffusers and insulation for new systems, renovations and equipment replacements, so air is delivered where it is needed.</p></div>
+          <div><img src="img/s-emerg.jpg" alt="Pumps and piping in a mechanical room" loading="lazy"><h3>Emergency Service</h3><p>Equipment doesn’t fail on a schedule. Our team is available 24 hours a day, 7 days a week, with priority response for maintenance customers, nursing homes and other buildings that can’t wait.</p></div>
+          <div><img src="img/s-rebate.jpg" alt="High-efficiency heat pump units" loading="lazy"><h3>Rebates &amp; Efficiency Upgrades</h3><p>Older equipment costs more to run and breaks down more often. We help owners upgrade to high-efficiency systems through utility rebate and incentive programs that can offset a significant part of the cost, and improve indoor air quality with better filtration, ventilation and controls.</p></div>
+        </div>
+      </div>
+    </section>
+    <section style="padding-top:0"><div class="wrap">
+      <div class="cta" style="margin-top:0">
+        <h3>Need service?</h3>
+        <p>Tell us what’s happening and when works for you. Our service team will call to confirm your appointment.</p>
+        <div class="more-link"><a href="#schedule">Schedule Service</a></div>
+      </div>
+    </div></section>
+  </div></div>
+  <div class="view" data-view="projects" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Projects</h1><p>A selection of the nursing homes, commercial buildings, schools and residences we’ve worked on across New York, New Jersey, Connecticut, Pennsylvania, Maryland and Massachusetts.</p></div>
+    <section style="padding-top:60px">
+      <div class="wrap">
+        <div class="filters" role="group" aria-label="Filter projects by state">
+          <button type="button" class="on" data-f="all" aria-pressed="true">All</button>
+          <button type="button" data-f="NY" aria-pressed="false">New York</button>
+          <button type="button" data-f="NJ" aria-pressed="false">New Jersey</button>
+          <button type="button" data-f="CT" aria-pressed="false">Connecticut</button>
+          <button type="button" data-f="PA" aria-pressed="false">Pennsylvania</button>
+          <button type="button" data-f="MDMA" aria-pressed="false">Maryland &amp; Massachusetts</button>
+        </div>
+        <div id="pgroups"></div>
+      </div>
+    </section>
+    <section style="padding-top:0"><div class="wrap">
+      <div class="cta" style="margin-top:0">
+        <h3>Have a project for us?</h3>
+        <p>Send us the plans and project details. We’ll review the scope and get back to you with a written proposal.</p>
+        <div class="more-link"><a href="#estimating">Send Us a Project</a></div>
+      </div>
+    </div></section>
+  </div></div>
+  <div class="view" data-view="areas" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Service Areas</h1><p>Our crews work across New York, New Jersey, Connecticut, Pennsylvania and Maryland. If your building isn’t listed, ask us.</p></div>
+    <section class="areas" style="padding-top:60px">
+      <div class="wrap">
+        <dl>
+          <div><dt>New Jersey</dt><dd>Cape May Court House, Cedar Grove, Cherry Hill, East Hanover, East Orange, Englewood, Freehold, Hackensack, Hammonton, Hillside, Jackson, Jersey City, Linden, Morristown, Newark, Newton, North Bergen, Old Bridge, Oxford, Passaic, Pennsauken, Perth Amboy, Pompton Plains, Riverton, Rockaway, Sea Bright, Secaucus, Sewell, Somerset</dd></div>
+          <div><dt>New York</dt><dd>Manhattan, Brooklyn, Bronx, Queens, Long Island, Oceanside, West Babylon</dd></div>
+          <div><dt>Connecticut</dt><dd>Bridgeport, Hartford, Meriden, Milford, West Hartford, Windsor</dd></div>
+          <div><dt>Pennsylvania</dt><dd>Philadelphia, Broomall, Carlisle, Lock Haven</dd></div>
+          <div><dt>Maryland</dt><dd>Phoenix</dd></div>
+          <div><dt>Massachusetts &amp; Delaware</dt><dd>Contact us about your project.</dd></div>
+        </dl>
+      </div>
+    </section>
+  </div></div>
+  <div class="view" data-view="estimating" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Send Us a Project</h1><p>Planning a new project or replacement? Fill out the form, upload your drawings, and our estimating team will put together a detailed, written proposal.</p></div>
+    <section style="padding-top:60px">
+      <div class="wrap">
+        <div class="steps">
+          <div><div class="n">01</div><h3>Send your plans</h3><p>Mechanical drawings, specs, bid documents or just photos of the existing equipment.</p></div>
+          <div><div class="n">02</div><h3>We review the scope</h3><p>Our estimators go through the documents and schedule a site visit if it’s needed.</p></div>
+          <div><div class="n">03</div><h3>You get a proposal</h3><p>A clear written proposal with scope, equipment, exclusions, options and price.</p></div>
+        </div>
+        <div class="contact" style="margin-top:80px">
+          <p style="color:var(--text)">Email plans directly to</p>
+          <a class="phone-big" style="margin-top:6px" href="mailto:estimating@korhvac.com?subject=Plans%20for%20estimate">estimating@korhvac.com</a>
+          <p style="margin-top:10px;color:var(--mute);font-size:14px">or fill out the form below</p>
+        </div>
+        <form id="estForm" name="project-request" method="POST" enctype="multipart/form-data" data-netlify="true" netlify-honeypot="bot-field" novalidate><input type="hidden" name="form-name" value="project-request"><input type="hidden" name="subject" value="New project for estimate – KOR HVAC"><p hidden><label>Leave empty <input name="bot-field"></label></p>
+          <div class="field"><label for="e-name">Name</label><input id="e-name" name="name" autocomplete="name" required></div>
+          <div class="field"><label for="e-company">Company</label><input id="e-company" name="company" autocomplete="organization"></div>
+          <div class="field"><label for="e-email">Email</label><input id="e-email" name="email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="e-phone">Phone</label><input id="e-phone" name="phone" type="tel" autocomplete="tel"></div>
+          <div class="field full"><label for="e-project">Project name &amp; address</label><input id="e-project" name="project"></div>
+          <div class="field"><label for="e-type">Building type</label><select id="e-type" name="btype"><option>Nursing home / healthcare</option><option>Office / commercial</option><option>Multifamily / residential</option><option>School / institutional</option><option>Other</option></select></div>
+          <div class="field"><label for="e-due">Bid due date</label><input id="e-due" name="due" type="date"></div>
+          <div class="field full"><label>Plans &amp; documents</label><label class="drop" for="e-files">Click to choose plan file 1 (PDF, DWG, ZIP or photo)<input id="e-files" name="plans_1" type="file" accept=".pdf,.dwg,.zip,image/*"></label><label class="drop" for="e-files2" style="margin-top:8px">Plan file 2 (optional)<input id="e-files2" name="plans_2" type="file" accept=".pdf,.dwg,.zip,image/*"></label><label class="drop" for="e-files3" style="margin-top:8px">Plan file 3 (optional)<input id="e-files3" name="plans_3" type="file" accept=".pdf,.dwg,.zip,image/*"></label><div class="files" id="e-list"></div><div class="files" style="color:var(--mute)">Up to 8 MB total. For larger plan sets, email them to <a href="mailto:estimating@korhvac.com">estimating@korhvac.com</a> or send a download link in the notes.</div></div>
+          <div class="field full"><label for="e-msg">Scope / notes</label><textarea id="e-msg" name="message"></textarea></div>
+          <div class="form-foot"><button class="send" type="submit">Send to Estimating</button><span class="note" id="estNote" aria-live="polite"></span></div>
+        </form>
+      </div>
+    </section>
+  </div></div>
+  <div class="view" data-view="schedule" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Schedule Service</h1><p>Tell us what’s going on and when works for you. Our service team will confirm the appointment by phone or email. For an emergency, call <a href="tel:+13477446665" style="color:var(--ink);white-space:nowrap">(347)&nbsp;744-6665</a>.</p></div>
+    <section style="padding-top:20px">
+      <div class="wrap">
+        <form id="schedForm" name="service-request" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate><input type="hidden" name="form-name" value="service-request"><input type="hidden" name="subject" value="New service request – KOR HVAC"><p hidden><label>Leave empty <input name="bot-field"></label></p>
+          <div class="field"><label for="s-name">Your name</label><input id="s-name" name="name" autocomplete="name" required></div>
+          <div class="field"><label for="s-company">Facility or company</label><input id="s-company" name="company" autocomplete="organization"></div>
+          <div class="field"><label for="s-phone">Phone</label><input id="s-phone" name="phone" type="tel" autocomplete="tel" required></div>
+          <div class="field"><label for="s-email">Email</label><input id="s-email" name="email" type="email" autocomplete="email"></div>
+          <div class="field full"><label for="s-address">Service address</label><input id="s-address" name="address" autocomplete="street-address" required></div>
+          <div class="field"><label for="s-btype">Building type</label><select id="s-btype" name="building_type"><option>Nursing home / healthcare</option><option>Office / commercial</option><option>Multifamily / residential</option><option>School / institutional</option><option>Other</option></select></div>
+          <div class="field"><label for="s-equip">Equipment</label><select id="s-equip" name="equipment"><option>Rooftop unit</option><option>Chiller</option><option>Cooling tower</option><option>Boiler</option><option>Split system / VRF</option><option>Heat pump</option><option>Ventilation / exhaust</option><option>Controls / thermostat</option><option>Not sure</option></select></div>
+          <div class="field"><label for="s-type">Type of visit</label><select id="s-type" name="visit_type"><option>Repair</option><option>Preventive maintenance</option><option>Inspection</option><option>Estimate for replacement</option></select></div>
+          <div class="field"><label for="s-urg">How urgent?</label><select id="s-urg" name="urgency"><option>Emergency</option><option>Within 24 hours</option><option selected>This week</option><option>Flexible</option></select></div>
+          <div class="field"><label for="s-date">Preferred date</label><input id="s-date" name="preferred_date" type="date"></div>
+          <div class="field"><label for="s-win">Preferred time</label><select id="s-win" name="preferred_time"><option>Morning (7–11)</option><option>Midday (11–3)</option><option>Afternoon (3–7)</option><option>Any time</option></select></div>
+          <div class="field full"><label for="s-msg">What’s happening?</label><textarea id="s-msg" name="details" placeholder="e.g. Unit on the east roof isn’t cooling, compressor short-cycling since this morning"></textarea></div>
+          <div class="form-foot"><button class="send" type="submit">Request Appointment</button><span class="note" id="schedNote" aria-live="polite"></span></div>
+        </form>
+        <div class="myreq" id="myReq" hidden><h2>Your service requests</h2><div id="myList"></div></div>
+      </div>
+    </section>
+  </div></div>
+  <div class="view" data-view="dispatch" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Service Dispatch</h1><p>Incoming service requests. Set the appointment, assign a technician and track each call to completion.</p></div>
+    <section style="padding-top:20px">
+      <div class="wrap">
+        <div class="board">
+          <div class="bfilters" id="bFilters"></div>
+          <div id="boardList"><div class="empty">Loading requests…</div></div>
+        </div>
+      </div>
+    </section>
+  </div></div>
+  <div class="view" data-view="contact" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Contact</h1><p>Tell us about your building and what you need, and we’ll get back to you to schedule a call or a site visit.</p></div>
+    <section class="contact" style="padding-top:40px">
+      <div class="wrap">
+        
+        <a class="phone-big" href="tel:+13477446665">(347) 744-6665</a>
+        <div class="cards" style="margin-top:40px">
+          <div><h3>Service</h3><p>Repairs, maintenance and emergency calls.</p><a href="mailto:service@korhvac.com">service@korhvac.com</a></div>
+          <div><h3>Estimating</h3><p>New projects, bids and plans for review.</p><a href="mailto:estimating@korhvac.com">estimating@korhvac.com</a><br><a href="#estimating" style="font-size:14px;margin-top:6px">Upload plans →</a></div>
+          <div><h3>Information</h3><p>General questions and everything else.</p><a href="mailto:info@korhvac.com">info@korhvac.com</a></div>
+        </div>
+        <form id="contactForm" name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate><input type="hidden" name="form-name" value="contact"><input type="hidden" name="subject" value="New message from korhvac.com"><p hidden><label>Leave empty <input name="bot-field"></label></p>
+          <div class="field"><label for="f-name">Name</label><input id="f-name" name="name" autocomplete="name" required></div>
+          <div class="field"><label for="f-company">Company or Building</label><input id="f-company" name="company" autocomplete="organization"></div>
+          <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="f-phone">Phone</label><input id="f-phone" name="phone" type="tel" autocomplete="tel"></div>
+          <div class="field full"><label for="f-type">Request</label>
+            <select id="f-type" name="type"><option>Service or repair</option><option>Emergency</option><option>Maintenance contract</option><option>Installation or replacement</option><option>General question</option></select>
+          </div>
+          <div class="field full"><label for="f-msg">Details</label><textarea id="f-msg" name="message"></textarea></div>
+          <div class="form-foot"><button class="send" type="submit">Send</button><span class="note" id="formNote" aria-live="polite"></span></div>
+        </form>
+      </div>
+    </section>
+  </div></div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 KOR HVAC</span>
+    <nav aria-label="Footer"><a href="#services">Services</a><a href="#projects">Projects</a><a href="#about">About</a><a href="#contact">Contact</a><a href="#schedule">Schedule Service</a><a href="#dispatch" id="dispatchLink" hidden>Dispatch</a></nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var hdr = document.getElementById('hdr');
+  var views = document.querySelectorAll('.view'), current = 'home';
+  function onScroll() { hdr.classList.toggle('solid', current !== 'home' || window.scrollY > window.innerHeight * 0.6); }
+  function route() {
+    var h = (location.hash || '').replace('#', '');
+    var target = 'home';
+    views.forEach(function (v) { if (v.dataset.view === h) target = h; });
+    if (h === 'welcome') target = 'home';
+    var changed = target !== current; current = target;
+    views.forEach(function (v) { v.hidden = v.dataset.view !== target; });
+    document.querySelectorAll('.tabs a').forEach(function (a) { a.classList.toggle('on', a.dataset.v === target); });
+    if (h === 'welcome') { var w = document.getElementById('welcome'); if (w) w.scrollIntoView(); }
+    else if (changed || target !== 'home') window.scrollTo(0, 0);
+    onScroll();
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('hashchange', route); route();
+
+  var menu = document.getElementById('menu'), ob = document.getElementById('openMenu'), cb = document.getElementById('closeMenu');
+  function setMenu(open) { menu.hidden = !open; ob.setAttribute('aria-expanded', String(open)); if (open) cb.focus(); else ob.focus(); }
+  ob.addEventListener('click', function () { setMenu(true); });
+  cb.addEventListener('click', function () { setMenu(false); });
+  menu.addEventListener('click', function (e) { if (e.target.tagName === 'A') { menu.hidden = true; ob.setAttribute('aria-expanded', 'false'); } });
+  menu.addEventListener('keydown', function (e) { if (e.key === 'Escape') setMenu(false); });
+
+  var form = document.getElementById('contactForm'), note = document.getElementById('formNote');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var n = document.getElementById('f-name'), em = document.getElementById('f-email');
+    if (!n.value.trim() || !em.value.trim() || em.validity.typeMismatch) { note.textContent = 'Please add your name and a valid email.'; (n.value.trim() ? em : n).focus(); return; }
+    var t = document.getElementById('f-type').value;
+    var to = /General/.test(t) ? 'info@korhvac.com' : 'service@korhvac.com';
+    var body = 'Name: ' + n.value + '\nCompany/Building: ' + document.getElementById('f-company').value + '\nEmail: ' + em.value + '\nPhone: ' + document.getElementById('f-phone').value + '\nRequest: ' + t + '\n\n' + document.getElementById('f-msg').value;
+    var mail = function () { window.location.href = 'mailto:' + to + '?subject=' + encodeURIComponent(t + ' - ' + n.value) + '&body=' + encodeURIComponent(body); note.textContent = 'Your email app should open with the message ready to send to ' + to + '.'; };
+    note.textContent = 'Sending…';
+    fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(new FormData(form)).toString() })
+      .then(function (r) { if (!r.ok) throw 0; note.textContent = 'Thank you. Your message was sent and we’ll get back to you shortly.'; form.reset(); })
+      .catch(mail);
+  });
+  var ef = document.getElementById('estForm'), en = document.getElementById('estNote'), fl = document.getElementById('e-files'), ll = document.getElementById('e-list');
+  ['e-files','e-files2','e-files3'].forEach(function (id) { document.getElementById(id).addEventListener('change', function () { ll.textContent = ['e-files','e-files2','e-files3'].map(function (x) { var f = document.getElementById(x).files[0]; return f ? f.name : ''; }).filter(Boolean).join(', '); }); });
+  ef.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var n = document.getElementById('e-name'), em = document.getElementById('e-email');
+    if (!n.value.trim() || !em.value.trim() || em.validity.typeMismatch) { en.textContent = 'Please add your name and a valid email.'; (n.value.trim() ? em : n).focus(); return; }
+    var g = function (id) { return document.getElementById(id).value; };
+    var fd = new FormData(ef), size = 0;
+    ['e-files', 'e-files2', 'e-files3'].forEach(function (id) { var f = document.getElementById(id).files[0]; if (f) size += f.size; });
+    var mail = function () {
+      var body = 'Name: ' + g('e-name') + '\nCompany: ' + g('e-company') + '\nEmail: ' + g('e-email') + '\nPhone: ' + g('e-phone') + '\nProject: ' + g('e-project') + '\nBuilding type: ' + g('e-type') + '\nBid due: ' + g('e-due') + '\n\n' + g('e-msg');
+      window.location.href = 'mailto:estimating@korhvac.com?subject=' + encodeURIComponent('Estimate request - ' + (g('e-project') || g('e-name'))) + '&body=' + encodeURIComponent(body);
+      en.textContent = 'Your email app should open addressed to estimating@korhvac.com. Attach your plans there before sending.';
+    };
+    if (size > 8 * 1024 * 1024) { en.textContent = 'These files are over 8 MB together. Please email them to estimating@korhvac.com instead.'; mail(); return; }
+    en.textContent = 'Uploading…';
+    fetch('/', { method: 'POST', body: fd })
+      .then(function (r) { if (!r.ok) throw 0; en.textContent = 'Thank you. Your project and plans were sent to our estimating team.'; ef.reset(); ll.textContent = ''; })
+      .catch(mail);
+  });
+
+  var P = [
+    ['26 Broadway, 26th Floor','New York, NY','NY','Office'],
+    ['The Lang School','26 Broadway, New York, NY','NY','School'],
+    ['Harry Winston','580 Fifth Ave, New York, NY','NY','Retail'],
+    ['444 Manhattan Ave','New York, NY','NY','Residential'],
+    ['6 W 48th St','New York, NY','NY','Commercial'],
+    ['The Altneu Synagogue','107 E 70th St, New York, NY','NY','House of worship'],
+    ['1027 Fulton St','Brooklyn, NY','NY','Residential'],
+    ['2701 Avenue N','Brooklyn, NY','NY','Residential'],
+    ['5701 Foster Ave','Brooklyn, NY','NY','Commercial'],
+    ['Bazalel Nursing Home','Far Rockaway, NY','NY','Nursing home'],
+    ['Suffolk Center for Rehab','Long Island, NY','NY','Nursing home'],
+    ['112 Wooleys Dr','The Hamptons, NY','NY','Residential'],
+    ['60 Middle Line Hwy','Southampton, NY','NY','—'],
+    ['3 West Ramapo Rd','New York','NY','—'],
+    ['Complete Care at Barn Hill','Newton, NJ','NJ','Nursing home'],
+    ['Morristown Post Acute','Morristown, NJ','NJ','Nursing home'],
+    ['Complete Care at Prospect Heights','Hackensack, NJ','NJ','Nursing home'],
+    ['Complete Care Edison','Edison, NJ','NJ','Nursing home'],
+    ['Alaris Health at Cedar Grove','Cedar Grove, NJ','NJ','Nursing home'],
+    ['Crest Haven','Cape May Court House, NJ','NJ','Nursing home'],
+    ['1 Lindberg Ave','Perth Amboy, NJ','NJ','Nursing home'],
+    ['5 & 6 Executive Campus','Cherry Hill, NJ','NJ','Office'],
+    ['Complete Care at Regent','Hackensack, NJ','NJ','Nursing home'],
+    ['ZY Lab','57 N Johnston Ave, NJ','NJ','Laboratory'],
+    ['300 Atrium Dr','Somerset, NJ','NJ','Office'],
+    ['505 County Ave','Secaucus, NJ','NJ','Commercial'],
+    ['Chabad of Somerset County','Basking Ridge, NJ','NJ','House of worship'],
+    ['130 Summit Ave','New Jersey','NJ','—'],
+    ['1515 Lamberts Mill Rd','New Jersey','NJ','—'],
+    ['277 Coit St','Irvington, NJ','NJ','Residential'],
+    ['15 Farm Springs Rd','Farmington, CT','CT','Residential'],
+    ['13 Hakim St','Danbury, CT','CT','—'],
+    ['160 Newington Rd','Connecticut','CT','—'],
+    ['18 High St','New Haven, CT','CT','Commercial'],
+    ['Colony St','Connecticut','CT','—'],
+    ['Madison Ave Self Storage','Connecticut','CT','Commercial'],
+    ['Claremont Nursing Home','Carlisle, PA','PA','Nursing home'],
+    ['4401 Haverford Ave','Philadelphia, PA','PA','Healthcare'],
+    ['1200 Washington Ave','Philadelphia, PA','PA','Residential'],
+    ['9501 State Rd','Philadelphia, PA','PA','—'],
+    ['1070 Stouffer Ave','Pennsylvania','PA','—'],
+    ['425 Buttonwood St','Pennsylvania','PA','—'],
+    ['Country club','Phoenix, MD','MDMA','Club'],
+    ['120 Fisher Ave','Boston, MA','MDMA','—'],
+    ['403 Whitin St','New Jersey','NJ','—']
+  ];
+  var GROUPS = [
+    ['Healthcare & Senior Living', ['Nursing home', 'Healthcare']],
+    ['Commercial & Office', ['Office', 'Commercial', 'Retail']],
+    ['Residential', ['Residential']],
+    ['Institutional & Specialty', ['School', 'House of worship', 'Laboratory', 'Club']],
+    ['More Projects', ['—']]
+  ];
+  var box = document.getElementById('pgroups');
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  function render(f) {
+    var list = P.filter(function (p) { return f === 'all' || p[2] === f; });
+    box.innerHTML = GROUPS.map(function (g) {
+      var items = list.filter(function (p) { return g[1].indexOf(p[3]) > -1; }).sort(function (a, b) { return a[0].localeCompare(b[0]); });
+      if (!items.length) return '';
+      return '<div class="pgroup"><div><h3>' + esc(g[0]) + '</h3><div class="n">' + items.length + (items.length === 1 ? ' project' : ' projects') + '</div></div><ul class="plist">' +
+        items.map(function (p) { return '<li><b>' + esc(p[0]) + '</b>' + (p[1] !== '—' ? '<small>' + esc(p[1]) + '</small>' : '') + '</li>'; }).join('') + '</ul></div>';
+    }).join('');
+  }
+  document.querySelectorAll('.filters button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.filters button').forEach(function (x) { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); });
+      b.classList.add('on'); b.setAttribute('aria-pressed', 'true'); render(b.dataset.f);
+    });
+  });
+  render('all');
+})();
+
+  /* ---------- Schedule service + dispatch backend ---------- */
+  (function () {
+    var sf = document.getElementById('schedForm'), sn = document.getElementById('schedNote');
+    var g = function (id) { return document.getElementById(id).value.trim(); };
+    var esc2 = function (t) { var d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; };
+    var db = null, user = null, uid = null, myItems = [], admin = false;
+    var STAT = ['New', 'Scheduled', 'In progress', 'Completed', 'Cancelled'];
+    function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso + (iso.length === 10 ? 'T12:00:00' : '')); return isNaN(d) ? iso : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+    function pill(st) { return '<span class="pill ' + st.replace(' ', '-') + '">' + esc2(st) + '</span>'; }
+    function mailFallback(rec) {
+      var body = Object.keys(rec).filter(function (k) { return k !== 'id' && k !== 'status' && k !== 'createdAt'; }).map(function (k) { return k + ': ' + rec[k]; }).join('\n');
+      window.location.href = 'mailto:service@korhvac.com?subject=' + encodeURIComponent('Service request - ' + (rec.company || rec.name)) + '&body=' + encodeURIComponent(body);
+      sn.textContent = 'Your email app should open with the request ready to send to service@korhvac.com.';
+    }
+    function renderMine() {
+      var box = document.getElementById('myReq'), list = document.getElementById('myList');
+      if (!myItems.length) { box.hidden = true; return; }
+      box.hidden = false;
+      list.innerHTML = myItems.slice().reverse().map(function (r) {
+        return '<div class="rq"><div><b>' + esc2(r.equipment) + ' · ' + esc2(r.visitType) + '</b><div class="meta">' + esc2(r.address) + '</div></div>' + pill(r.status) +
+          '<div class="desc">' + (r.status === 'Scheduled' || r.status === 'In progress' ? 'Appointment: <b>' + esc2(fmtDate(r.apptDate)) + ' ' + esc2(r.apptTime || '') + '</b>' + (r.tech ? ' · Technician: ' + esc2(r.tech) : '') : 'Requested for ' + esc2(fmtDate(r.prefDate) || 'first available') + ', ' + esc2(r.window)) + '</div></div>';
+      }).join('');
+    }
+    sf.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!g('s-name') || !g('s-phone') || !g('s-address')) { sn.textContent = 'Please add your name, phone and the service address.'; return; }
+      var rec = { id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: g('s-name'), company: g('s-company'), phone: g('s-phone'), email: g('s-email'), address: g('s-address'), buildingType: g('s-btype'), equipment: g('s-equip'), visitType: g('s-type'), urgency: g('s-urg'), prefDate: g('s-date'), window: g('s-win'), details: g('s-msg'), status: 'New', createdAt: new Date().toISOString() };
+      if (!db || !uid) {
+        sn.textContent = 'Sending…';
+        fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(new FormData(sf)).toString() })
+          .then(function (r) { if (!r.ok) throw 0; sn.textContent = 'Thank you. Your request was received and our service team will call to confirm the appointment.'; sf.reset(); })
+          .catch(function () { mailFallback(rec); });
+        return;
+      }
+      var btn = sf.querySelector('.send'); btn.disabled = true; sn.textContent = 'Sending…';
+      var next = myItems.concat([rec]).slice(-50);
+      db.doc('requests/' + uid).set({ items: next, updatedAt: rec.createdAt }).then(function () {
+        sn.textContent = 'Thank you. Your request was received and our service team will confirm the appointment shortly.';
+        sf.reset(); btn.disabled = false;
+      }, function (err) {
+        btn.disabled = false;
+        if (err && err.code === 'quota_exceeded') { sn.textContent = 'We couldn’t save this online. Please call (347) 744-6665.'; return; }
+        mailFallback(rec);
+      });
+    });
+    /* dispatch board */
+    var all = [], filt = 'Open';
+    function renderBoard() {
+      var fb = document.getElementById('bFilters');
+      var counts = { Open: 0 }; STAT.forEach(function (s) { counts[s] = 0; });
+      all.forEach(function (x) { counts[x.r.status] = (counts[x.r.status] || 0) + 1; if (x.r.status !== 'Completed' && x.r.status !== 'Cancelled') counts.Open++; });
+      fb.innerHTML = ['Open'].concat(STAT).concat(['All']).map(function (k) { return '<button type="button" data-f="' + k + '" class="' + (k === filt ? 'on' : '') + '">' + k + (k === 'All' ? ' (' + all.length + ')' : ' (' + (counts[k] || 0) + ')') + '</button>'; }).join('');
+      var rows = all.filter(function (x) { return filt === 'All' || (filt === 'Open' ? (x.r.status !== 'Completed' && x.r.status !== 'Cancelled') : x.r.status === filt); });
+      rows.sort(function (a, b) { var ea = a.r.urgency === 'Emergency' ? 0 : 1, eb = b.r.urgency === 'Emergency' ? 0 : 1; return ea - eb || (b.r.createdAt > a.r.createdAt ? 1 : -1); });
+      var bl = document.getElementById('boardList');
+      if (!rows.length) { bl.innerHTML = '<div class="empty">No requests here.</div>'; return; }
+      bl.innerHTML = rows.map(function (x) {
+        var r = x.r, key = x.doc + '|' + r.id;
+        return '<div class="rq" data-k="' + esc2(key) + '"><div><b>' + esc2(r.company || r.name) + '</b> · ' + esc2(r.equipment) + ' · ' + esc2(r.visitType) +
+          '<div class="meta">' + esc2(r.address) + ' · ' + esc2(r.name) + ' · <a href="tel:' + esc2(r.phone) + '">' + esc2(r.phone) + '</a>' + (r.email ? ' · ' + esc2(r.email) : '') + '</div>' +
+          '<div class="meta">' + esc2(r.buildingType) + ' · Requested ' + esc2(new Date(r.createdAt).toLocaleString()) + ' · Prefers ' + esc2(fmtDate(r.prefDate) || 'first available') + ', ' + esc2(r.window) + '</div></div>' +
+          '<div>' + (r.urgency === 'Emergency' ? pill('Emergency') + ' ' : '') + pill(r.status) + '</div>' +
+          (r.details ? '<div class="desc">' + esc2(r.details) + '</div>' : '') +
+          '<div class="ctrl"><select data-f="status">' + STAT.map(function (s) { return '<option' + (s === r.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
+          '<input type="date" data-f="apptDate" value="' + esc2(r.apptDate || '') + '"><input data-f="apptTime" placeholder="Time, e.g. 9:00 AM" value="' + esc2(r.apptTime || '') + '">' +
+          '<input data-f="tech" placeholder="Technician" value="' + esc2(r.tech || '') + '"><input data-f="note" placeholder="Internal note" value="' + esc2(r.note || '') + '" style="grid-column:1/-2"><button type="button" data-save>Save</button></div></div>';
+      }).join('');
+    }
+    document.getElementById('bFilters').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { filt = b.dataset.f; renderBoard(); } });
+    document.getElementById('boardList').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-save]'); if (!b || !db) return;
+      var row = b.closest('.rq'), k = row.dataset.k.split('|'), docId = k[0], rid = k[1];
+      var src = all.filter(function (x) { return x.doc === docId; })[0]; if (!src) return;
+      var items = src.items.map(function (it) {
+        if (it.id !== rid) return it;
+        var c = JSON.parse(JSON.stringify(it));
+        row.querySelectorAll('[data-f]').forEach(function (el) { c[el.dataset.f] = el.value; });
+        if (c.status === 'New' && c.apptDate) c.status = 'Scheduled';
+        return c;
+      });
+      b.textContent = 'Saving…'; b.disabled = true;
+      db.doc('requests/' + docId).update({ items: items, updatedAt: new Date().toISOString() }).then(function () { b.textContent = 'Saved'; setTimeout(function () { b.textContent = 'Save'; b.disabled = false; }, 1200); }, function () { b.textContent = 'Error'; b.disabled = false; });
+    });
+    if (!window.claude || !window.claude.use) return;
+    Promise.all([window.claude.use('db'), window.claude.use('user')]).then(function (res) {
+      db = res[0]; user = res[1];
+      if (!db || !user) return;
+      admin = !!(user.canEdit && user.canEdit());
+      return user.id().then(function (id) {
+        uid = id;
+        if (uid) db.doc('requests/' + uid).onSnapshot(function (snap) { var d = snap.exists ? snap.data() : null; myItems = d && Array.isArray(d.items) ? d.items : []; renderMine(); }, function () {});
+        if (admin) {
+          document.getElementById('dispatchLink').hidden = false;
+          var timer = setTimeout(function () { var bl = document.getElementById('boardList'); if (!all.length) bl.innerHTML = '<div class="empty">Requests can’t be reached right now.</div>'; }, 10000);
+          db.collection('requests').onSnapshot(function (qs) {
+            if (!qs.metadata.fromCache) clearTimeout(timer);
+            all = [];
+            qs.docs.forEach(function (d) { var data = d.data() || {}; var items = Array.isArray(data.items) ? data.items : []; items.forEach(function (r) { all.push({ doc: d.id, r: r, items: items }); }); });
+            renderBoard();
+          }, function () { clearTimeout(timer); document.getElementById('boardList').innerHTML = '<div class="empty">Requests can’t be loaded.</div>'; });
+        } else {
+          document.getElementById('boardList').innerHTML = '<div class="empty">This page is for the KOR HVAC team.</div>';
+        }
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
