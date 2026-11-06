@@ -235,6 +235,33 @@ footer .wrap { display: flex; justify-content: space-between; align-items: cente
 footer nav { display: flex; gap: 22px; flex-wrap: wrap; }
 footer a { text-decoration: none; }
 footer a:hover { color: var(--ink); }
+
+.legal h3 { font-size: 18px; margin-top: 30px; }
+.legal p { margin-top: 10px; }
+.legal a { color: var(--ink); }
+.fab { position: fixed; right: max(18px, env(safe-area-inset-right)); z-index: 80; width: 56px; height: 56px; border-radius: 50%; border: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.22); text-decoration: none; }
+.fab svg { width: 28px; height: 28px; }
+.fab-wa { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 70px); background: #25D366; color: #fff; }
+.fab-ai { bottom: max(18px, env(safe-area-inset-bottom)); background: var(--ink); color: #fff; }
+.fab-ai .dot { position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; border-radius: 50%; background: #2E7D32; border: 2px solid #fff; }
+.chat { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: calc(max(18px, env(safe-area-inset-bottom)) + 70px); z-index: 90; width: min(380px, calc(100vw - 36px)); height: min(560px, calc(100vh - 120px)); background: #fff; border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(0,0,0,.2); display: flex; flex-direction: column; }
+.chat[hidden] { display: none; }
+.chat-h { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.chat-h b { font-weight: 600; color: var(--ink); display: block; }
+.chat-h small { color: var(--mute); font-size: 12px; }
+.chat-h button { background: none; border: 0; font-size: 22px; line-height: 1; cursor: pointer; color: var(--ink); }
+.chat-b { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.msg { max-width: 85%; padding: 10px 12px; line-height: 1.5; white-space: pre-wrap; }
+.msg.bot { background: #F4F4F3; color: var(--text); align-self: flex-start; }
+.msg.me { background: var(--ink); color: #fff; align-self: flex-end; }
+.msg a { color: inherit; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { font: inherit; font-size: 13px; padding: 7px 11px; border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.chips button:hover { background: var(--ink); color: #fff; }
+.chat-f { border-top: 1px solid var(--line); display: flex; }
+.chat-f input { flex: 1; border: 0; padding: 14px; font-size: 15px; }
+.chat-f button { border: 0; background: var(--ink); color: #fff; padding: 0 16px; font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.chat-note { font-size: 11px; color: var(--mute); padding: 6px 14px; border-top: 1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -456,7 +483,7 @@ footer a:hover { color: var(--ink); }
           <a class="phone-big" style="margin-top:6px" href="mailto:estimating@korhvac.com?subject=Plans%20for%20estimate">estimating@korhvac.com</a>
           <p style="margin-top:10px;color:var(--mute);font-size:14px">or fill out the form below</p>
         </div>
-        <form id="estForm" name="project-request" method="POST" enctype="multipart/form-data" data-netlify="true" netlify-honeypot="bot-field" novalidate><input type="hidden" name="form-name" value="project-request"><input type="hidden" name="subject" value="New project for estimate – KOR HVAC"><p hidden><label>Leave empty <input name="bot-field"></label></p>
+        <form id="estForm" name="project-request" method="POST" action="https://formsubmit.co/estimating@korhvac.com" enctype="multipart/form-data" novalidate><input type="hidden" name="_subject" value="New project for estimate – KOR HVAC"><input type="hidden" name="_template" value="table"><input type="hidden" name="_captcha" value="false"><input type="hidden" name="_next" value="https://korhvac.com/#thanks"><p hidden><label>Leave empty <input name="_honey"></label></p>
           <div class="field"><label for="e-name">Name</label><input id="e-name" name="name" autocomplete="name" required></div>
           <div class="field"><label for="e-company">Company</label><input id="e-company" name="company" autocomplete="organization"></div>
           <div class="field"><label for="e-email">Email</label><input id="e-email" name="email" type="email" autocomplete="email" required></div>
@@ -464,7 +491,7 @@ footer a:hover { color: var(--ink); }
           <div class="field full"><label for="e-project">Project name &amp; address</label><input id="e-project" name="project"></div>
           <div class="field"><label for="e-type">Building type</label><select id="e-type" name="btype"><option>Nursing home / healthcare</option><option>Office / commercial</option><option>Multifamily / residential</option><option>School / institutional</option><option>Other</option></select></div>
           <div class="field"><label for="e-due">Bid due date</label><input id="e-due" name="due" type="date"></div>
-          <div class="field full"><label>Plans &amp; documents</label><label class="drop" for="e-files">Click to choose plan file 1 (PDF, DWG, ZIP or photo)<input id="e-files" name="plans_1" type="file" accept=".pdf,.dwg,.zip,image/*"></label><label class="drop" for="e-files2" style="margin-top:8px">Plan file 2 (optional)<input id="e-files2" name="plans_2" type="file" accept=".pdf,.dwg,.zip,image/*"></label><label class="drop" for="e-files3" style="margin-top:8px">Plan file 3 (optional)<input id="e-files3" name="plans_3" type="file" accept=".pdf,.dwg,.zip,image/*"></label><div class="files" id="e-list"></div><div class="files" style="color:var(--mute)">Up to 8 MB total. For larger plan sets, email them to <a href="mailto:estimating@korhvac.com">estimating@korhvac.com</a> or send a download link in the notes.</div></div>
+          <div class="field full"><label>Plans &amp; documents</label><label class="drop" for="e-files">Click to choose plan file 1 (PDF, DWG, ZIP or photo)<input id="e-files" name="plans_1" type="file" accept=".pdf,.dwg,.zip,image/*"></label><label class="drop" for="e-files2" style="margin-top:8px">Plan file 2 (optional)<input id="e-files2" name="plans_2" type="file" accept=".pdf,.dwg,.zip,image/*"></label><label class="drop" for="e-files3" style="margin-top:8px">Plan file 3 (optional)<input id="e-files3" name="plans_3" type="file" accept=".pdf,.dwg,.zip,image/*"></label><div class="files" id="e-list"></div><div class="files" style="color:var(--mute)">Up to 5 MB total. For larger plan sets, email them to <a href="mailto:estimating@korhvac.com">estimating@korhvac.com</a> or send a download link in the notes.</div></div>
           <div class="field full"><label for="e-msg">Scope / notes</label><textarea id="e-msg" name="message"></textarea></div>
           <div class="form-foot"><button class="send" type="submit">Send to Estimating</button><span class="note" id="estNote" aria-live="polite"></span></div>
         </form>
@@ -475,7 +502,7 @@ footer a:hover { color: var(--ink); }
       <div class="pagehead wrap"><h1>Schedule Service</h1><p>Tell us what’s going on and when works for you. Our service team will confirm the appointment by phone or email. For an emergency, call <a href="tel:+13477446665" style="color:var(--ink);white-space:nowrap">(347)&nbsp;744-6665</a>.</p></div>
     <section style="padding-top:20px">
       <div class="wrap">
-        <form id="schedForm" name="service-request" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate><input type="hidden" name="form-name" value="service-request"><input type="hidden" name="subject" value="New service request – KOR HVAC"><p hidden><label>Leave empty <input name="bot-field"></label></p>
+        <form id="schedForm" name="service-request" method="POST" novalidate><p hidden><label>Leave empty <input name="_honey"></label></p>
           <div class="field"><label for="s-name">Your name</label><input id="s-name" name="name" autocomplete="name" required></div>
           <div class="field"><label for="s-company">Facility or company</label><input id="s-company" name="company" autocomplete="organization"></div>
           <div class="field"><label for="s-phone">Phone</label><input id="s-phone" name="phone" type="tel" autocomplete="tel" required></div>
@@ -505,6 +532,42 @@ footer a:hover { color: var(--ink); }
       </div>
     </section>
   </div></div>
+  <div class="view" data-view="thanks" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Thank You</h1><p>Your project and plans were sent to our estimating team. We’ll review the documents and get back to you.</p></div>
+      <section style="padding-top:20px"><div class="wrap"><div class="more-link"><a href="#home">Back to Home</a></div></div></section>
+  </div></div>
+  <div class="view" data-view="terms" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Terms &amp; Conditions</h1><p>Last updated November 2026</p></div>
+      <section style="padding-top:40px"><div class="wrap"><div class="legal narrow">
+        <p>These terms apply to your use of korhvac.com (the “Site”), operated by KOR HVAC (“KOR HVAC”, “we”, “us”). By using the Site you agree to these terms.</p>
+        <h3>1. Information on this Site</h3><p>Content on the Site, including service descriptions, project lists and photos, is for general information. Some photos are representative stock images. Nothing on the Site is an offer, quote or guarantee of price, availability or results.</p>
+        <h3>2. Requests, Quotes and Proposals</h3><p>Submitting a service request, project, chat message or form does not create a contract. Appointments are confirmed only when our team contacts you. All work is governed by a separate written proposal or service agreement, which sets out the scope, price, schedule, exclusions and warranty for that job. If anything on the Site conflicts with a signed proposal or agreement, the proposal or agreement controls.</p>
+        <h3>3. Emergencies</h3><p>For an emergency, call us at (347) 744-6665. Do not rely on website forms, chat or email for urgent safety issues. If there is a gas smell, fire, carbon monoxide alarm or other immediate danger, leave the area and call 911 and your utility first.</p>
+        <h3>4. AI Assistant</h3><p>The Site includes an automated assistant to answer common questions and collect service and project details. Its answers are general information and may be incomplete or inaccurate. It cannot diagnose equipment, confirm appointments, give prices or make commitments on behalf of KOR HVAC. A member of our team reviews every request.</p>
+        <h3>5. WhatsApp, Phone, Email and Text</h3><p>If you contact us by WhatsApp, phone, email or text, you agree that we may reply using the same channel about your request. Message and data rates may apply. You can ask us to stop contacting you at any time.</p>
+        <h3>6. Uploaded Files</h3><p>If you upload plans, drawings or photos, you confirm you have the right to share them. We use them only to review and price your project.</p>
+        <h3>7. Use of the Site</h3><p>You agree not to misuse the Site, submit false information, interfere with its operation or attempt to access it without authorization.</p>
+        <h3>8. Intellectual Property</h3><p>The KOR HVAC name, logo and Site content belong to KOR HVAC or its licensors and may not be copied without permission.</p>
+        <h3>9. Limitation of Liability</h3><p>The Site is provided “as is”. To the extent permitted by law, KOR HVAC is not liable for any indirect or consequential damages arising from use of the Site or reliance on its content.</p>
+        <h3>10. Changes</h3><p>We may update these terms at any time. The updated version applies once posted on this page.</p>
+        <h3>11. Contact</h3><p>Questions about these terms: <a href="mailto:info@korhvac.com">info@korhvac.com</a> · (347) 744-6665.</p>
+      </div></div></section>
+  </div></div>
+  <div class="view" data-view="privacy" hidden><div class="page">
+      <div class="pagehead wrap"><h1>Privacy Policy</h1><p>Last updated November 2026</p></div>
+      <section style="padding-top:40px"><div class="wrap"><div class="legal narrow">
+        <p>KOR HVAC respects your privacy. This policy explains what we collect through korhvac.com and how we use it.</p>
+        <h3>What we collect</h3><p>Information you give us: your name, company or facility, phone, email, service address, equipment details, project information, uploaded files and messages you send through forms, the website assistant, WhatsApp or email. We do not ask for payment information on this Site.</p>
+        <h3>How we use it</h3><p>To respond to you, schedule and perform service, prepare proposals, follow up on your request and keep records of our work. We do not sell your personal information.</p>
+        <h3>Service providers</h3><p>We use trusted providers to run the Site and deliver messages, such as website hosting, form-to-email delivery, WhatsApp and our email provider. When the website assistant uses artificial intelligence, the text of your chat is processed by an AI provider to generate replies. These providers handle information only to provide their services to us.</p>
+        <h3>How long we keep it</h3><p>We keep request and project information as long as needed to serve you and for our business records, then delete or archive it.</p>
+        <h3>Your choices</h3><p>You can ask us to access, correct or delete your information, or to stop contacting you, by emailing <a href="mailto:info@korhvac.com">info@korhvac.com</a>.</p>
+        <h3>Cookies</h3><p>The Site does not use advertising cookies. Your browser may store small settings, such as whether you closed the assistant.</p>
+        <h3>Children</h3><p>The Site is intended for businesses and adults and is not directed to children under 13.</p>
+        <h3>Changes</h3><p>We may update this policy. The updated version applies once posted on this page.</p>
+        <h3>Contact</h3><p><a href="mailto:info@korhvac.com">info@korhvac.com</a> · (347) 744-6665</p>
+      </div></div></section>
+  </div></div>
   <div class="view" data-view="contact" hidden><div class="page">
       <div class="pagehead wrap"><h1>Contact</h1><p>Tell us about your building and what you need, and we’ll get back to you to schedule a call or a site visit.</p></div>
     <section class="contact" style="padding-top:40px">
@@ -516,7 +579,7 @@ footer a:hover { color: var(--ink); }
           <div><h3>Estimating</h3><p>New projects, bids and plans for review.</p><a href="mailto:estimating@korhvac.com">estimating@korhvac.com</a><br><a href="#estimating" style="font-size:14px;margin-top:6px">Upload plans →</a></div>
           <div><h3>Information</h3><p>General questions and everything else.</p><a href="mailto:info@korhvac.com">info@korhvac.com</a></div>
         </div>
-        <form id="contactForm" name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate><input type="hidden" name="form-name" value="contact"><input type="hidden" name="subject" value="New message from korhvac.com"><p hidden><label>Leave empty <input name="bot-field"></label></p>
+        <form id="contactForm" name="contact" method="POST" novalidate><p hidden><label>Leave empty <input name="_honey"></label></p>
           <div class="field"><label for="f-name">Name</label><input id="f-name" name="name" autocomplete="name" required></div>
           <div class="field"><label for="f-company">Company or Building</label><input id="f-company" name="company" autocomplete="organization"></div>
           <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email" autocomplete="email" required></div>
@@ -532,9 +595,17 @@ footer a:hover { color: var(--ink); }
   </div></div>
 </main>
 
+<a class="fab fab-wa" href="https://wa.me/13477446665?text=Hi%20KOR%20HVAC%2C%20I%20have%20a%20question" target="_blank" rel="noopener" aria-label="Message us on WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg></a>
+<button class="fab fab-ai" id="aiOpen" type="button" aria-label="Chat with the KOR HVAC assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg><span class="dot"></span></button>
+<div class="chat" id="aiChat" hidden role="dialog" aria-label="KOR HVAC assistant">
+  <div class="chat-h"><div><b>KOR HVAC Assistant</b><small>Automated · a real person reviews every request</small></div><button type="button" id="aiClose" aria-label="Close">×</button></div>
+  <div class="chat-b" id="aiBody" aria-live="polite"></div>
+  <form class="chat-f" id="aiForm"><input id="aiInput" autocomplete="off" placeholder="Type a message…" aria-label="Message"><button type="submit">Send</button></form>
+  <div class="chat-note">Emergency? Call <a href="tel:+13477446665">(347) 744-6665</a>. By chatting you agree to our <a href="#terms">Terms</a>.</div>
+</div>
 <footer>
   <div class="wrap">
-    <span>© 2026 KOR HVAC</span>
+    <span>© 2026 KOR HVAC · <a href="#terms">Terms</a> · <a href="#privacy">Privacy</a></span>
     <nav aria-label="Footer"><a href="#services">Services</a><a href="#projects">Projects</a><a href="#about">About</a><a href="#contact">Contact</a><a href="#schedule">Schedule Service</a><a href="#dispatch" id="dispatchLink" hidden>Dispatch</a></nav>
   </div>
 </footer>
@@ -576,8 +647,8 @@ footer a:hover { color: var(--ink); }
     var body = 'Name: ' + n.value + '\nCompany/Building: ' + document.getElementById('f-company').value + '\nEmail: ' + em.value + '\nPhone: ' + document.getElementById('f-phone').value + '\nRequest: ' + t + '\n\n' + document.getElementById('f-msg').value;
     var mail = function () { window.location.href = 'mailto:' + to + '?subject=' + encodeURIComponent(t + ' - ' + n.value) + '&body=' + encodeURIComponent(body); note.textContent = 'Your email app should open with the message ready to send to ' + to + '.'; };
     note.textContent = 'Sending…';
-    fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(new FormData(form)).toString() })
-      .then(function (r) { if (!r.ok) throw 0; note.textContent = 'Thank you. Your message was sent and we’ll get back to you shortly.'; form.reset(); })
+    KOR.send(to, 'New message from korhvac.com – ' + t, KOR.formObj(form))
+      .then(function () { note.textContent = 'Thank you. Your message was sent and we’ll get back to you shortly.'; form.reset(); })
       .catch(mail);
   });
   var ef = document.getElementById('estForm'), en = document.getElementById('estNote'), fl = document.getElementById('e-files'), ll = document.getElementById('e-list');
@@ -594,11 +665,9 @@ footer a:hover { color: var(--ink); }
       window.location.href = 'mailto:estimating@korhvac.com?subject=' + encodeURIComponent('Estimate request - ' + (g('e-project') || g('e-name'))) + '&body=' + encodeURIComponent(body);
       en.textContent = 'Your email app should open addressed to estimating@korhvac.com. Attach your plans there before sending.';
     };
-    if (size > 8 * 1024 * 1024) { en.textContent = 'These files are over 8 MB together. Please email them to estimating@korhvac.com instead.'; mail(); return; }
+    if (size > 5 * 1024 * 1024) { en.textContent = 'These files are over 5 MB together. Please email them to estimating@korhvac.com instead.'; mail(); return; }
     en.textContent = 'Uploading…';
-    fetch('/', { method: 'POST', body: fd })
-      .then(function (r) { if (!r.ok) throw 0; en.textContent = 'Thank you. Your project and plans were sent to our estimating team.'; ef.reset(); ll.textContent = ''; })
-      .catch(mail);
+    ef.submit();
   });
 
   var P = [
@@ -704,8 +773,8 @@ footer a:hover { color: var(--ink); }
       var rec = { id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: g('s-name'), company: g('s-company'), phone: g('s-phone'), email: g('s-email'), address: g('s-address'), buildingType: g('s-btype'), equipment: g('s-equip'), visitType: g('s-type'), urgency: g('s-urg'), prefDate: g('s-date'), window: g('s-win'), details: g('s-msg'), status: 'New', createdAt: new Date().toISOString() };
       if (!db || !uid) {
         sn.textContent = 'Sending…';
-        fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(new FormData(sf)).toString() })
-          .then(function (r) { if (!r.ok) throw 0; sn.textContent = 'Thank you. Your request was received and our service team will call to confirm the appointment.'; sf.reset(); })
+        KOR.send('service@korhvac.com', (rec.urgency === 'Emergency' ? 'EMERGENCY ' : '') + 'Service request – ' + (rec.company || rec.name), KOR.formObj(sf))
+          .then(function () { sn.textContent = 'Thank you. Your request was received and our service team will call to confirm the appointment.'; sf.reset(); })
           .catch(function () { mailFallback(rec); });
         return;
       }
@@ -781,6 +850,123 @@ footer a:hover { color: var(--ink); }
       });
     });
   })();
+
+/* ---------- KOR helpers: email delivery via FormSubmit ---------- */
+window.KOR = {
+  AI_URL: '',  /* set to the AI backend URL to switch the assistant to full AI answers */
+  formObj: function (f) { var o = {}; new FormData(f).forEach(function (v, k) { if (typeof v === 'string' && k !== '_honey') o[k] = v; }); return o; },
+  send: function (to, subject, data) {
+    var body = Object.assign({ _subject: subject, _template: 'table', _captcha: 'false' }, data);
+    return fetch('https://formsubmit.co/ajax/' + to, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (j) { if (j && (j.success === false || j.success === 'false')) throw 0; return j; });
+  }
+};
+(function () {
+  var open = document.getElementById('aiOpen'), chat = document.getElementById('aiChat'), body = document.getElementById('aiBody'), form = document.getElementById('aiForm'), input = document.getElementById('aiInput');
+  var flow = null, step = 0, data = {}, history = [], started = false;
+  function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+  function linkify(t) { return esc(t).replace(/\(347\) 744-6665/g, '<a href="tel:+13477446665">(347) 744-6665</a>').replace(/([a-z]+@korhvac\.com)/g, '<a href="mailto:$1">$1</a>'); }
+  function say(t, chips) {
+    var m = document.createElement('div'); m.className = 'msg bot'; m.innerHTML = linkify(t); body.appendChild(m);
+    if (chips && chips.length) { var c = document.createElement('div'); c.className = 'chips'; chips.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.onclick = function () { c.remove(); handle(x); }; c.appendChild(b); }); body.appendChild(c); }
+    body.scrollTop = body.scrollHeight;
+  }
+  function me(t) { var m = document.createElement('div'); m.className = 'msg me'; m.textContent = t; body.appendChild(m); body.scrollTop = body.scrollHeight; }
+  var MENU = ['Schedule service', 'Send a project', 'Ask a question', 'Talk to a person'];
+  function menu(t) { flow = null; step = 0; data = {}; say(t || 'How can I help?', MENU); }
+  var FLOWS = {
+    service: { to: 'service@korhvac.com', title: 'Service request', steps: [
+      ['name', 'Sure, let’s get a technician scheduled. What’s your name?'],
+      ['phone', 'What’s the best phone number to reach you?'],
+      ['company', 'What’s the facility or company name? (Type “none” for a residence.)'],
+      ['address', 'What’s the service address?'],
+      ['equipment', 'What equipment needs attention?', ['Rooftop unit', 'Chiller', 'Cooling tower', 'Boiler', 'Split / VRF', 'Heat pump', 'Ventilation', 'Not sure']],
+      ['issue', 'Briefly, what’s happening?'],
+      ['urgency', 'How urgent is it?', ['Emergency', 'Within 24 hours', 'This week', 'Flexible']],
+      ['when', 'What day and time window works best for a visit?', ['First available', 'Morning (7–11)', 'Midday (11–3)', 'Afternoon (3–7)']],
+      ['email', 'Last one: your email for the confirmation? (Type “skip” if you prefer phone only.)']
+    ]},
+    project: { to: 'estimating@korhvac.com', title: 'Project for estimate', steps: [
+      ['name', 'Great, I’ll pass this to our estimating team. What’s your name?'],
+      ['company', 'What company are you with?'],
+      ['email', 'Your email?'],
+      ['phone', 'And your phone number?'],
+      ['project', 'What’s the project name and address?'],
+      ['building', 'What type of building is it?', ['Nursing home / healthcare', 'Office / commercial', 'Multifamily / residential', 'School / institutional', 'Other']],
+      ['scope', 'What’s the scope? For example: replace 3 rooftop units, new boiler plant, ductwork for a fit-out.'],
+      ['plans', 'Do you have plans or drawings?', ['Yes, I’ll upload them', 'Yes, I’ll email them', 'No plans yet, need a site visit']],
+      ['due', 'Is there a bid due date or target start? (Type “none” if not.)']
+    ]}
+  };
+  function startFlow(k) { flow = k; step = 0; data = {}; ask(); }
+  function ask() { var s = FLOWS[flow].steps[step]; say(s[1], s[2]); if (flow === 'service' && s[0] === 'urgency') {} }
+  function finish() {
+    var F = FLOWS[flow], lines = F.steps.map(function (s) { return s[0].charAt(0).toUpperCase() + s[0].slice(1) + ': ' + data[s[0]]; });
+    say('Here’s what I have:\n\n' + lines.join('\n') + '\n\nShall I send this to our team?', ['Send it', 'Start over']);
+    step = -1;
+  }
+  function submit() {
+    var F = FLOWS[flow], k = flow;
+    say('Sending…');
+    var payload = Object.assign({ source: 'Website assistant' }, data);
+    if (payload.email && /skip|none/i.test(payload.email)) delete payload.email;
+    KOR.send(F.to, (data.urgency === 'Emergency' ? 'EMERGENCY ' : '') + F.title + ' – ' + (data.company && !/none/i.test(data.company) ? data.company : data.name), payload).then(function () {
+      if (k === 'service') say(data.urgency === 'Emergency' ? 'Sent. Because this is an emergency, please also call us now at (347) 744-6665 so we can dispatch right away.' : 'Sent! Our service team will call you to confirm the appointment. Anything else?', ['Ask a question', 'Main menu']);
+      else say(/upload/i.test(data.plans) ? 'Sent! Now upload your plans on the project page: korhvac.com/#estimating. Anything else?' : /email/i.test(data.plans) ? 'Sent! Please email the plans to estimating@korhvac.com with the project name in the subject. Anything else?' : 'Sent! Our estimating team will reach out to set up a site visit. Anything else?', /upload/i.test(data.plans) ? ['Open upload page', 'Main menu'] : ['Main menu']);
+      flow = null;
+    }, function () {
+      say('I couldn’t send that just now. Please call (347) 744-6665 or email ' + F.to + ' and we’ll take care of it.', ['Main menu']); flow = null;
+    });
+  }
+  var FAQ = [
+    [/emergenc|24\/?7|after hours|weekend|night|no heat|no cool|not (cool|heat)|down|broke/i, 'We provide 24/7 emergency service. For an emergency call (347) 744-6665 right away. If you smell gas or a CO alarm is going off, leave the building and call 911 and your gas utility first.', ['Schedule service', 'Main menu']],
+    [/area|where|state|location|serve|new york|nyc|jersey|nj|connecticut|ct|pennsylvania|pa|maryland|massachusetts|delaware/i, 'We work across New York (Manhattan, Brooklyn, Bronx, Queens, Long Island), New Jersey, Connecticut, Pennsylvania and Maryland, and take projects in Massachusetts and Delaware. Not sure if we cover your building? Just ask.', ['Schedule service', 'Main menu']],
+    [/nursing|health|hospital|rehab|senior|assisted|medical/i, 'Healthcare is a big part of our work: nursing homes, rehab centers and medical offices. We plan shutdowns around residents, provide temporary heating or cooling when needed, keep maintenance records ready for inspections, and give priority emergency response.', ['Schedule service', 'Send a project']],
+    [/rebate|incentive|efficien|save|energy|utility/i, 'We help owners upgrade to high-efficiency equipment through utility rebate and incentive programs, which can offset a significant part of the cost. Tell us about your building and we’ll look at what may qualify.', ['Send a project', 'Main menu']],
+    [/price|cost|quote|how much|estimate|free/i, 'Every building is different, so we price after reviewing the equipment or plans. You’ll get a written proposal with scope, equipment, exclusions and price before any work starts.', ['Send a project', 'Schedule service']],
+    [/maint|contract|pm\b|preventive|filter|tune/i, 'We offer preventive maintenance plans built around your equipment: filter and belt changes, coil cleaning, refrigerant and combustion checks, seasonal startups, and records ready for inspections.', ['Schedule service', 'Main menu']],
+    [/chiller|cooling tower|boiler|rooftop|rtu|vrf|split|heat pump|duct|ventilat|make.?up|exhaust|furnace/i, 'Yes, we install, service and maintain that: rooftop units, chillers, cooling towers, boilers, VRF and split systems, heat pumps, make-up air units, ventilation and ductwork.', ['Schedule service', 'Send a project']],
+    [/phone|call|number|email|contact|reach|whatsapp|text/i, 'You can call (347) 744-6665, message us on WhatsApp with the green button, or email service@korhvac.com for service, estimating@korhvac.com for projects and info@korhvac.com for everything else.', ['Main menu']],
+    [/project|bid|plan|drawing|gc|general contractor|install|replace/i, 'We’d be glad to look at it. I can collect the project details here, and you can upload plans on the project page.', ['Send a project', 'Main menu']],
+    [/hello|hi\b|hey|good (morning|afternoon|evening)/i, 'Hi! I’m the KOR HVAC assistant.', MENU]
+  ];
+  function ai(text) {
+    history.push({ role: 'user', content: text });
+    var t = document.createElement('div'); t.className = 'msg bot'; t.textContent = '…'; body.appendChild(t);
+    fetch(KOR.AI_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: history.slice(-12) }) })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        t.remove(); var reply = (j && j.reply) || 'Sorry, I didn’t catch that.'; history.push({ role: 'assistant', content: reply });
+        var act = (j && j.action) || '';
+        say(reply, act === 'service' ? ['Schedule service'] : act === 'project' ? ['Send a project'] : ['Main menu']);
+      }, function () { t.remove(); faq(text, true); });
+  }
+  function faq(text, noAi) {
+    for (var i = 0; i < FAQ.length; i++) if (FAQ[i][0].test(text)) { say(FAQ[i][1], FAQ[i][2]); return; }
+    if (KOR.AI_URL && !noAi) { ai(text); return; }
+    say('I’m not sure about that one, but our team can help. Call (347) 744-6665, message us on WhatsApp, or email info@korhvac.com.', MENU);
+  }
+  function handle(text) {
+    text = String(text).trim(); if (!text) return; me(text);
+    if (/^main menu$|^start over$/i.test(text)) { menu(); return; }
+    if (/^open upload page$/i.test(text)) { location.hash = 'estimating'; return; }
+    if (flow && step === -1) { if (/send/i.test(text)) submit(); else menu(); return; }
+    if (flow) {
+      var s = FLOWS[flow].steps[step]; data[s[0]] = text;
+      if (flow === 'service' && s[0] === 'urgency' && text === 'Emergency') say('For an emergency, please call (347) 744-6665 now. I’ll still send your details so the team has them.');
+      step++; if (step < FLOWS[flow].steps.length) ask(); else finish(); return;
+    }
+    if (/schedule|book|service|repair|appointment|technician/i.test(text) && !/question/i.test(text)) { startFlow('service'); return; }
+    if (/^send a project$/i.test(text)) { startFlow('project'); return; }
+    if (/^ask a question$/i.test(text)) { say('Sure, ask me anything about our services, areas, healthcare work, rebates or how to reach us.'); return; }
+    if (/^talk to a person$/i.test(text)) { say('Our team is happy to help. Call (347) 744-6665, tap the green WhatsApp button, or email info@korhvac.com.', ['Main menu']); return; }
+    faq(text);
+  }
+  function show(v) { chat.hidden = !v; if (v && !started) { started = true; say('Hi! I’m the KOR HVAC assistant. I can schedule service, take project details for a proposal, or answer questions.', MENU); } if (v) setTimeout(function () { input.focus(); }, 50); }
+  open.addEventListener('click', function () { show(chat.hidden); });
+  document.getElementById('aiClose').addEventListener('click', function () { show(false); });
+  form.addEventListener('submit', function (e) { e.preventDefault(); var v = input.value; input.value = ''; handle(v); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !chat.hidden) show(false); });
+})();
 </script>
 
 </body>
