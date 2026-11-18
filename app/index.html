@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><meta name="robots" content="noindex">
 <meta charset="UTF-8">
-<meta name="robots" content="noindex, nofollow">
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KOR HVAC Service</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIuMCA1MTIuMCIgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMTExMTExIi8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIxMzIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSI2NiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMzkiIGZpbGw9IiNGRkZGRkYiLz48L3N2Zz4=">
@@ -769,6 +767,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 .leaflet-tooltip.techlbl{font:600 12px Inter,sans-serif;padding:2px 6px}
 @media(max-width:900px){.mapgrid{grid-template-columns:1fr}#map{height:420px}}
 #auth{position:fixed;inset:0;background:#111;z-index:80;place-items:center;padding:20px;overflow:auto}.authbox{background:#fff;border-radius:16px;padding:28px;max-width:400px;width:100%}.authbox h2{margin:0 0 12px;font-size:20px}body.authing .app{visibility:hidden}
+.pbin{width:84px;text-align:right;padding:4px 6px;font-size:13px}
 </style>
 <script>/* @preserve
  * Leaflet 1.9.4, a JS library for interactive maps. https://leafletjs.com
@@ -819,7 +818,7 @@ let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null
 const isAdmin=()=>!sb||(me&&me.role==='Admin');
 const ADMIN_VIEWS=['reports','payroll','settings','users'];
 const crew=()=>S.techs.filter(t=>!t.access||t.access==='Technician');
-const UI={jobQ:'',jobSt:'Open',custQ:'',invSt:'All',estSt:'All',date:today(),pbQ:'',pbNeeds:false,sampleMap:false,routeTech:'',mapCenter:null,mapZoom:null,eqQ:'',rbSt:'All',from:today().slice(0,8)+'01',to:today(),tech:lsGet('tech')||'',tdate:today(),callQ:''};
+const UI={jobQ:'',jobSt:'Open',custQ:'',invSt:'All',estSt:'All',date:today(),pbQ:'',pbCat:'',pbNeeds:false,sampleMap:false,routeTech:'',mapCenter:null,mapZoom:null,eqQ:'',rbSt:'All',from:today().slice(0,8)+'01',to:today(),tech:lsGet('tech')||'',tdate:today(),callQ:''};
 let edit=null;
 
 /* ================= UTILS ================= */
@@ -1711,14 +1710,62 @@ function openTech(id){const t=id?{...byId('techs',id)}:{id:uid(),color:['#2f6fde
 async function saveTech(){const t=grab({...edit.obj},['name','title','color','phone','email','skills','payRate','costRate','commission']);delete t.role;t.active=v('f_active')==='Active';if(!t.name){toast('Enter a name');return}try{await save('techs',t);closeM();toast('Technician saved')}catch(e){}}
 
 /* ================= PRICEBOOK ================= */
-function vPB(){const q=UI.pbQ.toLowerCase();const np=S.pricebook.filter(p=>p.needsPrice&&!(+p.price));const list=S.pricebook.filter(p=>!UI.pbNeeds||(p.needsPrice&&!(+p.price))).filter(p=>!q||[p.name,p.category,p.sku].join(' ').toLowerCase().includes(q)).sort((a,b)=>(a.category||'').localeCompare(b.category||'')||(a.name||'').localeCompare(b.name||''));
-  return `<div class="top"><h1>Pricebook</h1>${isAdmin()?`<button class="pri" onclick="openPB()">+ Add Item</button>`:'<span class="mut small">View only — prices are set by an Admin</span>'}</div>
+const PB_CATS=['Labor','Parts','Refrigerant','Flat Rate Repair','Maintenance','Equipment','Fees'];
+function pbList(){const q=UI.pbQ.toLowerCase();return S.pricebook.filter(p=>!UI.pbNeeds||(p.needsPrice&&!(+p.price))).filter(p=>!UI.pbCat||p.category===UI.pbCat).filter(p=>!q||[p.name,p.category,p.sku].join(' ').toLowerCase().includes(q)).sort((a,b)=>(a.category||'').localeCompare(b.category||'')||(a.name||'').localeCompare(b.name||''))}
+function vPB(){const np=S.pricebook.filter(p=>p.needsPrice&&!(+p.price));const list=pbList();const ad=isAdmin();const cats=[...new Set([...PB_CATS,...S.pricebook.map(p=>p.category).filter(Boolean)])];
+  return `<div class="top"><h1>Pricebook <span class="mut small">${S.pricebook.length} items</span></h1>${ad?`<span><button onclick="pbExport()">Export</button> <button onclick="pbImportOpen()">Import</button> <button onclick="pbAdjustOpen()">Adjust prices</button> <button class="pri" onclick="openPB()">+ Add Item</button></span>`:'<span class="mut small">View only — prices are set by an Admin</span>'}</div>
   ${np.length?`<div class="hint">🔩 <b>${np.length} part(s) added by techs need a price.</b> Set the price and it fills in automatically on open jobs. <button class="sm" onclick="UI.pbNeeds=!UI.pbNeeds;render()">${UI.pbNeeds?'Show all':'Show only these'}</button></div>`:''}
-  <div class="filters"><input id="pq" placeholder="Search items…" value="${esc(UI.pbQ)}" oninput="UI.pbQ=this.value;render()"></div>
-  <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Item</th><th>Category</th><th>SKU</th><th class="r">Cost</th><th class="r">Price</th><th class="r">Margin</th></tr>${list.map(p=>`<tr class="click" onclick="openPB('${p.id}')"><td><b>${esc(p.name)}</b>${p.addedBy?`<div class="mut small">added by ${esc(p.addedBy)}${p.addedAt?' · '+fdate(p.addedAt):''}</div>`:''}</td><td>${esc(p.category)}</td><td>${esc(p.sku)}</td><td class="r">${p.cost?money(p.cost):'—'}</td><td class="r">${p.needsPrice&&!(+p.price)?'<span class="badge b-Overdue">Needs price</span>':money(p.price)}</td><td class="r">${+p.cost&&+p.price?pct(1-p.cost/p.price):'—'}</td></tr>`).join('')}</table>`:'<div class="empty">Add standard labor rates, parts and flat-rate repairs here so they drop onto jobs and estimates in one click.</div>'}</div>`}
+  ${ad?'<div class="mut small" style="margin:-4px 0 8px">Tip: type a new cost or price right in the table — it saves when you press Enter or click away.</div>':''}
+  <div class="filters"><input id="pq" placeholder="Search items…" value="${esc(UI.pbQ)}" oninput="UI.pbQ=this.value;render()"><select onchange="UI.pbCat=this.value;render()"><option value="">All categories</option>${cats.map(c=>`<option ${c===UI.pbCat?'selected':''}>${esc(c)}</option>`).join('')}</select><span class="mut small">${list.length} shown</span></div>
+  <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Item</th><th>Category</th><th>SKU</th><th class="r">Cost</th><th class="r">Price</th><th class="r">Margin</th></tr>${list.map(p=>`<tr class="click" onclick="openPB('${p.id}')"><td><b>${esc(p.name)}</b>${p.addedBy?`<div class="mut small">added by ${esc(p.addedBy)}${p.addedAt?' · '+fdate(p.addedAt):''}</div>`:''}</td><td>${esc(p.category)}</td><td>${esc(p.sku)}</td>${ad?`<td class="r" onclick="event.stopPropagation()"><input class="pbin" value="${+p.cost||''}" placeholder="—" onkeydown="if(event.key==='Enter')this.blur()" onchange="pbInline('${p.id}','cost',this)"></td><td class="r" onclick="event.stopPropagation()"><input class="pbin" value="${+p.price||''}" placeholder="${p.needsPrice?'Needs price':'—'}" style="${p.needsPrice&&!(+p.price)?'border-color:#c0392b':''}" onkeydown="if(event.key==='Enter')this.blur()" onchange="pbInline('${p.id}','price',this)"></td>`:`<td class="r">${p.cost?money(p.cost):'—'}</td><td class="r">${p.needsPrice&&!(+p.price)?'<span class="badge b-Overdue">Needs price</span>':money(p.price)}</td>`}<td class="r">${+p.cost&&+p.price?pct(1-p.cost/p.price):'—'}</td></tr>`).join('')}</table>`:'<div class="empty">No items match.</div>'}</div>`}
+async function pbInline(id,f,inp){const p=byId('pricebook',id);if(!p)return;const n=inp.value.replace(/[$,\s]/g,'');if(n!==''&&!isFinite(+n)){toast('Enter a number');inp.value=+p[f]||'';return}
+  const o={...p,[f]:n===''?'':Math.round(+n*100)/100};if(f==='price'&&+o.price)o.needsPrice=false;
+  try{await save('pricebook',o);toast((f==='price'?'Price':'Cost')+' saved — '+p.name)}catch(e){inp.value=+p[f]||''}}
+async function pbBulk(objs){if(!objs.length)return 0;
+  if(sb){let n=0;for(let i=0;i<objs.length;i+=200){const rows=objs.slice(i,i+200).map(o=>({id:o.id,...toRow('pricebook',o,new Set(['name','category','sku','cost','price','needsPrice']))}));const{data,error}=await sb.from('pricebook').upsert(rows,{onConflict:'id'}).select();if(error){toast(sbErr(error));break}(data||[]).forEach(r=>{const o=fromRow('pricebook',r);const a=S.pricebook,k=a.findIndex(x=>x.id===o.id);if(k>=0)a[k]=o;else a.push(o)});n+=(data||[]).length}render();return n}
+  let n=0;for(const o of objs){try{await save('pricebook',o);n++}catch(e){break}}return n}
+const pbRound=(x,how)=>how==='none'?Math.round(x*100)/100:how==='1'?Math.round(x):how==='5'?Math.max(5,Math.round(x/5)*5):(x<100?Math.round(x):Math.round(x/5)*5);
+function pbAdjustOpen(){const cats=[...new Set([...PB_CATS,...S.pricebook.map(p=>p.category).filter(Boolean)])];
+  modal(`<h2>Adjust prices<button class="sm" onclick="closeM()">✕</button></h2>
+  <div class="fg"><div><label>Which items</label><select id="aj_scope"><option value="shown">Items shown now (${pbList().length})</option><option value="all">All items (${S.pricebook.length})</option>${cats.map(c=>`<option value="cat:${esc(c)}">${esc(c)} (${S.pricebook.filter(p=>p.category===c).length})</option>`).join('')}</select></div>
+  <div><label>How</label><select id="aj_how" onchange="el('aj_lbl').textContent=this.value==='markup'?'Multiplier (e.g. 2 = double the cost)':this.value==='margin'?'Target margin %':this.value==='cost'?'Change cost by %':'Change price by %'"><option value="pct">Raise / lower price by %</option><option value="markup">Price = cost × markup</option><option value="margin">Price for a target margin %</option><option value="cost">Raise / lower cost by % (supplier increase)</option></select></div>
+  <div><label id="aj_lbl">Change price by %</label><input id="aj_val" placeholder="e.g. 5 or -10"></div>
+  <div><label>Round to</label><select id="aj_round"><option value="smart">Whole dollars (nearest $5 over $100)</option><option value="1">Whole dollars</option><option value="5">Nearest $5</option><option value="none">Cents (no rounding)</option></select></div></div>
+  <div class="mut small">Tip: “Raise cost by %” keeps your prices the same unless you also run a markup change.</div>
+  <div id="aj_prev" class="mut small" style="margin-top:8px"></div>
+  <div class="mfoot"><button onclick="pbAdjust(true)">Preview</button><span class="sp"></span><button onclick="closeM()">Cancel</button><button class="pri" onclick="pbAdjust(false)">Apply</button></div>`)}
+async function pbAdjust(preview){const sc=v('aj_scope'),how=v('aj_how'),val=+v('aj_val'),rd=v('aj_round');if(!isFinite(val)||v('aj_val')===''){toast('Enter a number');return}
+  let items=sc==='shown'?pbList():sc==='all'?[...S.pricebook]:S.pricebook.filter(p=>p.category===sc.slice(4));
+  const out=[];let skip=0;for(const p of items){const o={...p};
+    if(how==='pct'){if(!(+p.price)){skip++;continue}o.price=pbRound(p.price*(1+val/100),rd)}
+    else if(how==='cost'){if(!(+p.cost)){skip++;continue}o.cost=Math.round(p.cost*(1+val/100)*100)/100}
+    else if(how==='markup'){if(!(+p.cost)||val<=0){skip++;continue}o.price=pbRound(p.cost*val,rd)}
+    else{if(!(+p.cost)||val>=100||val<0){skip++;continue}o.price=pbRound(p.cost/(1-val/100),rd)}
+    if(+o.price)o.needsPrice=false;if(o.price!==p.price||o.cost!==p.cost)out.push(o)}
+  const ex=out.slice(0,5).map(o=>{const p=byId('pricebook',o.id);return `${esc(p.name)}: ${how==='cost'?money(p.cost)+' → '+money(o.cost)+' cost':money(p.price)+' → '+money(o.price)}`}).join('<br>');
+  if(preview){el('aj_prev').innerHTML=`<b>${out.length} item(s) will change</b>${skip?` · ${skip} skipped (missing cost/price)`:''}<br>${ex}${out.length>5?'<br>…':''}`;return}
+  if(!out.length){toast('Nothing to change');return}
+  if(!confirm(`Update ${out.length} item(s)?`))return;el('aj_prev').textContent='Saving…';const n=await pbBulk(out);closeM();toast(n+' item(s) updated')}
+function pbCsv(s){return /[",\n]/.test(s)?'"'+String(s).replace(/"/g,'""')+'"':String(s)}
+function pbExport(){const rows=[['Name','Category','SKU','Cost','Price']].concat(pbList().map(p=>[p.name||'',p.category||'',p.sku||'',+p.cost||'',+p.price||'']));
+  const csv=rows.map(r=>r.map(pbCsv).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download='KOR-HVAC-pricebook.csv';document.body.appendChild(a);a.click();a.remove();toast('Downloaded — edit in Excel, then use Import')}
+function pbImportOpen(){modal(`<h2>Import prices<button class="sm" onclick="closeM()">✕</button></h2>
+  <p class="mut small">Use a CSV with columns <b>Name, Category, SKU, Cost, Price</b> — easiest is to click <b>Export</b>, change prices in Excel, save as CSV and import it here. Items are matched by SKU (or name); new ones are added.</p>
+  <input type="file" id="pb_file" accept=".csv,text/csv"><div id="pb_imsg" class="mut small" style="margin-top:8px"></div>
+  <div class="mfoot"><span class="sp"></span><button onclick="closeM()">Cancel</button><button class="pri" onclick="pbImport()">Import</button></div>`)}
+function pbParseCsv(t){const rows=[];let r=[],f='',q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}else if(c==='"')q=true;else if(c===','){r.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;r.push(f);rows.push(r);r=[];f=''}else f+=c}if(f!==''||r.length){r.push(f);rows.push(r)}return rows.filter(x=>x.some(y=>y.trim()))}
+async function pbImport(){const fl=el('pb_file').files[0];if(!fl){toast('Pick a CSV file');return}const rows=pbParseCsv((await fl.text()).replace(/^﻿/,''));if(rows.length<2){toast('File is empty');return}
+  const h=rows[0].map(x=>x.trim().toLowerCase());const ix=k=>h.findIndex(x=>x.startsWith(k));const iN=ix('name'),iC=ix('cat'),iS=ix('sku'),iCo=ix('cost'),iP=ix('price');if(iN<0||iP<0){toast('Need at least Name and Price columns');return}
+  const bySku={},byName={};S.pricebook.forEach(p=>{if(p.sku)bySku[p.sku.trim().toLowerCase()]=p;if(p.name)byName[p.name.trim().toLowerCase()]=p});
+  const num=x=>{const n=String(x||'').replace(/[$,\s]/g,'');return n===''||!isFinite(+n)?'':Math.round(+n*100)/100};
+  const out=[];let add=0,upd=0;for(const r of rows.slice(1)){const name=(r[iN]||'').trim();if(!name)continue;const sku=iS>=0?(r[iS]||'').trim():'';const ex=(sku&&bySku[sku.toLowerCase()])||byName[name.toLowerCase()];
+    const o=ex?{...ex}:{id:uid(),category:'Parts'};o.name=name;if(iC>=0&&r[iC]&&r[iC].trim())o.category=r[iC].trim();if(sku)o.sku=sku;if(iCo>=0)o.cost=num(r[iCo]);o.price=num(r[iP]);if(+o.price)o.needsPrice=false;
+    if(ex){if(['name','category','sku','cost','price'].some(k=>String(ex[k]??'')!==String(o[k]??''))){out.push(o);upd++}}else{out.push(o);add++}}
+  if(!out.length){el('pb_imsg').textContent='No changes found.';return}el('pb_imsg').textContent=`Saving ${upd} update(s) and ${add} new item(s)…`;const n=await pbBulk(out);closeM();toast(`${n} item(s) saved (${upd} updated, ${add} added)`)}
+
 function openPB(id){const p=id?{...byId('pricebook',id)}:{id:uid(),category:'Labor'};edit={col:'pricebook',obj:p};
   modal(`<h2>${id?'Edit Item':'New Pricebook Item'}<button class="sm" onclick="closeM()">✕</button></h2>
-  <div class="fg"><div class="span2"><label>Name *</label><input id="f_name" value="${esc(p.name)}" placeholder="Service call – first hour"></div><div><label>Category</label><select id="f_category">${opts(['Labor','Parts','Refrigerant','Flat Rate Repair','Maintenance','Equipment','Fees'],p.category)}</select></div>
+  <div class="fg"><div class="span2"><label>Name *</label><input id="f_name" value="${esc(p.name)}" placeholder="Service call – first hour"></div><div><label>Category</label><select id="f_category">${opts([...new Set([...PB_CATS,...S.pricebook.map(x=>x.category).filter(Boolean)])],p.category)}</select></div>
   <div><label>SKU / part #</label><input id="f_sku" value="${esc(p.sku)}"></div><div><label>Cost</label><input id="f_cost" value="${esc(p.cost)}"></div><div><label>Sell price *</label><input id="f_price" value="${esc(p.price)}"></div></div>
   <div class="mfoot">${id?`<button class="danger" onclick="delRec('pricebook','${p.id}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM()">${isAdmin()?'Cancel':'Close'}</button>${isAdmin()?`<button class="pri" onclick="savePB()">Save</button>`:''}</div>`)}
 async function savePB(){const p=grab({...edit.obj},['name','category','sku','cost','price']);if(!p.name){toast('Enter a name');return}if(+p.price)p.needsPrice=false;
