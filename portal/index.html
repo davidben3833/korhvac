@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><meta name="robots" content="noindex">
 <meta charset="UTF-8">
-<meta name="robots" content="noindex, nofollow">
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KOR HVAC Customer Portal</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIuMCA1MTIuMCIgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMTExMTExIi8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIxMzIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSI2NiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMzkiIGZpbGw9IiNGRkZGRkYiLz48L3N2Zz4=">
@@ -325,7 +323,7 @@ async function submitReq(){const d=$('#rq_d').value.trim();if(d.length<5){toast(
 
 
 /* ---------- Text message updates (consent) ---------- */
-const SMS_CONSENT=()=>`By checking this box, you agree to receive text messages from ${esc(CFG.company)} about your appointments, technician arrival, completed work, invoices and estimates at the mobile number above. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out or HELP for help. Consent is not a condition of purchase.`;
+const SMS_CONSENT=()=>`Yes, text me. I agree to receive appointment confirmations, reminders, technician on-the-way updates and service notifications from ${esc(CFG.company)} at the mobile number above. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. Consent is not a condition of service. See our <a href="https://korhvac.com/sms/" target="_blank">SMS Terms</a> and <a href="https://korhvac.com/privacy/" target="_blank">Privacy Policy</a>.`;
 function smsCard(){const s=D.sms||{optIn:false,phone:''};
   return `<div class="card"><h2>📱 Text message updates</h2>${s.optIn?`<p class="small">You’ll get texts at <b>${esc(s.phone)}</b> when your visit is scheduled, the day before, when your technician is on the way (with a live tracking link), and when work is done.</p><button class="sm" onclick="setSms(false)">Stop text updates</button>`:
   `<p class="small mut" style="margin-top:0">Get a text when your technician is on the way — with a live map — plus appointment reminders.</p>

@@ -515,6 +515,7 @@ footer a:hover { color: var(--ink); }
           <div class="field"><label for="s-date">Preferred date</label><input id="s-date" name="preferred_date" type="date"></div>
           <div class="field"><label for="s-win">Preferred time</label><select id="s-win" name="preferred_time"><option>Morning (7–11)</option><option>Midday (11–3)</option><option>Afternoon (3–7)</option><option>Any time</option></select></div>
           <div class="field full"><label for="s-msg">What’s happening?</label><textarea id="s-msg" name="details" placeholder="e.g. Unit on the east roof isn’t cooling, compressor short-cycling since this morning"></textarea></div>
+          <div class="field full"><label class="smsok" style="display:flex;gap:10px;align-items:flex-start;font-weight:400;text-transform:none;letter-spacing:0;font-size:13px;line-height:1.5"><input type="checkbox" name="sms_consent" value="Yes - agreed to text messages" style="width:auto;margin-top:3px"> <span>Yes, text me about this service request. I agree to receive appointment confirmations, reminders, technician on-the-way updates and service notifications from KOR HVAC at the phone number above. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. Consent is not a condition of service. See our <a href="https://korhvac.com/sms/">SMS Terms</a> and <a href="https://korhvac.com/privacy/">Privacy Policy</a>.</span></label></div>
           <div class="form-foot"><button class="send" type="submit">Request Appointment</button><span class="note" id="schedNote" aria-live="polite"></span></div>
         </form>
         <div class="myreq" id="myReq" hidden><h2>Your service requests</h2><div id="myList"></div></div>
@@ -551,6 +552,8 @@ footer a:hover { color: var(--ink); }
         <h3>9. Limitation of Liability</h3><p>The Site is provided “as is”. To the extent permitted by law, KOR HVAC is not liable for any indirect or consequential damages arising from use of the Site or reliance on its content.</p>
         <h3>10. Changes</h3><p>We may update these terms at any time. The updated version applies once posted on this page.</p>
         <h3>11. Contact</h3><p>Questions about these terms: <a href="mailto:info@korhvac.com">info@korhvac.com</a> · (347) 744-6665.</p>
+<h3>Text Message (SMS) Program</h3><p><b>Program:</b> KOR HVAC Service Notifications. When you opt in (on our website service form, in the KOR HVAC customer portal, or on a signed service agreement or work order), KOR HVAC will text you about your service: appointment confirmations and reminders, technician on-the-way updates with a tracking link, job completion notices, and estimate or invoice notifications. We do not send marketing texts. <b>Frequency:</b> varies with your service activity, typically 1–5 messages per visit. <b>Cost:</b> Message and data rates may apply. <b>Opt out:</b> reply STOP at any time; you will receive one confirmation and no further texts. Reply START to resubscribe. <b>Help:</b> reply HELP or call (800) 617-7600 / email info@korhvac.com. Carriers are not liable for delayed or undelivered messages. Consent to receive texts is not a condition of purchasing any service. Full details: <a href="https://korhvac.com/sms/">korhvac.com/sms</a>.</p>
+
       </div></div></section>
   </div></div>
   <div class="view" data-view="privacy" hidden><div class="page">
@@ -566,6 +569,8 @@ footer a:hover { color: var(--ink); }
         <h3>Children</h3><p>The Site is intended for businesses and adults and is not directed to children under 13.</p>
         <h3>Changes</h3><p>We may update this policy. The updated version applies once posted on this page.</p>
         <h3>Contact</h3><p><a href="mailto:info@korhvac.com">info@korhvac.com</a> · (347) 744-6665</p>
+<h3>Text messages (SMS)</h3><p>If you agree to receive text messages, we use your mobile number only to send service notifications about your account and appointments. <b>No mobile information will be shared with third parties or affiliates for marketing or promotional purposes.</b> Text message opt-in data and consent will not be shared with any third parties, except the messaging provider that delivers our texts (Twilio). You can opt out at any time by replying STOP.</p>
+
       </div></div></section>
   </div></div>
   <div class="view" data-view="contact" hidden><div class="page">
@@ -605,7 +610,7 @@ footer a:hover { color: var(--ink); }
 </div>
 <footer>
   <div class="wrap">
-    <span>© 2026 KOR HVAC · <a href="#terms">Terms</a> · <a href="#privacy">Privacy</a></span>
+    <span>© 2026 KOR HVAC · <a href="#terms">Terms</a> · <a href="#privacy">Privacy</a> · <a href="/sms/">SMS Terms</a></span>
     <nav aria-label="Footer"><a href="#services">Services</a><a href="#projects">Projects</a><a href="#about">About</a><a href="#contact">Contact</a><a href="#schedule">Schedule Service</a><a href="#dispatch" id="dispatchLink" hidden>Dispatch</a></nav>
   </div>
 </footer>
