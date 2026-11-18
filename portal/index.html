@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOR HVAC Customer Portal</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIuMCA1MTIuMCIgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMTExMTExIi8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIxMzIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSI2NiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMzkiIGZpbGw9IiNGRkZGRkYiLz48L3N2Zz4=">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+/* ===================== SETTINGS — edit these ===================== */
+window.PORTAL_CONFIG = {
+  company: 'KOR HVAC',
+  tagline: 'Heating · Cooling · Boilers · Chillers',
+  phone: '(347) 744-6665', // shown for calls
+  email: 'service@korhvac.com',
+  payLink: '',          // default online payment link (Stripe / QuickBooks / Square). Invoices can have their own.
+  remitTo: '',          // check / ACH instructions
+  supabaseUrl: 'https://bljdqwbbcfgouuekcqxl.supabase.co',
+  supabaseAnonKey: 'sb_publishable_0s8YO90VzMEQRijvflJH3Q_p7rODDYS'  // public key only — never the secret key
+};
+</script>
+<style>
+:root{--navy:#111111;--navy2:#262626;--accent:#111111;--accent2:#9a9a9a;--bg:#f4f6fa;--card:#fff;--line:#e3e7ef;--txt:#1b2333;--mut:#6b7488;--ok:#1f9d55;--warn:#b77400;--bad:#d64545;--blue:#2f6fde}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+a{color:var(--blue)}
+button,.btn{font:inherit;border:1px solid var(--line);background:#fff;padding:10px 16px;border-radius:10px;cursor:pointer;font-weight:600;color:var(--txt);text-decoration:none;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+button:hover,.btn:hover{border-color:#c3cad8}
+button:disabled{opacity:.5;cursor:default}
+.pri{background:var(--accent);border-color:var(--accent);color:#fff}.pri:hover{background:#333333;border-color:#333333}
+.grn{background:var(--ok);border-color:var(--ok);color:#fff}
+.sm{padding:6px 12px;font-size:13px}
+input,select,textarea{font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:10px;width:100%;background:#fff;color:var(--txt)}
+textarea{min-height:100px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid #cfcfcf;border-color:var(--accent)}
+label{display:block;font-size:13px;font-weight:600;color:var(--mut);margin:12px 0 5px}
+/* header */
+header{background:var(--navy);color:#fff}
+.hwrap{max-width:1100px;margin:0 auto;padding:16px 20px;display:flex;align-items:center;gap:14px}
+.logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-size:20px;flex-shrink:0}
+.cname{font-weight:800;font-size:18px}.ctag{font-size:12px;color:#b3b3b3}
+.hright{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:13px;color:#d4d4d4}
+.hright button{background:transparent;color:#fff;border-color:#555555}
+nav{background:var(--navy2)}
+.nwrap{max-width:1100px;margin:0 auto;padding:0 12px;display:flex;overflow-x:auto}
+nav a{color:#d4d4d4;text-decoration:none;padding:12px 14px;font-weight:600;font-size:14px;border-bottom:3px solid transparent;white-space:nowrap}
+nav a.on{color:#fff;border-bottom-color:#fff}
+main{max-width:1100px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:0 0 12px}
+.sub{color:var(--mut);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-bottom:16px}
+.kpi .l{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+.kpi .v{font-size:26px;font-weight:800;margin:6px 0 2px}
+.kpi .s{font-size:13px;color:var(--mut)}
+.kpi.due{border-color:#cfcfcf;background:#f7f7f7}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);padding:10px;border-bottom:1px solid var(--line)}
+td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:#fafbfd}
+.r{text-align:right}.mut{color:var(--mut)}.small{font-size:13px}.nowrap{white-space:nowrap}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:#eef0f4;color:#5a6378;white-space:nowrap}
+.b-Paid,.b-Completed,.b-Approved,.b-Active{background:#e2f6ea;color:var(--ok)}
+.b-Due,.b-Partial,.b-Sent,.b-Awaiting,.b-New{background:#fff4dc;color:var(--warn)}
+.b-Overdue,.b-Declined,.b-Expired{background:#fde8e8;color:var(--bad)}
+.b-Scheduled,.b-Dispatched,.b-En,.b-On,.b-Received{background:#e6efff;color:var(--blue)}
+.empty{text-align:center;color:var(--mut);padding:30px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.ov{position:fixed;inset:0;background:rgba(15,31,58,.5);display:none;align-items:flex-start;justify-content:center;padding:30px 14px;overflow-y:auto;z-index:50}
+.ov.show{display:flex}
+.modal{background:#fff;border-radius:16px;max-width:760px;width:100%;padding:24px}
+.modal h2{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.opt{border:2px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer}
+.opt.sel{border-color:var(--accent);background:#f7f7f7}
+.opt .price{font-size:22px;font-weight:800}
+.tot{text-align:right;line-height:1.9;margin-top:8px}.tot b{font-size:18px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;opacity:0;transition:.3s;pointer-events:none;z-index:99}
+.toast.show{opacity:1}
+.login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,var(--navy),#2a2a2a);padding:20px}
+.lbox{background:#fff;border-radius:18px;padding:30px;max-width:420px;width:100%}
+.demo{background:#f6f6f6;border:1px solid #dddddd;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:16px}
+.loc{display:inline-block;background:#eef1f6;border-radius:6px;padding:2px 8px;font-size:12px;margin-left:6px}
+.timeline{border-left:3px solid var(--line);margin-left:6px;padding-left:18px}
+.tl{position:relative;padding-bottom:18px}.tl::before{content:'';position:absolute;left:-26px;top:4px;width:13px;height:13px;border-radius:50%;background:#111;border:3px solid #fff;box-shadow:0 0 0 1px var(--line)}
+@media(max-width:700px){.hide-m{display:none}main{padding:18px 14px 50px}h1{font-size:22px}td,th{padding:9px 6px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="ov" id="ov"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CFG=window.PORTAL_CONFIG;
+const DEMO=!CFG.supabaseUrl||!CFG.supabaseAnonKey;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>(+n||0).toLocaleString('en-US',{style:'currency',currency:'USD'});
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>ymd(new Date());
+const addDays=(s,n)=>{const d=new Date(s+'T12:00');d.setDate(d.getDate()+n);return ymd(d)};
+const fdate=s=>{if(!s)return '';const d=new Date(String(s).slice(0,10)+'T12:00');return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})};
+const ftime=t=>{if(!t)return '';let[h,m]=String(t).split(':');h=+h;return (h%12||12)+':'+m+(h<12?' AM':' PM')};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800)}
+function badge(s){return `<span class="badge b-${esc(String(s).split(' ')[0])}">${esc(s)}</span>`}
+const sub=items=>(items||[]).reduce((a,i)=>a+(+i.qty||0)*(+i.price||0),0);
+const invTotal=i=>{const s=sub(i.items);return s+s*(+i.taxRate||0)/100};
+const invPaid=i=>(i.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
+const invBal=i=>Math.max(0,invTotal(i)-invPaid(i));
+const invStatus=i=>{if(invBal(i)<=0.005)return 'Paid';if(i.due&&i.due<today())return 'Overdue';return invPaid(i)>0?'Partial':'Due'};
+
+/* ===================== DATA ===================== */
+let api;
+function demoApi(){
+  const t=today();
+  const KEY='jobswift_portal_demo_v1';
+  const seed=()=>({
+    me:{email:'maria@sunrise-living.com',name:'Maria Lopez'},
+    customers:[{id:'c1',name:'Maria Lopez',company:'Sunrise Senior Living – Edison',address:'120 Oak St, Edison, NJ'},{id:'c2',name:'Maria Lopez',company:'Sunrise Senior Living – Woodbridge',address:'88 Main St, Woodbridge, NJ'}],
+    equipment:[
+      {id:'e1',customerId:'c1',tag:'RTU-1',type:'Rooftop Unit',make:'Trane',model:'YSC120',serial:'T19K48820',location:'Roof – west',installDate:'2019-05-14',warrantyExp:'2024-05-14'},
+      {id:'e2',customerId:'c1',tag:'RTU-2',type:'Rooftop Unit',make:'Trane',model:'YSC120',serial:'T19K48821',location:'Roof – east',installDate:'2021-06-02',warrantyExp:addDays(t,200)},
+      {id:'e3',customerId:'c1',tag:'B-1',type:'Boiler',make:'Weil-McLain',model:'SlimFit 750',serial:'WM5531-22',location:'Basement',installDate:'2016-10-01'},
+      {id:'e4',customerId:'c2',tag:'AHU-1',type:'Air Handler',make:'Carrier',model:'39M',serial:'C3398112',location:'Mechanical room'}],
+    jobs:[
+      {id:'j1',number:'J-1041',customerId:'c1',equipmentId:'e2',type:'Service Call',status:'Completed',date:addDays(t,-6),time:'08:00',tech:'Jim',description:'RTU-2 not cooling, east wing warm.',notes:'Found failed run capacitor on condenser fan motor. Replaced capacitor, verified operation and pressures. Unit cooling normally.',signedBy:'Maria Lopez'},
+      {id:'j2',number:'J-1012',customerId:'c1',equipmentId:'e3',type:'Maintenance',status:'Completed',date:addDays(t,-40),time:'09:00',tech:'Mike',description:'Quarterly PM – boiler',notes:'Cleaned burner and flame sensor, checked combustion, tested low-water cutoff and safeties. Operating normally.',signedBy:'Front desk'},
+      {id:'j3',number:'J-1052',customerId:'c1',type:'Maintenance',status:'Scheduled',date:addDays(t,5),time:'08:00',tech:'Jim',description:'Quarterly PM – RTU-1, RTU-2 and boiler'},
+      {id:'j4',number:'J-1003',customerId:'c2',equipmentId:'e4',type:'Repair',status:'Completed',date:addDays(t,-55),time:'13:00',tech:'Mike',description:'AHU-1 belt squeal',notes:'Replaced worn belt and adjusted tension. Greased bearings.',signedBy:'R. Patel'}],
+    invoices:[
+      {id:'i1',number:'INV-5021',customerId:'c1',jobNumber:'J-1041',date:addDays(t,-6),due:addDays(t,24),taxRate:6.625,items:[{desc:'Service call – first hour',qty:1,price:195},{desc:'Run capacitor 45/5 MFD',qty:1,price:145}],payments:[]},
+      {id:'i2',number:'INV-5004',customerId:'c1',jobNumber:'J-1012',date:addDays(t,-40),due:addDays(t,-10),taxRate:0,items:[{desc:'Quarterly maintenance agreement – Q3',qty:1,price:1200}],payments:[{date:addDays(t,-20),amount:600,method:'Check',ref:'10442'}]},
+      {id:'i3',number:'INV-4990',customerId:'c2',jobNumber:'J-1003',date:addDays(t,-55),due:addDays(t,-25),taxRate:6.625,items:[{desc:'Labor',qty:1.5,price:135},{desc:'V-belt B48',qty:1,price:38}],payments:[{date:addDays(t,-30),amount:256.43,method:'ACH'}]}],
+    estimates:[
+      {id:'x1',number:'EST-2031',customerId:'c1',title:'Replace RTU-1 (end of life, out of warranty)',date:addDays(t,-3),status:'Sent',notes:'Includes crane, disconnect/reconnect, startup and 1-year labor warranty. Utility rebate paperwork handled by us.',valid:30,
+       options:[{name:'Good',desc:'Standard efficiency 10-ton, R-454B',items:[{desc:'10-ton RTU, standard efficiency',qty:1,price:14800},{desc:'Installation, crane & startup',qty:1,price:5200}]},
+                {name:'Better',desc:'High efficiency with economizer – qualifies for rebate',items:[{desc:'10-ton RTU, high efficiency w/ economizer',qty:1,price:17900},{desc:'Installation, crane & startup',qty:1,price:5200}]},
+                {name:'Best',desc:'High efficiency + variable speed + 5-yr parts & labor',items:[{desc:'10-ton RTU, variable speed',qty:1,price:21400},{desc:'Installation, crane & startup',qty:1,price:5200},{desc:'5-year parts & labor warranty',qty:1,price:1900}]}]}],
+    agreements:[{id:'a1',number:'AG-301',customerId:'c1',name:'Quarterly PM – 2 RTUs + boiler',status:'Active',visits:4,billing:'Quarterly',start:addDays(t,-200),end:addDays(t,165),nextVisit:addDays(t,5)}],
+    requests:[],
+    sms:{optIn:false,phone:''}
+  });
+  let db;try{db=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  if(!db)db=seed();
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}};
+  let signed=false;try{signed=sessionStorage.getItem('portal_demo')==='1'}catch(e){}
+  return{
+    demo:true,
+    async session(){return signed?db.me:null},
+    async sendLink(){throw new Error('Demo mode — use "View demo account" below.')},
+    async demoLogin(){signed=true;try{sessionStorage.setItem('portal_demo','1')}catch(e){};return db.me},
+    async signOut(){signed=false;try{sessionStorage.removeItem('portal_demo')}catch(e){}},
+    async load(){return JSON.parse(JSON.stringify(db))},
+    async decide(id,optIdx,approve,name){const e=db.estimates.find(x=>x.id===id);e.status=approve?'Approved':'Declined';e.selected=approve?optIdx:null;e.approvedBy=name;e.approvedAt=new Date().toISOString();save()},
+    async request(r){db.requests.unshift({...r,id:'r'+Date.now(),status:'Received',createdAt:new Date().toISOString()});save()},
+    async setSms(optIn,phone){const d=String(phone||'').replace(/\D/g,'');if(optIn&&!(d.length===10||(d.length===11&&d[0]==='1')))throw new Error('Enter a valid US mobile number');db.sms={optIn,phone:optIn?phone:db.sms.phone};save()},
+    reset(){localStorage.removeItem(KEY);location.reload()}
+  };
+}
+function supabaseApi(){
+  const sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
+  const rpc=async(fn,args={})=>{const{data,error}=await sb.rpc(fn,args);if(error)throw new Error(error.message);return data};
+  const J=r=>r||[];
+  return{
+    demo:false,
+    async session(){const{data}=await sb.auth.getSession();if(!data.session)return null;const me=await rpc('client_me');return me&&me.customers&&me.customers.length?me:{...me,unlinked:true}},
+    async sendLink(email){const{error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.origin+location.pathname}});if(error)throw new Error(error.message.includes('Signups not allowed')?'This email isn’t set up for portal access. Please contact us.':error.message)},
+    async signOut(){await sb.auth.signOut()},
+    async load(){const me=await rpc('client_me');const[jobs,invoices,estimates,equipment,agreements,requests]=await Promise.all(['client_jobs','client_invoices','client_estimates','client_equipment','client_agreements','client_requests'].map(f=>rpc(f)));
+      const sms=await rpc('client_sms_status').catch(()=>({optIn:false,phone:''}));
+      return{me,customers:me.customers||[],jobs:J(jobs),invoices:J(invoices),estimates:J(estimates),equipment:J(equipment),agreements:J(agreements),requests:J(requests),sms:sms||{optIn:false,phone:''}}},
+    async setSms(optIn,phone){await rpc('client_set_sms',{p_opt_in:optIn,p_phone:phone})},
+    async decide(id,optIdx,approve,name){await rpc('client_estimate_decide',{p_id:id,p_option:optIdx,p_approve:approve,p_name:name})},
+    async request(r){await rpc('client_request_service',{p_customer:r.customerId,p_equipment:r.equipmentId||null,p_description:r.description,p_preferred_date:r.preferredDate||null,p_urgency:r.urgency,p_contact:r.contact,p_phone:r.phone})}
+  };
+}
+
+/* ===================== STATE / ROUTING ===================== */
+let D=null,me=null,loc='all';
+const TABS=[['home','Overview'],['history','Service History'],['invoices','Invoices'],['estimates','Estimates'],['equipment','Equipment'],['request','Request Service']];
+const tab=()=>{const h=location.hash.slice(1);return TABS.some(t=>t[0]===h)?h:'home'};
+window.addEventListener('hashchange',()=>render());
+const inLoc=x=>loc==='all'||x.customerId===loc;
+const locName=id=>{const c=(D.customers||[]).find(c=>c.id===id);return c?(c.company||c.name):''};
+const multi=()=>(D.customers||[]).length>1;
+
+async function boot(){
+  try{
+    if(!DEMO){await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js')}
+    api=DEMO?demoApi():supabaseApi();
+    me=await api.session();
+  }catch(e){me=null}
+  if(me&&!me.unlinked){await refresh()}else render();
+}
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+async function refresh(){try{D=await api.load()}catch(e){toast('Could not load your account — please try again');D=null}render()}
+
+/* ===================== RENDER ===================== */
+function render(){
+  if(!me||!D){$('#app').innerHTML=me&&me.unlinked?unlinked():login();return}
+  const t=tab();
+  $('#app').innerHTML=`<header><div class="hwrap"><div><svg style="height:50px;width:auto;display:block" role="img" aria-label="KOR HVAC" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450.9 268.3"><path d="M71.65 152.50L40 152.50L40 40L74.65 40L74.65 106L125.50 40L162.10 40L124.30 87.10L163.75 152.50L124.15 152.50L102.25 114.40" fill="#FFFFFF"/><circle cx="229" cy="96.25" r="44.82421875" fill="none" stroke="#FFFFFF" stroke-width="22.8515625"/><circle cx="229" cy="96.25" r="13.18359375" fill="#FFFFFF"/><path d="M343.15 113.50L329.20 113.50L329.20 152.50L294.25 152.50L294.25 40L362.95 40Q376 40 385.90 44.65Q395.80 49.30 401.35 57.55Q406.90 65.80 406.90 76.90Q406.90 87.70 401.35 96.03Q395.80 104.35 385.90 108.85Q383.35 110.20 380.50 110.95L410.95 152.50L370.90 152.50L343.15 113.50M329.20 65.20L329.20 88.60L357.70 88.60Q364.30 88.60 367.98 85.60Q371.65 82.60 371.65 76.90Q371.65 71.20 367.98 68.20Q364.30 65.20 357.70 65.20" fill="#FFFFFF"/><path d="M160.70 224.68L157.38 224.68L157.38 206.13L160.70 206.13L160.70 213.80L169.33 213.80L169.33 206.13L172.65 206.13L172.65 224.68L169.33 224.68L169.33 216.60L160.70 216.60M207.64 224.68L203.43 224.68L196.82 206.13L200.47 206.13L203.76 215.76Q204.22 217.21 204.75 219.09Q205.14 220.43 205.56 222.03Q205.98 220.41 206.36 219.08Q206.87 217.21 207.32 215.76L210.50 206.13L214.14 206.13M240.68 224.68L237.05 224.68L243.52 206.13L247.74 206.13L254.37 224.68L250.72 224.68L249.15 220.09L242.20 220.09L240.68 224.68M243.09 217.41L248.23 217.41L247.42 215.04Q246.93 213.55 246.41 211.66Q246.04 210.31 245.60 208.71Q245.19 210.34 244.83 211.69Q244.32 213.60 243.87 215.04M286.43 224.93Q283.99 224.93 282.07 223.80Q280.15 222.66 279.04 220.53Q277.93 218.40 277.93 215.42Q277.93 212.42 279.05 210.28Q280.16 208.14 282.09 207.01Q284.01 205.88 286.43 205.88Q287.95 205.88 289.27 206.31Q290.60 206.74 291.64 207.57Q292.68 208.39 293.35 209.59Q294.02 210.78 294.25 212.30L290.90 212.30Q290.73 211.47 290.34 210.83Q289.95 210.20 289.36 209.76Q288.78 209.32 288.04 209.08Q287.31 208.85 286.48 208.85Q284.96 208.85 283.78 209.62Q282.60 210.39 281.94 211.85Q281.27 213.31 281.27 215.42Q281.27 217.55 281.94 219Q282.62 220.46 283.79 221.21Q284.97 221.95 286.46 221.95Q287.30 221.95 288.03 221.72Q288.77 221.49 289.36 221.05Q289.95 220.61 290.35 219.97Q290.75 219.33 290.90 218.50L294.26 218.50Q294.07 219.84 293.44 221Q292.81 222.16 291.79 223.05Q290.77 223.93 289.42 224.43Q288.07 224.93 286.43 224.93" fill="#FFFFFF"/><rect x="67.0" y="214.0" width="67.5" height="3" fill="#FFFFFF"/><rect x="316.4" y="214.0" width="67.5" height="3" fill="#FFFFFF"/></svg><div class="ctag" style="margin-top:6px">Customer Portal</div></div>
+   <div class="hright"><span class="hide-m">${esc(me.email||'')}</span>${api.demo?'<button class="sm" onclick="api.reset()">Reset demo</button>':''}<button class="sm" onclick="signOut()">Sign out</button></div></div></header>
+   <nav><div class="nwrap">${TABS.map(([k,l])=>`<a href="#${k}" class="${k===t?'on':''}">${l}</a>`).join('')}</div></nav>
+   <main>${multi()?`<div class="row" style="margin-bottom:16px"><span class="mut small">Location</span><select style="max-width:360px" onchange="loc=this.value;render()"><option value="all">All locations (${D.customers.length})</option>${D.customers.map(c=>`<option value="${c.id}" ${loc===c.id?'selected':''}>${esc(c.company||c.name)}</option>`).join('')}</select></div>`:''}
+   ${({home:vHome,history:vHistory,invoices:vInvoices,estimates:vEstimates,equipment:vEquipment,request:vRequest})[t]()}
+   <p class="mut small" style="margin-top:30px;text-align:center">${esc(CFG.company)}${CFG.phone?' · '+esc(CFG.phone):''}${CFG.email?' · '+esc(CFG.email):''}</p></main>`;
+}
+function login(){return `<div class="login"><div class="lbox"><div style="margin-bottom:22px"><svg style="height:76px;width:auto;display:block" role="img" aria-label="KOR HVAC" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450.9 268.3"><path d="M71.65 152.50L40 152.50L40 40L74.65 40L74.65 106L125.50 40L162.10 40L124.30 87.10L163.75 152.50L124.15 152.50L102.25 114.40" fill="#111111"/><circle cx="229" cy="96.25" r="44.82421875" fill="none" stroke="#111111" stroke-width="22.8515625"/><circle cx="229" cy="96.25" r="13.18359375" fill="#111111"/><path d="M343.15 113.50L329.20 113.50L329.20 152.50L294.25 152.50L294.25 40L362.95 40Q376 40 385.90 44.65Q395.80 49.30 401.35 57.55Q406.90 65.80 406.90 76.90Q406.90 87.70 401.35 96.03Q395.80 104.35 385.90 108.85Q383.35 110.20 380.50 110.95L410.95 152.50L370.90 152.50L343.15 113.50M329.20 65.20L329.20 88.60L357.70 88.60Q364.30 88.60 367.98 85.60Q371.65 82.60 371.65 76.90Q371.65 71.20 367.98 68.20Q364.30 65.20 357.70 65.20" fill="#111111"/><path d="M160.70 224.68L157.38 224.68L157.38 206.13L160.70 206.13L160.70 213.80L169.33 213.80L169.33 206.13L172.65 206.13L172.65 224.68L169.33 224.68L169.33 216.60L160.70 216.60M207.64 224.68L203.43 224.68L196.82 206.13L200.47 206.13L203.76 215.76Q204.22 217.21 204.75 219.09Q205.14 220.43 205.56 222.03Q205.98 220.41 206.36 219.08Q206.87 217.21 207.32 215.76L210.50 206.13L214.14 206.13M240.68 224.68L237.05 224.68L243.52 206.13L247.74 206.13L254.37 224.68L250.72 224.68L249.15 220.09L242.20 220.09L240.68 224.68M243.09 217.41L248.23 217.41L247.42 215.04Q246.93 213.55 246.41 211.66Q246.04 210.31 245.60 208.71Q245.19 210.34 244.83 211.69Q244.32 213.60 243.87 215.04M286.43 224.93Q283.99 224.93 282.07 223.80Q280.15 222.66 279.04 220.53Q277.93 218.40 277.93 215.42Q277.93 212.42 279.05 210.28Q280.16 208.14 282.09 207.01Q284.01 205.88 286.43 205.88Q287.95 205.88 289.27 206.31Q290.60 206.74 291.64 207.57Q292.68 208.39 293.35 209.59Q294.02 210.78 294.25 212.30L290.90 212.30Q290.73 211.47 290.34 210.83Q289.95 210.20 289.36 209.76Q288.78 209.32 288.04 209.08Q287.31 208.85 286.48 208.85Q284.96 208.85 283.78 209.62Q282.60 210.39 281.94 211.85Q281.27 213.31 281.27 215.42Q281.27 217.55 281.94 219Q282.62 220.46 283.79 221.21Q284.97 221.95 286.46 221.95Q287.30 221.95 288.03 221.72Q288.77 221.49 289.36 221.05Q289.95 220.61 290.35 219.97Q290.75 219.33 290.90 218.50L294.26 218.50Q294.07 219.84 293.44 221Q292.81 222.16 291.79 223.05Q290.77 223.93 289.42 224.43Q288.07 224.93 286.43 224.93" fill="#111111"/><rect x="67.0" y="214.0" width="67.5" height="3" fill="#111111"/><rect x="316.4" y="214.0" width="67.5" height="3" fill="#111111"/></svg><div class="mut small" style="margin-top:8px">Customer Portal</div></div>
+  <h2 style="margin-bottom:4px">Sign in</h2><p class="mut small" style="margin-top:0">View your service history, invoices, estimates and equipment — and request service anytime.</p>
+  ${DEMO?`<div class="demo"><b>Demo mode</b> — not connected to live data yet.</div><button class="pri" style="width:100%" onclick="demoIn()">View demo account</button>`:
+  `<label>Email address</label><input id="em" type="email" autocomplete="email" placeholder="you@company.com" onkeydown="if(event.key==='Enter')sendLink()">
+  <button class="pri" style="width:100%;margin-top:14px" id="sl" onclick="sendLink()">Email me a sign-in link</button>
+  <p class="mut small" id="lmsg">We’ll email you a secure link — no password needed.</p>`}
+  ${CFG.phone?`<p class="small mut">Need access? Call ${esc(CFG.phone)}</p>`:''}</div></div>`}
+function unlinked(){return `<div class="login"><div class="lbox"><h2>Almost there</h2><p>You’re signed in as <b>${esc(me.email||'')}</b>, but this email isn’t linked to a customer account yet. Please contact ${esc(CFG.company)}${CFG.phone?' at '+esc(CFG.phone):''} and we’ll connect it.</p><button onclick="signOut()">Sign out</button></div></div>`}
+async function demoIn(){me=await api.demoLogin();await refresh()}
+async function sendLink(){const em=$('#em').value.trim();if(!/^\S+@\S+\.\S+$/.test(em)){toast('Enter a valid email');return}$('#sl').disabled=true;
+  try{await api.sendLink(em);$('#lmsg').innerHTML='✅ Check your inbox for a sign-in link from <b>'+esc(CFG.company)+'</b>. You can close this page.'}catch(e){$('#lmsg').textContent=e.message;$('#sl').disabled=false}}
+async function signOut(){await api.signOut();me=null;D=null;location.hash='';render()}
+
+/* ---------- Overview ---------- */
+function vHome(){
+  const inv=D.invoices.filter(inLoc),bal=inv.reduce((a,i)=>a+invBal(i),0),over=inv.filter(i=>invStatus(i)==='Overdue');
+  const up=D.jobs.filter(inLoc).filter(j=>!['Completed','Canceled'].includes(j.status)&&j.date).sort((a,b)=>a.date.localeCompare(b.date));
+  const est=D.estimates.filter(inLoc).filter(e=>e.status==='Sent');
+  const ag=D.agreements.filter(inLoc).filter(a=>a.status==='Active');
+  const last=D.jobs.filter(inLoc).filter(j=>j.status==='Completed').sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
+  return `<h1>Welcome${D.me&&D.me.name?', '+esc(D.me.name.split(' ')[0]):''}</h1><p class="sub">Here’s a summary of your account.</p>
+  <div class="grid">
+   <div class="card kpi ${bal?'due':''}"><div class="l">Balance due</div><div class="v">${money(bal)}</div><div class="s" style="${over.length?'color:var(--bad)':''}">${over.length?over.length+' overdue invoice'+(over.length>1?'s':''):'All caught up'}</div>${bal?`<a class="btn pri sm" href="#invoices" style="margin-top:10px">View & pay</a>`:''}</div>
+   <div class="card kpi"><div class="l">Next visit</div><div class="v" style="font-size:20px">${up[0]?fdate(up[0].date):'None scheduled'}</div><div class="s">${up[0]?esc(up[0].type)+(up[0].time?' · '+ftime(up[0].time):'')+(multi()?'<br>'+esc(locName(up[0].customerId)):''):'<a href="#request">Request service</a>'}</div></div>
+   <div class="card kpi"><div class="l">Estimates awaiting you</div><div class="v">${est.length}</div><div class="s">${est.length?'<a href="#estimates">Review & approve</a>':'Nothing pending'}</div></div>
+   <div class="card kpi"><div class="l">Maintenance plan</div><div class="v" style="font-size:20px">${ag.length?'Active':'—'}</div><div class="s">${ag.length?esc(ag[0].name)+'<br>Renews '+fdate(ag[0].end):'Ask us about a maintenance plan'}</div></div>
+  </div>
+  ${est.length?`<div class="card" style="border-color:#cfcfcf"><h2>📝 Estimate ready for your review</h2>${est.map(e=>`<div class="row"><div><b>${esc(e.title)}</b><div class="mut small">${esc(e.number)} · ${fdate(e.date)}${multi()?' · '+esc(locName(e.customerId)):''}</div></div><span class="sp"></span><button class="pri sm" onclick="openEst('${e.id}')">Review</button></div>`).join('<hr style="border:none;border-top:1px solid var(--line)">')}</div>`:''}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+   <div class="card"><h2>Most recent service</h2>${last?`<b>${esc(last.type)}</b> · ${fdate(last.date)}<p class="small" style="margin:8px 0">${esc(last.notes||last.description||'')}</p><a href="#history" class="small">See full history →</a>`:'<div class="empty">No completed service yet</div>'}</div>
+   ${smsCard()}
+   <div class="card"><h2>Need service?</h2><p class="small mut">Submit a request any time — our office will confirm a time with you.</p><a class="btn pri" href="#request">Request service</a>${CFG.phone?`<p class="small" style="margin-bottom:0">Emergency? Call <b>${esc(CFG.phone)}</b></p>`:''}</div>
+  </div>`;
+}
+
+/* ---------- Service history ---------- */
+function vHistory(){
+  const js=D.jobs.filter(inLoc).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const up=js.filter(j=>!['Completed','Canceled'].includes(j.status)),done=js.filter(j=>j.status==='Completed');
+  const item=j=>{const eq=D.equipment.find(e=>e.id===j.equipmentId);const inv=D.invoices.find(i=>i.jobNumber===j.number);
+    return `<div class="tl"><div class="row"><b>${fdate(j.date)}</b>${badge(j.status)}<span class="mut small">${esc(j.number)}</span>${multi()?`<span class="loc">${esc(locName(j.customerId))}</span>`:''}</div>
+    <div style="margin-top:4px"><b>${esc(j.type)}</b>${eq?` · ${esc(eq.tag||'')} ${esc(eq.type||'')}`:''}${j.tech?` · Technician: ${esc(j.tech)}`:''}</div>
+    ${j.description?`<div class="small mut" style="margin-top:4px">Reported: ${esc(j.description)}</div>`:''}
+    ${j.notes?`<div class="small" style="margin-top:6px;background:#f7f9fc;border-radius:8px;padding:8px 10px"><b>Work performed:</b> ${esc(j.notes)}</div>`:''}
+    <div class="small mut" style="margin-top:4px">${j.signedBy?'Signed off by '+esc(j.signedBy):''}${inv?` · <a href="#invoices" onclick="setTimeout(()=>openInv('${inv.id}'),50)">Invoice ${esc(inv.number)}</a>`:''}</div></div>`};
+  return `<h1>Service History</h1><p class="sub">Every visit, what was found, and what was done.</p>
+  ${up.length?`<div class="card"><h2>Upcoming</h2>${up.map(j=>`<div class="row" style="padding:6px 0"><b>${fdate(j.date)}${j.time?' · '+ftime(j.time):''}</b>${badge(j.status)}<span>${esc(j.type)}</span>${multi()?`<span class="loc">${esc(locName(j.customerId))}</span>`:''}</div>`).join('')}</div>`:''}
+  <div class="card"><h2>Completed visits (${done.length})</h2>${done.length?`<div class="timeline">${done.map(item).join('')}</div>`:'<div class="empty">No completed visits yet</div>'}</div>`;
+}
+
+/* ---------- Invoices ---------- */
+function vInvoices(){
+  const inv=D.invoices.filter(inLoc).sort((a,b)=>(b.date||'').localeCompare(a.date||''));const bal=inv.reduce((a,i)=>a+invBal(i),0);
+  return `<h1>Invoices</h1><p class="sub">Open balance: <b>${money(bal)}</b></p>
+  <div class="card" style="padding:0;overflow-x:auto">${inv.length?`<table><tr><th>Invoice</th>${multi()?'<th class="hide-m">Location</th>':''}<th>Date</th><th class="hide-m">Due</th><th>Status</th><th class="r">Total</th><th class="r">Balance</th><th></th></tr>
+  ${inv.map(i=>`<tr class="click" onclick="openInv('${i.id}')"><td><b>${esc(i.number)}</b>${i.jobNumber?`<div class="mut small">Job ${esc(i.jobNumber)}</div>`:''}</td>${multi()?`<td class="hide-m small">${esc(locName(i.customerId))}</td>`:''}<td class="nowrap">${fdate(i.date)}</td><td class="hide-m nowrap">${fdate(i.due)}</td><td>${badge(invStatus(i))}</td><td class="r">${money(invTotal(i))}</td><td class="r"><b>${money(invBal(i))}</b></td><td class="r">${invBal(i)&&payLink(i)?`<a class="btn pri sm" href="${esc(payLink(i))}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Pay</a>`:''}</td></tr>`).join('')}</table>`:'<div class="empty">No invoices</div>'}</div>
+  ${CFG.remitTo?`<p class="small mut">Paying by check or ACH: ${esc(CFG.remitTo)}</p>`:''}`;
+}
+const payLink=i=>i.payLink||CFG.payLink;
+function openInv(id){const i=D.invoices.find(x=>x.id===id);if(!i)return;const s=sub(i.items),tax=s*(+i.taxRate||0)/100;
+  modal(`<h2><span>Invoice ${esc(i.number)} ${badge(invStatus(i))}</span><button class="sm" onclick="closeM()">✕</button></h2>
+  <div class="row small mut" style="margin-bottom:12px"><span>Date: <b>${fdate(i.date)}</b></span><span>Due: <b>${fdate(i.due)}</b></span>${i.jobNumber?`<span>Job: <b>${esc(i.jobNumber)}</b></span>`:''}${i.po?`<span>PO: <b>${esc(i.po)}</b></span>`:''}</div>
+  ${multi()?`<p class="small">${esc(locName(i.customerId))}</p>`:''}${i.notes?`<p class="small">${esc(i.notes)}</p>`:''}
+  <table><tr><th>Description</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr>${(i.items||[]).map(x=>`<tr><td>${esc(x.desc)}</td><td class="r">${esc(x.qty)}</td><td class="r">${money(x.price)}</td><td class="r">${money(x.qty*x.price)}</td></tr>`).join('')}</table>
+  <div class="tot">Subtotal ${money(s)}<br>${+i.taxRate?`Tax (${esc(i.taxRate)}%) ${money(tax)}<br>`:''}Total ${money(s+tax)}<br>${(i.payments||[]).map(p=>`<span class="mut small">Payment ${fdate(p.date)} · ${esc(p.method||'')}${p.ref?' #'+esc(p.ref):''}</span> −${money(p.amount)}<br>`).join('')}<b>Balance due ${money(invBal(i))}</b></div>
+  <div class="row" style="margin-top:16px"><span class="sp"></span>${invBal(i)?(payLink(i)?`<a class="btn pri" href="${esc(payLink(i))}" target="_blank" rel="noopener">💳 Pay ${money(invBal(i))} online</a>`:`<span class="small mut">${CFG.remitTo?'Remit to: '+esc(CFG.remitTo):'Please contact us to pay.'}</span>`):'<span class="badge b-Paid">Paid in full — thank you!</span>'}</div>`)}
+
+/* ---------- Estimates ---------- */
+function vEstimates(){const es=D.estimates.filter(inLoc).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return `<h1>Estimates</h1><p class="sub">Review proposals and approve the option that’s right for you.</p>
+  <div class="card" style="padding:0;overflow-x:auto">${es.length?`<table><tr><th>Estimate</th><th>Scope</th><th class="hide-m">Date</th><th>Status</th><th></th></tr>${es.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b></td><td>${esc(e.title)}${multi()?`<div class="mut small">${esc(locName(e.customerId))}</div>`:''}</td><td class="hide-m nowrap">${fdate(e.date)}</td><td>${badge(e.status==='Sent'?'Awaiting approval':e.status)}</td><td class="r"><button class="sm ${e.status==='Sent'?'pri':''}">${e.status==='Sent'?'Review':'View'}</button></td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
+let pick=null;
+function openEst(id,keep){const e=D.estimates.find(x=>x.id===id);if(!e)return;const open=e.status==='Sent';if(!keep)pick=null;pick=open?(e.options.length===1?0:pick):e.selected;
+  const exp=e.date&&e.valid?addDays(e.date,+e.valid):'';
+  modal(`<h2><span>${esc(e.title)}</span><button class="sm" onclick="closeM()">✕</button></h2>
+  <div class="row small mut" style="margin-bottom:10px"><span>${esc(e.number)}</span><span>Issued ${fdate(e.date)}</span>${exp?`<span>Valid until ${fdate(exp)}</span>`:''}${multi()?`<span>${esc(locName(e.customerId))}</span>`:''}${badge(open?'Awaiting approval':e.status)}</div>
+  ${e.notes?`<p class="small">${esc(e.notes)}</p>`:''}
+  ${(e.options||[]).map((o,n)=>`<div class="opt ${pick===n?'sel':''}" onclick="${open?`pick=${n};openEst('${e.id}',1)`:''}"><div class="row"><b style="font-size:17px">${esc(o.name)}</b>${!open&&e.selected===n?'<span class="badge b-Approved">Selected</span>':''}<span class="sp"></span><span class="price">${money(sub(o.items))}</span></div>
+   ${o.desc?`<div class="small mut">${esc(o.desc)}</div>`:''}<ul class="small" style="margin:8px 0 0;padding-left:18px">${(o.items||[]).map(x=>`<li>${esc(x.desc)}${+x.qty!==1?' (×'+esc(x.qty)+')':''}</li>`).join('')}</ul></div>`).join('')}
+  <p class="small mut">Prices before applicable tax.</p>
+  ${open?`<div class="card" style="background:#fafbfd"><label style="margin-top:0">Your name</label><input id="apn" value="${esc(D.me&&D.me.name||'')}" placeholder="Full name">
+   <label style="display:flex;gap:8px;align-items:flex-start;font-weight:500;color:var(--txt)"><input type="checkbox" id="apc" style="width:auto;margin-top:3px"> I authorize ${esc(CFG.company)} to perform the work in the selected option at the price shown.</label>
+   <div class="row" style="margin-top:12px"><button onclick="decide('${e.id}',false)">Decline</button><span class="sp"></span><button class="grn" onclick="decide('${e.id}',true)">✓ Approve ${pick!=null&&e.options[pick]?esc(e.options[pick].name):'selected option'}</button></div></div>`
+  :e.approvedBy?`<p class="small">${e.status} by <b>${esc(e.approvedBy)}</b> on ${fdate(e.approvedAt)}.</p>`:''}`)}
+async function decide(id,approve){const e=D.estimates.find(x=>x.id===id);const name=$('#apn').value.trim();
+  if(approve&&pick==null){toast('Choose an option first');return}if(!name){toast('Please enter your name');return}if(approve&&!$('#apc').checked){toast('Please check the authorization box');return}
+  try{await api.decide(id,approve?pick:null,approve,name);closeM();await refresh();toast(approve?'Approved — thank you! We’ll contact you to schedule.':'Estimate declined. Thank you for letting us know.')}catch(err){toast(err.message||'Something went wrong')}}
+
+/* ---------- Equipment ---------- */
+function vEquipment(){const eq=D.equipment.filter(inLoc);const t=today();
+  return `<h1>Your Equipment</h1><p class="sub">The HVAC equipment we service at your ${multi()?'locations':'location'}.</p>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${eq.length?eq.map(e=>{const visits=D.jobs.filter(j=>j.equipmentId===e.id&&j.status==='Completed');const lastv=visits.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
+   return `<div class="card"><div class="row"><b style="font-size:17px">${esc(e.tag||'')} ${esc(e.type||'')}</b></div>${multi()?`<div class="mut small">${esc(locName(e.customerId))}</div>`:''}
+   <table class="small" style="margin-top:8px">${[['Make / model',`${e.make||''} ${e.model||''}`],['Serial',e.serial],['Location',e.location],['Installed',fdate(e.installDate)],['Warranty',e.warrantyExp?(e.warrantyExp>=t?'Until '+fdate(e.warrantyExp):'Expired '+fdate(e.warrantyExp)):''],['Last service',lastv?fdate(lastv.date):'']].filter(r=>String(r[1]||'').trim()).map(r=>`<tr><td class="mut" style="padding:4px 0;border:none;width:110px">${r[0]}</td><td style="padding:4px 0;border:none"><b>${esc(r[1])}</b></td></tr>`).join('')}</table>
+   <a class="btn sm" style="margin-top:10px" href="#request" onclick="window._eq='${e.id}'">Request service on this unit</a></div>`}).join(''):'<div class="card empty">No equipment on file yet</div>'}</div>
+  ${D.agreements.filter(inLoc).length?`<div class="card"><h2>Maintenance agreements</h2><table><tr><th>Plan</th><th>Visits / yr</th><th class="hide-m">Term</th><th>Next visit</th><th>Status</th></tr>${D.agreements.filter(inLoc).map(a=>`<tr><td><b>${esc(a.name)}</b>${multi()?`<div class="mut small">${esc(locName(a.customerId))}</div>`:''}</td><td>${esc(a.visits)}</td><td class="hide-m small">${fdate(a.start)} – ${fdate(a.end)}</td><td>${fdate(a.nextVisit)}</td><td>${badge(a.status)}</td></tr>`).join('')}</table></div>`:''}`}
+
+/* ---------- Request service ---------- */
+function vRequest(){const custs=D.customers;const cid=loc!=='all'?loc:(custs[0]&&custs[0].id);const eqSel=window._eq||'';
+  const reqs=(D.requests||[]).filter(inLoc);
+  return `<h1>Request Service</h1><p class="sub">Tell us what’s going on and we’ll confirm a time with you.${CFG.phone?` For emergencies (no heat, no cooling in a care area, leaks) please also call <b>${esc(CFG.phone)}</b>.`:''}</p>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))"><div class="card">
+   ${custs.length>1?`<label style="margin-top:0">Location</label><select id="rq_c" onchange="loc=this.value;render()">${custs.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${esc(c.company||c.name)}</option>`).join('')}</select>`:`<input type="hidden" id="rq_c" value="${esc(cid)}">`}
+   <label${custs.length>1?'':' style="margin-top:0"'}>Equipment (if known)</label><select id="rq_e"><option value="">Not sure / general</option>${D.equipment.filter(e=>e.customerId===cid).map(e=>`<option value="${e.id}" ${e.id===eqSel?'selected':''}>${esc(e.tag||'')} ${esc(e.type||'')} ${e.location?'– '+esc(e.location):''}</option>`).join('')}</select>
+   <label>What’s happening? *</label><textarea id="rq_d" placeholder="e.g. 2nd floor east wing is not getting heat; thermostat set to 72, reading 64."></textarea>
+   <label>How urgent?</label><select id="rq_u"><option>Routine – within a few days</option><option>Soon – within 24 hours</option><option>Emergency – as soon as possible</option></select>
+   <label>Preferred date</label><input type="date" id="rq_p" min="${today()}">
+   <div class="row" style="gap:10px"><div style="flex:1;min-width:160px"><label>On-site contact</label><input id="rq_n" value="${esc(D.me&&D.me.name||'')}"></div><div style="flex:1;min-width:160px"><label>Phone</label><input id="rq_ph" type="tel"></div></div>
+   <button class="pri" style="width:100%;margin-top:16px" id="rq_btn" onclick="submitReq()">Submit request</button></div>
+   <div class="card"><h2>Your recent requests</h2>${reqs.length?`<table class="small">${reqs.map(r=>`<tr><td class="nowrap">${fdate(r.createdAt)}</td><td>${esc(r.description)}${multi()?`<div class="mut">${esc(locName(r.customerId))}</div>`:''}</td><td>${badge(r.status)}</td></tr>`).join('')}</table>`:'<div class="empty">No requests yet</div>'}</div></div>`}
+async function submitReq(){const d=$('#rq_d').value.trim();if(d.length<5){toast('Please describe the problem');return}$('#rq_btn').disabled=true;
+  try{await api.request({customerId:$('#rq_c').value,equipmentId:$('#rq_e').value,description:d,urgency:$('#rq_u').value,preferredDate:$('#rq_p').value,contact:$('#rq_n').value.trim(),phone:$('#rq_ph').value.trim()});window._eq='';await refresh();toast('Request received — we’ll be in touch shortly.')}
+  catch(e){toast(e.message||'Could not submit — please call us');$('#rq_btn').disabled=false}}
+
+
+/* ---------- Text message updates (consent) ---------- */
+const SMS_CONSENT=()=>`By checking this box, you agree to receive text messages from ${esc(CFG.company)} about your appointments, technician arrival, completed work, invoices and estimates at the mobile number above. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out or HELP for help. Consent is not a condition of purchase.`;
+function smsCard(){const s=D.sms||{optIn:false,phone:''};
+  return `<div class="card"><h2>📱 Text message updates</h2>${s.optIn?`<p class="small">You’ll get texts at <b>${esc(s.phone)}</b> when your visit is scheduled, the day before, when your technician is on the way (with a live tracking link), and when work is done.</p><button class="sm" onclick="setSms(false)">Stop text updates</button>`:
+  `<p class="small mut" style="margin-top:0">Get a text when your technician is on the way — with a live map — plus appointment reminders.</p>
+   <label style="margin-top:0">Mobile number</label><input id="sms_ph" type="tel" placeholder="(555) 555-5555" value="${esc(s.phone||'')}">
+   <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;color:var(--txt);font-size:12px;line-height:1.5"><input type="checkbox" id="sms_ok" style="width:auto;margin-top:2px"> <span>${SMS_CONSENT()}</span></label>
+   <button class="pri" style="margin-top:10px" onclick="setSms(true)">Turn on text updates</button>`}</div>`}
+async function setSms(on){try{if(on){const ph=$('#sms_ph').value.trim();if(!$('#sms_ok').checked){toast('Please check the box to agree to texts');return}await api.setSms(true,ph)}else await api.setSms(false,'');await refresh();toast(on?'Text updates are on':'Text updates are off')}catch(e){toast(e.message||'Could not save')}}
+/* ---------- modal ---------- */
+function modal(h){$('#modal').innerHTML=h;$('#ov').classList.add('show')}
+function closeM(){$('#ov').classList.remove('show')}
+$('#ov').addEventListener('mousedown',e=>{if(e.target.id==='ov')closeM()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
+boot();
+</script>
+</body>
+</html>
