@@ -1348,12 +1348,12 @@ function drawJob(){
   <div class="mfoot">${!isNew?`<button class="danger" onclick="delRec('jobs','${j.id}')">Delete</button>`:''}<span class="sp"></span>
   ${inv?`<button onclick="closeM();openInv('${inv.id}')">View invoice ${esc(inv.number)}</button>`:(!isNew?`<button onclick="jobToInv()">Create Invoice</button>`:'')}
   <button onclick="closeM()">Cancel</button><button class="pri" onclick="saveJob()">Save Job</button></div>`);
-  itemsEditor('items',j.items,()=>0);
+  applyLabor(j);itemsEditor('items',j.items,()=>0,{labor:j});
 }
 function syncJob(){if(!$('#ov').classList.contains('show')||!document.getElementById('f_duration'))return;grab(edit.obj,['customerId','site','equipmentId','type','priority','status','techId','date','time','duration','description','po','notes'])}
 function finishJob(j){j.items=(j.items||[]).filter(i=>i.desc||+i.price);if(j.date&&j.status==='Unscheduled')j.status='Scheduled';if(j.status==='Completed'&&!j.completedAt)j.completedAt=today();return j}
 async function saveJob(){syncJob();const j=finishJob(edit.obj);if(!j.customerId){toast('Pick a customer');return}const rq=j.fromRequest;delete j.fromRequest;try{await save('jobs',j);closeM();toast('Job '+j.number+' saved');if(rq){const r=byId('requests',rq);if(r)await save('requests',{...r,status:'Scheduled',jobId:j.id})}}catch(e){}}
-async function jobToInv(){syncJob();const j=finishJob(edit.obj);if(!j.customerId){toast('Pick a customer');return}
+async function jobToInv(){syncJob();const j=finishJob(edit.obj);if(!j.customerId){toast('Pick a customer');return}applyLabor(j);
   fillPrices(j.items);const miss=j.items.filter(i=>i.needsPrice&&!(+i.price));if(miss.length){drawJob();toast(miss.length+' part(s) still need a price — type it in, or set it in the Pricebook');return}
   const inv={id:uid(),number:nextNum('invoices','INV-',5001),customerId:j.customerId,jobId:j.id,jobNumber:j.number,site:j.site,po:j.po,items:JSON.parse(JSON.stringify(j.items)),taxRate:company().taxRate||'0',status:'Open',date:today(),due:addDays(today(),+(company().terms||30)),notes:j.description||'',payments:[]};
   j.invoiceId=inv.id;if(!['Completed','Canceled'].includes(j.status)){j.status='Completed';j.completedAt=today()}
@@ -1367,19 +1367,29 @@ function notifyJob(kind){syncJob();const j=edit.obj,c=byId('customers',j.custome
   if(kind==='sms'){smsBox(c.phone,`${nm}: ${j.status==='En Route'?(t?t.name:'Your technician')+' is on the way for your service call.':'Your '+j.type.toLowerCase()+' is scheduled for '+when+'.'} Job #${j.number}. Questions? ${co.phone||''}`);return}
   const[s,b]=msg[kind];sendEmail(c.email,s,b).then(ok=>{if(ok){j.notified=(j.notified||[]).concat([{kind,at:new Date().toISOString()}]);save('jobs',j).catch(()=>{})}})}
 
+const laborRate=()=>{const r=+company().laborRate;return r>0?r:220};
+const laborHrs=j=>Math.round(jobHours(j)*4)/4;
+/* keeps one automatic "Labor" line in sync with the time clock (hours × labor rate). Rate on the line can be changed per job. */
+function applyLabor(j){if(!j||j.noAutoLabor||j.invoiceId)return false;const h=laborHrs(j);j.items=j.items||[];const k=j.items.findIndex(i=>i.auto==='labor');
+  if(h<=0){return false}
+  const desc=`Labor – ${h.toFixed(2)} hrs (time clock)`;
+  if(k>=0){const it=j.items[k];if(+it.qty===h&&it.desc===desc)return false;it.qty=h;it.desc=desc;return true}
+  j.items.push({desc,qty:h,price:laborRate(),cost:'',auto:'labor'});return true}
 /* ================= ITEMS EDITOR ================= */
 function itemsEditor(elId,arr,taxFn,opt={}){
   const el=document.getElementById(elId);if(!el)return;el._arr=arr;el._tax=taxFn;
   const pb=[...S.pricebook].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   el.innerHTML=`<table class="items"><tr><th style="width:50%">Description</th><th>Qty</th><th>Price</th><th>Cost</th><th class="r">Amount</th><th></th></tr>
   ${arr.map((i,n)=>`<tr><td><input data-i="${n}" data-k="desc" value="${esc(i.desc)}">${i.needsPrice&&!(+i.price)?`<div class="small" style="color:var(--bad)">⚠ Part added by tech — needs a price${i.addedBy?' ('+esc(i.addedBy)+')':''}</div>`:''}</td><td><input data-i="${n}" data-k="qty" value="${esc(i.qty)}" style="width:60px"></td><td><input data-i="${n}" data-k="price" value="${esc(i.price)}" style="width:90px${i.needsPrice&&!(+i.price)?';border-color:var(--bad)':''}" placeholder="${i.needsPrice?'Needs price':''}"></td><td><input data-i="${n}" data-k="cost" value="${esc(i.cost??'')}" style="width:80px" title="Your cost (not shown to customer)"></td><td class="r" data-amt="${n}">${money((+i.qty||0)*(+i.price||0))}</td><td><button class="sm" data-act="del" data-i="${n}">✕</button></td></tr>`).join('')}</table>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"><button class="sm" data-act="add">+ Line</button>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"><button class="sm" data-act="add">+ Line</button>${opt.labor?`<button class="sm" data-act="labor" title="Hours from the time clock × labor rate">⏱ Labor from time clock (${laborHrs(opt.labor).toFixed(2)} h × ${money(laborRate())})</button>`:''}
   ${pb.length?`<select class="sm" data-act="pb" style="width:auto;padding:5px"><option value="">+ From pricebook…</option>${pb.map(p=>`<option value="${p.id}">${esc(p.name)} — ${money(p.price)}</option>`).join('')}</select>`:''}</div>
   <div class="tot"></div>`;
   const tot=()=>{const c=calc(arr,taxFn());const tr=+taxFn()||0;el.querySelector('.tot').innerHTML=`Subtotal: ${money(c.sub)}<br>${tr?`Tax (${tr}%): ${money(c.tax)}<br>`:''}<b>Total: ${money(c.total)}</b>${opt.hideCost?'':` <span class="mut small">· cost ${money(c.cost)}</span>`}`;if(opt.onChange)opt.onChange()};
   el._tot=tot;
   el.oninput=e=>{const t=e.target;if(t.dataset.i==null||!t.dataset.k)return;const it=arr[+t.dataset.i];it[t.dataset.k]=t.value;if(t.dataset.k==='price'&&+t.value)delete it.needsPrice;const a=el.querySelector(`[data-amt="${t.dataset.i}"]`);if(a)a.textContent=money((+it.qty||0)*(+it.price||0));tot()};
-  el.onclick=e=>{const b=e.target.closest('[data-act]');if(!b||b.tagName==='SELECT')return;if(b.dataset.act==='add')arr.push({desc:'',qty:1,price:0,cost:''});if(b.dataset.act==='del')arr.splice(+b.dataset.i,1);itemsEditor(elId,arr,taxFn,opt)};
+  el.onclick=e=>{const b=e.target.closest('[data-act]');if(!b||b.tagName==='SELECT')return;if(b.dataset.act==='add')arr.push({desc:'',qty:1,price:0,cost:''});if(b.dataset.act==='del'){const d=arr[+b.dataset.i];if(d&&d.auto==='labor'&&opt.labor)opt.labor.noAutoLabor=true;arr.splice(+b.dataset.i,1)}
+    if(b.dataset.act==='labor'&&opt.labor){opt.labor.noAutoLabor=false;if(laborHrs(opt.labor)<=0){toast('No time on the clock for this job yet');return}const it=arr.find(i=>i.auto==='labor');if(it)it.price=laborRate();applyLabor(opt.labor)}
+    itemsEditor(elId,arr,taxFn,opt)};
   el.onchange=e=>{const s=e.target;if(s.dataset.act!=='pb'||!s.value)return;const p=byId('pricebook',s.value);arr.push({desc:p.name,qty:1,price:+p.price||0,cost:+p.cost||'',pricebookId:p.id,...(p.needsPrice&&!(+p.price)?{needsPrice:true}:{})});itemsEditor(elId,arr,taxFn,opt)};
   tot();
 }
@@ -1883,7 +1893,7 @@ function vSettings(){const c=company();
   <div class="span2"><label>Company name</label><input id="s_name" value="${esc(c.name)}"></div><div><label>License #</label><input id="s_license" value="${esc(c.license)}"></div>
   <div class="span3"><label>Address</label><input id="s_address" value="${esc(c.address)}"></div>
   <div><label>Phone</label><input id="s_phone" value="${esc(c.phone)}"></div><div><label>Email</label><input id="s_email" value="${esc(c.email)}"></div><div><label>Default tax rate %</label><input id="s_taxRate" value="${esc(c.taxRate)}"></div>
-  <div><label>Payment terms (days)</label><input id="s_terms" value="${esc(c.terms||'30')}"></div><div><label>Default labor cost ($/hr)</label><input id="s_laborCost" value="${esc(c.laborCost)}" placeholder="used if tech has none"></div><div></div>
+  <div><label>Payment terms (days)</label><input id="s_terms" value="${esc(c.terms||'30')}"></div><div><label>Default labor cost ($/hr)</label><input id="s_laborCost" value="${esc(c.laborCost)}" placeholder="used if tech has none"></div><div><label>Labor rate billed to customers ($/hr)</label><input id="s_laborRate" value="${esc(c.laborRate||'220')}"><div class="small mut">Time-clock hours × this rate are added to jobs automatically.</div></div>
   <div class="span3"><label>Default online payment link (Stripe / QuickBooks Payments / Square)</label><input id="s_payLink" value="${esc(c.payLink)}" placeholder="https://…"></div>
   <div class="span3"><label>Remit-to (for checks / ACH instructions)</label><input id="s_remit" value="${esc(c.remit)}"></div>
   <div class="span3"><label>Invoice footer</label><textarea id="s_invoiceFooter">${esc(c.invoiceFooter||'Thank you for your business! Please remit payment by the due date.')}</textarea></div></div>
@@ -1894,7 +1904,7 @@ function vSettings(){const c=company();
   <b>Data:</b> ${db?'Stored in this app and shared live with everyone you share it with (Contributor access or higher can edit).':'Saved in this browser only.'}<br>
   <b>QuickBooks:</b> Export CSVs from Customers and Invoices, then import in QuickBooks Online (Settings → Import Data).<br>
   <b>Card payments:</b> paste your Stripe / QuickBooks Payments / Square payment link above — it goes on every invoice email. Record payments on each invoice.</p></div>`}
-async function saveSettings(){const c=grab({id:'company'},['name','license','address','phone','email','taxRate','terms','laborCost','payLink','remit','invoiceFooter'],'s_');try{await save('settings',c);toast('Settings saved')}catch(e){}}
+async function saveSettings(){const c=grab({id:'company'},['name','license','address','phone','email','taxRate','terms','laborCost','laborRate','payLink','remit','invoiceFooter'],'s_');try{await save('settings',c);toast('Settings saved')}catch(e){}}
 
 /* ================= MODAL ================= */
 function modal(h){$('#modal').innerHTML=h;$('#ov').classList.add('show');$('#ov').scrollTop=0;hydratePhotos();const t=document.querySelector('#modal .thr');if(t)t.scrollTop=t.scrollHeight}
