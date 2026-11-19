@@ -768,6 +768,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
 @media(max-width:900px){.mapgrid{grid-template-columns:1fr}#map{height:420px}}
 #auth{position:fixed;inset:0;background:#111;z-index:80;place-items:center;padding:20px;overflow:auto}.authbox{background:#fff;border-radius:16px;padding:28px;max-width:400px;width:100%}.authbox h2{margin:0 0 12px;font-size:20px}body.authing .app{visibility:hidden}
 .pbin{width:84px;text-align:right;padding:4px 6px;font-size:13px}
+.bell{position:fixed;top:14px;right:18px;z-index:40;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;color:#111;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:0}
+.bell .bdg{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;background:#c0392b;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px}
+.bellp{position:fixed;top:62px;right:18px;z-index:41;width:360px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+.bph{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}.bph .sp{flex:1}.bph a{font-size:12px}
+.bpi{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}.bpi:hover{background:#f6f6f6}.bpi.unread{background:#f3f3f3;font-weight:600}.bpi.unread .small{font-weight:400}.bpi.pend{background:#fff7e0}
+.treq{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12.5px}.treq.pending{border-color:#e0b000;background:#fffbe8}.treq.approved{border-color:#bfe3c9}.treq.rejected{border-color:#f0c2bc;background:#fff6f5}
+@media(max-width:900px){.bell{top:auto;bottom:16px;right:16px}.bellp{top:auto;bottom:66px;right:12px}}
 </style>
 <script>/* @preserve
  * Leaflet 1.9.4, a JS library for interactive maps. https://leafletjs.com
@@ -1027,7 +1034,7 @@ async function enter(){
       :`<h2>No office access</h2><p>This login isn’t set up for the office system. If you’re a customer, use the customer portal${KOR.portalUrl?` at <a href="${esc(KOR.portalUrl)}">${esc(KOR.portalUrl.replace(/^https?:\/\//,''))}</a>`:''}. Otherwise ask an Admin to give you access.</p><button onclick="signOut()">Sign out</button>`);return}
   me=data;setSync('Loading…');
   try{await sbLoadAll()}catch(e){authScreen(`<h2>Couldn’t load data</h2><p class="small">${esc(e.message)}</p><p class="small">If this mentions a missing table, run the latest database update in Supabase.</p><button onclick="location.reload()">Try again</button> <button onclick="signOut()">Sign out</button>`);return}
-  hideAuth();sbRealtime();route();
+  hideAuth();sbRealtime();route();loadTreqs().then(()=>{schedRender()});loadNotifs();bellRealtime();
   $('#sync').insertAdjacentHTML('afterend',`<div style="padding:0 18px 14px;font-size:12px"><a href="#" style="color:#bbb" onclick="signOut();return false">Sign out</a></div>`)}
 async function signOut(){await sb.auth.signOut();location.hash='';location.reload()}
 
@@ -1332,7 +1339,7 @@ function drawJob(){
   ${eq?`<div class="small mut" style="margin-top:6px">Unit: ${esc(eq.type)} ${esc(eq.make||'')} ${esc(eq.model||'')} · S/N ${esc(eq.serial||'—')} · ${esc(eq.refrigerant||'')} · filter ${esc(eq.filter||'—')}${eq.warrantyExp?` · warranty ${eq.warrantyExp>=today()?'until':'<b style="color:var(--bad)">expired</b>'} ${fdate(eq.warrantyExp)}`:''}</div>`:''}
   <div class="sec">Parts & Labor</div><div id="items"></div>
   ${!isNew?`<div class="sec">Job Costing</div><div class="grid3 small"><div>Revenue <b>${money(c.rev)}</b></div><div>Materials <b>${money(c.mat)}</b> · Labor <b>${money(c.labor)}</b> (${jobHours(j).toFixed(1)}h)</div><div>Gross margin <b style="color:${c.margin<0?'var(--bad)':'var(--ok)'}">${money(c.margin)} ${c.rev?'('+pct(c.margin/c.rev)+')':''}</b></div></div>
-  <div class="sec">Time Clock</div>${(j.timeLog||[]).length?`<table class="small">${j.timeLog.map(t=>`<tr><td>${esc(techName(t.techId))}</td><td>${fdt(t.in)}</td><td>${t.out?fdt(t.out):'<b style="color:var(--ok)">on the clock</b>'}</td><td class="r">${(((t.out?new Date(t.out):new Date())-new Date(t.in))/36e5).toFixed(2)}h</td></tr>`).join('')}</table>`:'<div class="mut small">No time logged — techs clock in from the Tech App.</div>'}
+  ${timeSection(j)}
   ${(j.photos||[]).length?`<div class="sec">Photos</div><div class="photos">${j.photos.map(p=>`<a href="${esc(p.url||'#')}" target="_blank" data-path="${esc(p.url?'':p.path||'')}"><img src="${esc(p.url||'')}" data-path="${esc(p.url?'':p.path||'')}"></a>`).join('')}</div>`:''}
   ${j.signature?`<div class="sec">Customer Signature</div><img src="${esc(j.signature)}" style="max-width:300px;border:1px solid var(--line);border-radius:8px"><div class="small mut">Signed by ${esc(j.signedBy||'')} · ${fdt(j.signedAt)}</div>`:''}
   <div class="sec">Notify Customer</div><div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1708,6 +1715,79 @@ function openTech(id){const t=id?{...byId('techs',id)}:{id:uid(),color:['#2f6fde
   <p class="small" style="margin-top:10px">📍 <b>Location tracking notice:</b> ${t.locationAckAt?`acknowledged by ${esc(t.locationAckName||t.name)} on ${fdt(t.locationAckAt)}`:'<span style="color:var(--warn)">not acknowledged yet</span> — the tech acknowledges it the first time they sign in to the KOR HVAC Tech app.'}</p>
   <div class="mfoot">${id&&!sb?`<button class="danger" onclick="delRec('techs','${t.id}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM()">${isAdmin()?'Cancel':'Close'}</button>${isAdmin()?`<button class="pri" onclick="saveTech()">Save</button>`:''}</div>`)}
 async function saveTech(){const t=grab({...edit.obj},['name','title','color','phone','email','skills','payRate','costRate','commission']);delete t.role;t.active=v('f_active')==='Active';if(!t.name){toast('Enter a name');return}try{await save('techs',t);closeM();toast('Technician saved')}catch(e){}}
+
+/* ================= NOTIFICATIONS (bell) + TIME CHANGE REQUESTS ================= */
+const BELL_SVG='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+S.notifs=[];S.treqs=[];
+async function loadNotifs(){if(!sb)return;const{data}=await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(60);S.notifs=data||[];drawBell()}
+async function loadTreqs(){if(!sb)return;const{data}=await sb.from('time_requests').select('*').order('created_at',{ascending:false}).limit(500);S.treqs=data||[]}
+function bellRealtime(){if(!sb)return;sb.channel('office-bell')
+  .on('postgres_changes',{event:'*',schema:'public',table:'notifications'},()=>loadNotifs())
+  .on('postgres_changes',{event:'*',schema:'public',table:'time_requests'},()=>loadTreqs().then(()=>{schedRender();if($('#ov').classList.contains('show')&&edit&&edit.col==='jobs'){syncJob();drawJob()}}))
+  .subscribe()}
+function drawBell(){let b=$('#bell');if(!sb){if(b)b.remove();return}
+  if(!b){document.body.insertAdjacentHTML('beforeend',`<button id="bell" class="bell" onclick="toggleBell(event)" title="Notifications">${BELL_SVG}<span class="bdg"></span></button><div id="bellp" class="bellp" hidden></div>`);b=$('#bell')}
+  const n=S.notifs.filter(x=>!x.read_at).length;const d=b.querySelector('.bdg');d.textContent=n>99?'99+':n;d.style.display=n?'':'none';
+  if(!$('#bellp').hidden)drawBellPanel()}
+function drawBellPanel(){const p=$('#bellp');const pend=isAdmin()?S.treqs.filter(r=>r.status==='Pending').length:0;
+  p.innerHTML=`<div class="bph"><b>Notifications</b><span class="sp"></span>${S.notifs.some(x=>!x.read_at)?'<a href="#" onclick="markAllRead();return false">Mark all read</a>':''}</div>
+  ${pend?`<div class="bpi pend" onclick="openTreqList()"><b>⏱ ${pend} time change request${pend>1?'s':''} waiting for approval</b><div class="small mut">Review and approve or reject</div></div>`:''}
+  ${S.notifs.length?S.notifs.map(x=>`<div class="bpi ${x.read_at?'':'unread'}" onclick="openNotif('${x.id}')"><div>${esc(x.title)}</div>${x.body?`<div class="small mut">${esc(x.body)}</div>`:''}<div class="small mut">${ago(x.created_at)}</div></div>`).join(''):'<div class="bpi mut small">No notifications yet.</div>'}`}
+function toggleBell(e){e&&e.stopPropagation();const p=$('#bellp');p.hidden=!p.hidden;if(!p.hidden)drawBellPanel()}
+document.addEventListener('click',e=>{const p=$('#bellp');if(p&&!p.hidden&&!p.contains(e.target)&&e.target.id!=='bell'&&!e.target.closest('#bell'))p.hidden=true});
+async function markAllRead(){await sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);await loadNotifs()}
+async function openNotif(id){const x=S.notifs.find(n=>n.id===id);if(!x)return;$('#bellp').hidden=true;
+  if(!x.read_at){x.read_at=new Date().toISOString();drawBell();sb.from('notifications').update({read_at:x.read_at}).eq('id',id).then(()=>{})}
+  const[k,ref]=String(x.link||'').split(':');
+  if(k==='job'&&byId('jobs',ref))openJob(ref);
+  else if(k==='timereq')openTreq(ref);
+  else if(k==='estimate'&&byId('estimates',ref))openEst(ref);
+  else if(k==='invoice'&&byId('invoices',ref))openInv(ref);
+  else if(k==='request'){location.hash='dashboard'}
+  else if(k==='pricebook'){UI.pbNeeds=true;location.hash='pricebook'}}
+const dtl=iso=>{if(!iso)return '';const d=new Date(iso);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
+const hrs=(a,b)=>(((b?new Date(b):new Date())-new Date(a))/36e5);
+/* job modal: time clock section */
+function timeSection(j){const log=j.timeLog||[];const ad=isAdmin();const reqs=(S.treqs||[]).filter(r=>r.job_id===j.id);const pend=reqs.filter(r=>r.status==='Pending');
+  return `<div class="sec">Time Clock</div>${log.length?`<table class="small">${log.map((t,i)=>`<tr><td>${esc(techName(t.techId))}</td><td>${fdt(t.in)}</td><td>${t.out?fdt(t.out):'<b style="color:var(--ok)">on the clock</b>'}</td><td class="r">${hrs(t.in,t.out).toFixed(2)}h</td><td class="r">${t.editedBy?`<span class="mut" title="${esc(t.note||'')}">edited by ${esc(t.editedBy)}</span> `:''}${ad?`<button class="sm" onclick="timeEdit(${i})">Edit</button> <button class="sm" onclick="timeDel(${i})" title="Delete entry">✕</button>`:`<button class="sm" onclick="timeEdit(${i})">Request change</button>`}</td></tr>`).join('')}</table>`:'<div class="mut small">No time logged — techs clock in from the Tech App.</div>'}
+  <div style="margin-top:6px"><button class="sm" onclick="timeEdit(null)">${ad?'+ Add time':'+ Request missed time'}</button>${ad?'':' <span class="small mut">Time changes need Admin approval.</span>'}</div>
+  ${reqs.length?`<div style="margin-top:8px">${reqs.map(r=>`<div class="treq ${r.status.toLowerCase()}"><b>${esc(r.status)}</b> · ${esc(techName(r.tech_id))}: ${r.entry_index==null?'add':'change to'} ${fdt(r.new_in)} → ${r.new_out?fdt(r.new_out):'open'} <span class="mut">(${r.new_out?hrs(r.new_in,r.new_out).toFixed(2)+'h':''})</span> — “${esc(r.reason)}” <span class="mut">by ${esc(r.requested_name||'')}, ${ago(r.created_at)}</span>${r.status==='Pending'&&ad?` <button class="sm pri" onclick="openTreq('${r.id}')">Review</button>`:''}${r.decision_note?`<div class="small mut">Note: ${esc(r.decision_note)}</div>`:''}</div>`).join('')}</div>`:''}`}
+function timeEdit(i){const j=edit.obj;const t=i==null?null:(j.timeLog||[])[i];const ad=isAdmin();const techs=crew();
+  const dflt=t?null:(j.techId||((techs[0]||{}).id));const base=j.date?j.date+'T08:00':dtl(new Date().toISOString());
+  $('#modal2').innerHTML=`<h2>${t?(ad?'Edit time entry':'Request a time change'):(ad?'Add time':'Request missed time')}<button class="sm" onclick="closeM2()">✕</button></h2>
+  <div class="fg">${t?`<div class="span2"><label>Technician</label><input value="${esc(techName(t.techId))}" disabled></div>`:`<div class="span2"><label>Technician</label><select id="te_tech">${techs.map(x=>`<option value="${x.id}" ${x.id===dflt?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`}
+  <div><label>Clock in</label><input id="te_in" type="datetime-local" value="${t?dtl(t.in):base}"></div><div><label>Clock out</label><input id="te_out" type="datetime-local" value="${t&&t.out?dtl(t.out):''}"></div>
+  <div class="span2"><label>${ad?'Note (optional)':'Reason *'}</label><input id="te_note" placeholder="e.g. Forgot to clock back in after lunch"></div></div>
+  ${t?`<p class="small mut">Currently: ${fdt(t.in)} → ${t.out?fdt(t.out):'on the clock'} (${hrs(t.in,t.out).toFixed(2)} h)</p>`:''}
+  ${ad?'':'<p class="small mut">An Admin will get a notification to approve this. Times change only after approval.</p>'}
+  <div class="mfoot"><span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" id="te_btn" onclick="timeSave(${i==null?'null':i})">${ad?'Save':'Send for approval'}</button></div>`;$('#ov2').classList.add('show')}
+async function timeSave(i){const j=edit.obj;const t=i==null?null:j.timeLog[i];const tin=v('te_in'),tout=v('te_out'),note=v('te_note');
+  if(!tin){toast('Enter the clock-in time');return}const inIso=new Date(tin).toISOString(),outIso=tout?new Date(tout).toISOString():null;
+  if(outIso&&outIso<=inIso){toast('Clock out must be after clock in');return}if(outIso&&hrs(inIso,outIso)>16){toast('One entry can’t be longer than 16 hours');return}
+  const techId=t?t.techId:v('te_tech');if(!techId){toast('Pick a technician');return}
+  if(!isAdmin()){if(!note){toast('Add a reason');return}if(!sb){toast('Time requests work once the system is live');return}
+    $('#te_btn').disabled=true;const{error}=await sb.rpc('request_time_fix',{p_job:j.id,p_tech:techId,p_index:i,p_in:inIso,p_out:outIso,p_reason:note});$('#te_btn').disabled=false;
+    if(error){toast(sbErr(error));return}closeM2();toast('Sent to Admin for approval');await loadTreqs();syncJob();drawJob();return}
+  const entry={techId,in:inIso,...(outIso?{out:outIso}:{}),editedBy:(me&&me.name)||'Admin',editedAt:new Date().toISOString(),...(note?{note}:{})};
+  const cur=JSON.parse(JSON.stringify(byId('jobs',j.id)||j));cur.timeLog=cur.timeLog||[];if(i==null)cur.timeLog.push(entry);else cur.timeLog[i]=entry;
+  try{if(byId('jobs',j.id))await save('jobs',{...cur});syncJob();edit.obj.timeLog=cur.timeLog;closeM2();drawJob();toast('Time updated')}catch(e){}}
+async function timeDel(i){const j=edit.obj;const t=j.timeLog[i];if(!confirm(`Delete ${techName(t.techId)}'s entry ${fdt(t.in)} → ${t.out?fdt(t.out):'now'}?`))return;
+  const cur=JSON.parse(JSON.stringify(byId('jobs',j.id)||j));cur.timeLog.splice(i,1);try{if(byId('jobs',j.id))await save('jobs',cur);syncJob();edit.obj.timeLog=cur.timeLog;drawJob();toast('Entry deleted')}catch(e){}}
+function openTreq(id){const r=(S.treqs||[]).find(x=>x.id===id);if(!r){toast('Request not found');return}const j=byId('jobs',r.job_id)||{};const ad=isAdmin();
+  $('#modal2').innerHTML=`<h2>Time change request<button class="sm" onclick="closeM2()">✕</button></h2>
+  <p><b>${esc(techName(r.tech_id))}</b> · Job #${esc(j.number||'')} ${j.customerId?'· '+esc(custName(j.customerId)):''}</p>
+  <table class="small"><tr><td class="mut">Now</td><td>${r.entry_index==null?'<i>no entry — missed time</i>':`${fdt(r.old_in)} → ${r.old_out?fdt(r.old_out):'on the clock'} (${hrs(r.old_in,r.old_out).toFixed(2)} h)`}</td></tr>
+  <tr><td class="mut">Requested</td><td><b>${fdt(r.new_in)} → ${r.new_out?fdt(r.new_out):'open'}</b> ${r.new_out?`(${hrs(r.new_in,r.new_out).toFixed(2)} h)`:''}</td></tr>
+  <tr><td class="mut">Reason</td><td>${esc(r.reason)}</td></tr><tr><td class="mut">Asked by</td><td>${esc(r.requested_name||'')} · ${fdt(r.created_at)}</td></tr>
+  <tr><td class="mut">Status</td><td><b>${esc(r.status)}</b>${r.decided_name?` by ${esc(r.decided_name)} · ${fdt(r.decided_at)}`:''}${r.decision_note?` — ${esc(r.decision_note)}`:''}</td></tr></table>
+  ${r.status==='Pending'&&ad?`<label style="margin-top:10px">Note to ${esc(r.requested_name||'them')} (optional)</label><input id="tr_note">`:''}
+  <div class="mfoot">${j.id?`<button onclick="closeM2();openJob('${j.id}')">Open job</button>`:''}<span class="sp"></span><button onclick="closeM2()">Close</button>${r.status==='Pending'&&ad?`<button class="danger" onclick="decideTreq('${r.id}',false)">Reject</button><button class="pri" onclick="decideTreq('${r.id}',true)">Approve</button>`:''}</div>`;$('#ov2').classList.add('show')}
+async function decideTreq(id,ok){const{error}=await sb.rpc('decide_time_request',{p_id:id,p_approve:ok,p_note:v('tr_note')||null});if(error){toast(sbErr(error));return}
+  closeM2();toast(ok?'Approved — time updated':'Rejected');await loadTreqs();
+  if($('#ov').classList.contains('show')&&edit&&edit.col==='jobs'){const r=S.treqs.find(x=>x.id===id);const fresh=byId('jobs',edit.obj.id);if(fresh){syncJob();edit.obj.timeLog=fresh.timeLog}drawJob()}else render()}
+function openTreqList(){$('#bellp').hidden=true;const rs=(S.treqs||[]).filter(r=>r.status==='Pending');
+  $('#modal2').innerHTML=`<h2>Time change requests<button class="sm" onclick="closeM2()">✕</button></h2>${rs.length?rs.map(r=>{const j=byId('jobs',r.job_id)||{};return `<div class="treq pending" style="cursor:pointer" onclick="openTreq('${r.id}')"><b>${esc(techName(r.tech_id))}</b> · Job #${esc(j.number||'')} — ${fdt(r.new_in)} → ${r.new_out?fdt(r.new_out):'open'} · “${esc(r.reason)}” <span class="mut">${ago(r.created_at)}</span></div>`}).join(''):'<p class="mut">Nothing waiting.</p>'}
+  <div class="mfoot"><span class="sp"></span><button onclick="closeM2()">Close</button></div>`;$('#ov2').classList.add('show')}
 
 /* ================= PRICEBOOK ================= */
 const PB_CATS=['Labor','Parts','Refrigerant','Flat Rate Repair','Maintenance','Equipment','Fees'];

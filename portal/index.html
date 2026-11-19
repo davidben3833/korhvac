@@ -84,6 +84,11 @@ tr.click{cursor:pointer}tr.click:hover td{background:#fafbfd}
 .timeline{border-left:3px solid var(--line);margin-left:6px;padding-left:18px}
 .tl{position:relative;padding-bottom:18px}.tl::before{content:'';position:absolute;left:-26px;top:4px;width:13px;height:13px;border-radius:50%;background:#111;border:3px solid #fff;box-shadow:0 0 0 1px var(--line)}
 @media(max-width:700px){.hide-m{display:none}main{padding:18px 14px 50px}h1{font-size:22px}td,th{padding:9px 6px}}
+.bellb{position:relative;width:38px;height:38px;border-radius:50%;border:1px solid #444;background:transparent;color:inherit;display:inline-grid;place-items:center;cursor:pointer;padding:0;margin-right:6px}
+.bellb .bdg{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#c0392b;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px}
+header{position:relative}.bellp{position:absolute;right:16px;top:calc(100% - 6px);z-index:50;width:340px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;background:#fff;color:#111;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);text-align:left}
+.bph{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid #eee;position:sticky;top:0;background:#fff}.bph a{font-size:12px;color:#111}
+.bpi{padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer;font-size:13px}.bpi:hover{background:#f6f6f6}.bpi.unread{background:#f3f3f3;font-weight:600}.bpi.unread .small{font-weight:400}
 </style>
 </head>
 <body>
@@ -139,6 +144,8 @@ function demoApi(){
                 {name:'Best',desc:'High efficiency + variable speed + 5-yr parts & labor',items:[{desc:'10-ton RTU, variable speed',qty:1,price:21400},{desc:'Installation, crane & startup',qty:1,price:5200},{desc:'5-year parts & labor warranty',qty:1,price:1900}]}]}],
     agreements:[{id:'a1',number:'AG-301',customerId:'c1',name:'Quarterly PM – 2 RTUs + boiler',status:'Active',visits:4,billing:'Quarterly',start:addDays(t,-200),end:addDays(t,165),nextVisit:addDays(t,5)}],
     requests:[],
+    notifs:[{id:'n1',kind:'estimate',title:'New estimate ready',body:'Replace RTU-1 — review it in your portal.',link:'estimate:x1',read_at:null,created_at:new Date(Date.now()-3*864e5).toISOString()},
+            {id:'n2',kind:'job',title:'Service completed',body:'Job #J-1041 is complete. Thank you!',link:'job:j1',read_at:new Date().toISOString(),created_at:new Date(Date.now()-6*864e5).toISOString()}],
     sms:{optIn:false,phone:''}
   });
   let db;try{db=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
@@ -155,6 +162,9 @@ function demoApi(){
     async decide(id,optIdx,approve,name){const e=db.estimates.find(x=>x.id===id);e.status=approve?'Approved':'Declined';e.selected=approve?optIdx:null;e.approvedBy=name;e.approvedAt=new Date().toISOString();save()},
     async request(r){db.requests.unshift({...r,id:'r'+Date.now(),status:'Received',createdAt:new Date().toISOString()});save()},
     async setSms(optIn,phone){const d=String(phone||'').replace(/\D/g,'');if(optIn&&!(d.length===10||(d.length===11&&d[0]==='1')))throw new Error('Enter a valid US mobile number');db.sms={optIn,phone:optIn?phone:db.sms.phone};save()},
+    async notifs(){return JSON.parse(JSON.stringify(db.notifs||[]))},
+    async markRead(ids){const at=new Date().toISOString();(db.notifs||[]).forEach(n=>{if(!ids||ids.includes(n.id))n.read_at=n.read_at||at});save()},
+    onNotif(){return()=>{}},
     reset(){localStorage.removeItem(KEY);location.reload()}
   };
 }
@@ -172,12 +182,15 @@ function supabaseApi(){
       return{me,customers:me.customers||[],jobs:J(jobs),invoices:J(invoices),estimates:J(estimates),equipment:J(equipment),agreements:J(agreements),requests:J(requests),sms:sms||{optIn:false,phone:''}}},
     async setSms(optIn,phone){await rpc('client_set_sms',{p_opt_in:optIn,p_phone:phone})},
     async decide(id,optIdx,approve,name){await rpc('client_estimate_decide',{p_id:id,p_option:optIdx,p_approve:approve,p_name:name})},
+    async notifs(){const{data,error}=await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(50);if(error)throw new Error(error.message);return data||[]},
+    async markRead(ids){let q=sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);if(ids)q=q.in('id',ids);await q},
+    onNotif(fn){const ch=sb.channel('portal-bell').on('postgres_changes',{event:'*',schema:'public',table:'notifications'},()=>fn()).subscribe();return()=>sb.removeChannel(ch)},
     async request(r){await rpc('client_request_service',{p_customer:r.customerId,p_equipment:r.equipmentId||null,p_description:r.description,p_preferred_date:r.preferredDate||null,p_urgency:r.urgency,p_contact:r.contact,p_phone:r.phone})}
   };
 }
 
 /* ===================== STATE / ROUTING ===================== */
-let D=null,me=null,loc='all';
+let D=null,me=null,loc='all',N=[],bellOpen=false,bellSub=null;
 const TABS=[['home','Overview'],['history','Service History'],['invoices','Invoices'],['estimates','Estimates'],['equipment','Equipment'],['request','Request Service']];
 const tab=()=>{const h=location.hash.slice(1);return TABS.some(t=>t[0]===h)?h:'home'};
 window.addEventListener('hashchange',()=>render());
@@ -194,14 +207,23 @@ async function boot(){
   if(me&&!me.unlinked){await refresh()}else render();
 }
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
-async function refresh(){try{D=await api.load()}catch(e){toast('Could not load your account — please try again');D=null}render()}
+async function refresh(){try{D=await api.load()}catch(e){toast('Could not load your account — please try again');D=null}await loadN(true);render();if(D&&!bellSub)bellSub=api.onNotif(()=>loadN().then(()=>{refresh()}))}
+async function loadN(quiet){try{N=await api.notifs()}catch(e){N=[]}if(!quiet)render()}
+const BELL='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+function bellBtn(){const n=N.filter(x=>!x.read_at).length;return `<button class="bellb" aria-label="Notifications, ${n} unread" onclick="event.stopPropagation();bellOpen=!bellOpen;render()">${BELL}${n?`<span class="bdg">${n>99?'99+':n}</span>`:''}</button>`}
+function bellPanel(){if(!bellOpen)return '';const ago=iso=>{const m=Math.round((Date.now()-new Date(iso))/6e4);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'};
+  return `<div class="bellp" onclick="event.stopPropagation()"><div class="bph"><b>Notifications</b><span style="flex:1"></span>${N.some(x=>!x.read_at)?'<a href="#" onclick="markAllN();return false">Mark all read</a>':''}</div>${N.length?N.map(x=>`<div class="bpi ${x.read_at?'':'unread'}" onclick="openN('${x.id}')"><div>${esc(x.title)}</div>${x.body?`<div class="small mut">${esc(x.body)}</div>`:''}<div class="small mut">${ago(x.created_at)}</div></div>`).join(''):'<div class="bpi mut small">No notifications yet.</div>'}</div>`}
+async function markAllN(){await api.markRead().catch(()=>{});await loadN()}
+async function openN(id){const x=N.find(n=>n.id===id);bellOpen=false;if(x&&!x.read_at){x.read_at=new Date().toISOString();api.markRead([id]).catch(()=>{})}
+  const k=String((x&&x.link)||'').split(':')[0];const to={job:'history',invoice:'invoices',estimate:'estimates',request:'request'}[k];if(to&&location.hash!=='#'+to)location.hash=to;else render()}
+document.addEventListener('click',()=>{if(bellOpen){bellOpen=false;render()}});
 
 /* ===================== RENDER ===================== */
 function render(){
   if(!me||!D){$('#app').innerHTML=me&&me.unlinked?unlinked():login();return}
   const t=tab();
   $('#app').innerHTML=`<header><div class="hwrap"><div><svg style="height:50px;width:auto;display:block" role="img" aria-label="KOR HVAC" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450.9 268.3"><path d="M71.65 152.50L40 152.50L40 40L74.65 40L74.65 106L125.50 40L162.10 40L124.30 87.10L163.75 152.50L124.15 152.50L102.25 114.40" fill="#FFFFFF"/><circle cx="229" cy="96.25" r="44.82421875" fill="none" stroke="#FFFFFF" stroke-width="22.8515625"/><circle cx="229" cy="96.25" r="13.18359375" fill="#FFFFFF"/><path d="M343.15 113.50L329.20 113.50L329.20 152.50L294.25 152.50L294.25 40L362.95 40Q376 40 385.90 44.65Q395.80 49.30 401.35 57.55Q406.90 65.80 406.90 76.90Q406.90 87.70 401.35 96.03Q395.80 104.35 385.90 108.85Q383.35 110.20 380.50 110.95L410.95 152.50L370.90 152.50L343.15 113.50M329.20 65.20L329.20 88.60L357.70 88.60Q364.30 88.60 367.98 85.60Q371.65 82.60 371.65 76.90Q371.65 71.20 367.98 68.20Q364.30 65.20 357.70 65.20" fill="#FFFFFF"/><path d="M160.70 224.68L157.38 224.68L157.38 206.13L160.70 206.13L160.70 213.80L169.33 213.80L169.33 206.13L172.65 206.13L172.65 224.68L169.33 224.68L169.33 216.60L160.70 216.60M207.64 224.68L203.43 224.68L196.82 206.13L200.47 206.13L203.76 215.76Q204.22 217.21 204.75 219.09Q205.14 220.43 205.56 222.03Q205.98 220.41 206.36 219.08Q206.87 217.21 207.32 215.76L210.50 206.13L214.14 206.13M240.68 224.68L237.05 224.68L243.52 206.13L247.74 206.13L254.37 224.68L250.72 224.68L249.15 220.09L242.20 220.09L240.68 224.68M243.09 217.41L248.23 217.41L247.42 215.04Q246.93 213.55 246.41 211.66Q246.04 210.31 245.60 208.71Q245.19 210.34 244.83 211.69Q244.32 213.60 243.87 215.04M286.43 224.93Q283.99 224.93 282.07 223.80Q280.15 222.66 279.04 220.53Q277.93 218.40 277.93 215.42Q277.93 212.42 279.05 210.28Q280.16 208.14 282.09 207.01Q284.01 205.88 286.43 205.88Q287.95 205.88 289.27 206.31Q290.60 206.74 291.64 207.57Q292.68 208.39 293.35 209.59Q294.02 210.78 294.25 212.30L290.90 212.30Q290.73 211.47 290.34 210.83Q289.95 210.20 289.36 209.76Q288.78 209.32 288.04 209.08Q287.31 208.85 286.48 208.85Q284.96 208.85 283.78 209.62Q282.60 210.39 281.94 211.85Q281.27 213.31 281.27 215.42Q281.27 217.55 281.94 219Q282.62 220.46 283.79 221.21Q284.97 221.95 286.46 221.95Q287.30 221.95 288.03 221.72Q288.77 221.49 289.36 221.05Q289.95 220.61 290.35 219.97Q290.75 219.33 290.90 218.50L294.26 218.50Q294.07 219.84 293.44 221Q292.81 222.16 291.79 223.05Q290.77 223.93 289.42 224.43Q288.07 224.93 286.43 224.93" fill="#FFFFFF"/><rect x="67.0" y="214.0" width="67.5" height="3" fill="#FFFFFF"/><rect x="316.4" y="214.0" width="67.5" height="3" fill="#FFFFFF"/></svg><div class="ctag" style="margin-top:6px">Customer Portal</div></div>
-   <div class="hright"><span class="hide-m">${esc(me.email||'')}</span>${api.demo?'<button class="sm" onclick="api.reset()">Reset demo</button>':''}<button class="sm" onclick="signOut()">Sign out</button></div></div></header>
+   <div class="hright"><span class="hide-m">${esc(me.email||'')}</span>${api.demo?'<button class="sm" onclick="api.reset()">Reset demo</button>':''}${bellBtn()}<button class="sm" onclick="signOut()">Sign out</button></div></div>${bellPanel()}</header>
    <nav><div class="nwrap">${TABS.map(([k,l])=>`<a href="#${k}" class="${k===t?'on':''}">${l}</a>`).join('')}</div></nav>
    <main>${multi()?`<div class="row" style="margin-bottom:16px"><span class="mut small">Location</span><select style="max-width:360px" onchange="loc=this.value;render()"><option value="all">All locations (${D.customers.length})</option>${D.customers.map(c=>`<option value="${c.id}" ${loc===c.id?'selected':''}>${esc(c.company||c.name)}</option>`).join('')}</select></div>`:''}
    ${({home:vHome,history:vHistory,invoices:vInvoices,estimates:vEstimates,equipment:vEquipment,request:vRequest})[t]()}
