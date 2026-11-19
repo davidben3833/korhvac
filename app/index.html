@@ -1368,7 +1368,8 @@ function notifyJob(kind){syncJob();const j=edit.obj,c=byId('customers',j.custome
   const[s,b]=msg[kind];sendEmail(c.email,s,b).then(ok=>{if(ok){j.notified=(j.notified||[]).concat([{kind,at:new Date().toISOString()}]);save('jobs',j).catch(()=>{})}})}
 
 const laborRate=()=>{const r=+company().laborRate;return r>0?r:220};
-const laborHrs=j=>Math.round(jobHours(j)*4)/4;
+const laborHrs=j=>{const h=jobHours(j);if(h<=0)return 0;const c=company();const min=+c.laborMinHrs>0?+c.laborMinHrs:1;const step=(+c.laborRoundMin>0?+c.laborRoundMin:30)/60;
+  const up=Math.ceil(h/step-1e-6)*step;return Math.round(Math.max(min,up)*100)/100};
 /* keeps one automatic "Labor" line in sync with the time clock (hours × labor rate). Rate on the line can be changed per job. */
 function applyLabor(j){if(!j||j.noAutoLabor||j.invoiceId)return false;const h=laborHrs(j);j.items=j.items||[];const k=j.items.findIndex(i=>i.auto==='labor');
   if(h<=0){return false}
@@ -1894,6 +1895,7 @@ function vSettings(){const c=company();
   <div class="span3"><label>Address</label><input id="s_address" value="${esc(c.address)}"></div>
   <div><label>Phone</label><input id="s_phone" value="${esc(c.phone)}"></div><div><label>Email</label><input id="s_email" value="${esc(c.email)}"></div><div><label>Default tax rate %</label><input id="s_taxRate" value="${esc(c.taxRate)}"></div>
   <div><label>Payment terms (days)</label><input id="s_terms" value="${esc(c.terms||'30')}"></div><div><label>Default labor cost ($/hr)</label><input id="s_laborCost" value="${esc(c.laborCost)}" placeholder="used if tech has none"></div><div><label>Labor rate billed to customers ($/hr)</label><input id="s_laborRate" value="${esc(c.laborRate||'220')}"><div class="small mut">Time-clock hours × this rate are added to jobs automatically.</div></div>
+  <div><label>Minimum billed hours per call</label><input id="s_laborMinHrs" value="${esc(c.laborMinHrs||'1')}"></div><div><label>After that, round up to every (minutes)</label><input id="s_laborRoundMin" value="${esc(c.laborRoundMin||'30')}"><div class="small mut">e.g. 1:10 → 1.5 h, 1:31 → 2 h</div></div><div></div>
   <div class="span3"><label>Default online payment link (Stripe / QuickBooks Payments / Square)</label><input id="s_payLink" value="${esc(c.payLink)}" placeholder="https://…"></div>
   <div class="span3"><label>Remit-to (for checks / ACH instructions)</label><input id="s_remit" value="${esc(c.remit)}"></div>
   <div class="span3"><label>Invoice footer</label><textarea id="s_invoiceFooter">${esc(c.invoiceFooter||'Thank you for your business! Please remit payment by the due date.')}</textarea></div></div>
@@ -1904,7 +1906,7 @@ function vSettings(){const c=company();
   <b>Data:</b> ${db?'Stored in this app and shared live with everyone you share it with (Contributor access or higher can edit).':'Saved in this browser only.'}<br>
   <b>QuickBooks:</b> Export CSVs from Customers and Invoices, then import in QuickBooks Online (Settings → Import Data).<br>
   <b>Card payments:</b> paste your Stripe / QuickBooks Payments / Square payment link above — it goes on every invoice email. Record payments on each invoice.</p></div>`}
-async function saveSettings(){const c=grab({id:'company'},['name','license','address','phone','email','taxRate','terms','laborCost','laborRate','payLink','remit','invoiceFooter'],'s_');try{await save('settings',c);toast('Settings saved')}catch(e){}}
+async function saveSettings(){const c=grab({id:'company'},['name','license','address','phone','email','taxRate','terms','laborCost','laborRate','laborMinHrs','laborRoundMin','payLink','remit','invoiceFooter'],'s_');try{await save('settings',c);toast('Settings saved')}catch(e){}}
 
 /* ================= MODAL ================= */
 function modal(h){$('#modal').innerHTML=h;$('#ov').classList.add('show');$('#ov').scrollTop=0;hydratePhotos();const t=document.querySelector('#modal .thr');if(t)t.scrollTop=t.scrollHeight}
