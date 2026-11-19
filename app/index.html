@@ -768,13 +768,14 @@ svg.leaflet-image-layer.leaflet-interactive path {
 @media(max-width:900px){.mapgrid{grid-template-columns:1fr}#map{height:420px}}
 #auth{position:fixed;inset:0;background:#111;z-index:80;place-items:center;padding:20px;overflow:auto}.authbox{background:#fff;border-radius:16px;padding:28px;max-width:400px;width:100%}.authbox h2{margin:0 0 12px;font-size:20px}body.authing .app{visibility:hidden}
 .pbin{width:84px;text-align:right;padding:4px 6px;font-size:13px}
-.bell{position:fixed;top:14px;right:18px;z-index:40;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;color:#111;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:0}
-.bell .bdg{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;background:#c0392b;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px}
-.bellp{position:fixed;top:62px;right:18px;z-index:41;width:360px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+.bell{display:flex;align-items:center;gap:10px;width:calc(100% - 24px);margin:0 12px 10px;padding:10px 12px;border-radius:10px;border:1px solid #333;background:#1c1c1c;color:#eee;cursor:pointer;font-size:14px;text-align:left}
+.bell:hover{background:#262626}.bell .bl{flex:1}
+.bell .bdg{min-width:20px;height:20px;border-radius:10px;background:#c0392b;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px}
+.bellp{position:fixed;left:225px;top:110px;z-index:60;width:360px;max-width:calc(100vw - 24px);max-height:80vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .bph{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}.bph .sp{flex:1}.bph a{font-size:12px}
 .bpi{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}.bpi:hover{background:#f6f6f6}.bpi.unread{background:#f3f3f3;font-weight:600}.bpi.unread .small{font-weight:400}.bpi.pend{background:#fff7e0}
 .treq{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12.5px}.treq.pending{border-color:#e0b000;background:#fffbe8}.treq.approved{border-color:#bfe3c9}.treq.rejected{border-color:#f0c2bc;background:#fff6f5}
-@media(max-width:900px){.bell{top:auto;bottom:16px;right:16px}.bellp{top:auto;bottom:66px;right:12px}}
+@media(max-width:900px){.bell{width:auto;margin:0 12px 8px}.bellp{left:12px;right:12px;top:150px;width:auto}}
 </style>
 <script>/* @preserve
  * Leaflet 1.9.4, a JS library for interactive maps. https://leafletjs.com
@@ -1726,7 +1727,7 @@ function bellRealtime(){if(!sb)return;sb.channel('office-bell')
   .on('postgres_changes',{event:'*',schema:'public',table:'time_requests'},()=>loadTreqs().then(()=>{schedRender();if($('#ov').classList.contains('show')&&edit&&edit.col==='jobs'){syncJob();drawJob()}}))
   .subscribe()}
 function drawBell(){let b=$('#bell');if(!sb){if(b)b.remove();return}
-  if(!b){document.body.insertAdjacentHTML('beforeend',`<button id="bell" class="bell" onclick="toggleBell(event)" title="Notifications">${BELL_SVG}<span class="bdg"></span></button><div id="bellp" class="bellp" hidden></div>`);b=$('#bell')}
+  if(!b){$('#nav').insertAdjacentHTML('beforebegin',`<button id="bell" class="bell" onclick="toggleBell(event)" title="Notifications">${BELL_SVG}<span class="bl">Notifications</span><span class="bdg"></span></button>`);document.body.insertAdjacentHTML('beforeend','<div id="bellp" class="bellp" hidden></div>');b=$('#bell')}
   const n=S.notifs.filter(x=>!x.read_at).length;const d=b.querySelector('.bdg');d.textContent=n>99?'99+':n;d.style.display=n?'':'none';
   if(!$('#bellp').hidden)drawBellPanel()}
 function drawBellPanel(){const p=$('#bellp');const pend=isAdmin()?S.treqs.filter(r=>r.status==='Pending').length:0;
