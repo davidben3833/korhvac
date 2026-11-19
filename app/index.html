@@ -49,6 +49,7 @@ table{width:100%;border-collapse:collapse}
 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
 td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 tr.click{cursor:pointer}tr.click:hover td{background:#fafbfd}
+.xp{display:inline-block;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;margin:1px 2px 1px 0}.xp.ok{background:#e7f6ee;color:#1f7a45}.xp.soon{background:#fff3dc;color:#9a6200}.xp.bad{background:#fde8e8;color:#b42318}.xp.none{background:#eef0f4;color:#8a93a6}
 .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;background:#eef0f4;color:#5a6378}
 .b-Scheduled,.b-Pre-approval{background:#e6efff;color:var(--blue)}.b-Dispatched,.b-Submitted{background:#efe7ff;color:#6d3fd8}
 .b-En,.b-Unpaid,.b-Sent,.b-Partial,.b-Callback,.b-Installed{background:#fff4dc;color:#a46a00}.b-On{background:#ffe9dc;color:#c4520f}
@@ -1805,6 +1806,7 @@ async function openNotif(id){const x=S.notifs.find(n=>n.id===id);if(!x)return;$(
   const[k,ref]=String(x.link||'').split(':');
   if(k==='job'&&byId('jobs',ref))openJob(ref);
   else if(k==='timereq')openTreq(ref);
+  else if(k==='vehicle'&&byId('vehicles',ref))openVeh(ref);
   else if(k==='estimate'&&byId('estimates',ref))openEst(ref);
   else if(k==='invoice'&&byId('invoices',ref))openInv(ref);
   else if(k==='request'){location.hash='dashboard'}
@@ -1982,11 +1984,26 @@ function tripCalc(t){const veh=byId('vehicles',t.vehicleId);let mi=numOr(t.miles
   const mpg=numOr(veh&&veh.mpg,0)||15,gp=fuelPrice(veh),pm=mileRate(),tolls=numOr(t.tolls,0);
   return{...t,miles:Math.round(mi*10)/10,tolls:r2(tolls),mpg,fuelPrice:gp,perMile:pm,vehicle:veh?vehLabel(veh):t.vehicle||'',gas:r2(mi/mpg*gp),wear:r2(mi*pm),total:r2(mi/mpg*gp+mi*pm+tolls)}}
 const tripsCost=j=>(j.trips||[]).reduce((a,t)=>a+(+t.total||0),0);
+const VDOC_TYPES=['Insurance card','Registration','Inspection sticker','E-ZPass','Title','Other'];
+const VEXP=[['regExp','Registration'],['inspExp','Inspection'],['insExp','Insurance'],['ezpassExp','E-ZPass']];
+const daysTo=d=>Math.round((new Date(d+'T12:00')-new Date(today()+'T12:00'))/864e5);
+function xp(label,d){if(!d)return `<span class="xp none">${label}: —</span>`;const n=daysTo(d);
+  return `<span class="xp ${n<0?'bad':n<=30?'soon':'ok'}" title="${esc(label)} expires ${fdate(d)}">${label}: ${n<0?'EXPIRED '+fdate(d):n===0?'today':n<=30?n+' days':fdate(d)}</span>`}
+
+function oilStatus(x){const tr=allTrips().filter(t=>t.vehicleId===x.id);const reads=[x.odometer,x.oilOdo,...tr.map(t=>t.endOdo)].filter(n=>n!==''&&n!=null&&!isNaN(+n)).map(Number);
+  const odo=reads.length?Math.max(...reads):null;const byOdo=odo!=null&&x.oilOdo!=null&&x.oilOdo!==''?odo-+x.oilOdo:0;
+  const byTrips=tr.filter(t=>!x.oilDate||t.date>=x.oilDate).reduce((a,t)=>a+(+t.miles||0),0);const since=Math.max(byOdo,byTrips);
+  const em=+x.oilEveryMiles||3000,mo=+x.oilEveryMonths||3;const due=x.oilDate?addMonths(x.oilDate,mo):null;
+  const leftMi=em-since,leftD=due?daysTo(due):9999;const set=!!(x.oilDate||(x.oilOdo!==''&&x.oilOdo!=null));
+  return{odo,since:Math.round(since),due,leftMi:Math.round(leftMi),leftD,set,stage:!set?null:leftMi<=0||leftD<=0?'due':leftMi<=300||leftD<=7?'soon':'ok'}}
+function oilBadge(x){const o=oilStatus(x);if(!o.set)return '<span class="xp none">Oil: not set</span>';
+  return `<span class="xp ${o.stage==='due'?'bad':o.stage==='soon'?'soon':'ok'}" title="${o.since} mi since last change${o.due?' · due by '+fdate(o.due):''}">Oil: ${o.stage==='due'?'DUE NOW':'due in '+Math.max(0,o.leftMi).toLocaleString()+' mi'+(o.due?' or by '+fdate(o.due):'')}</span>`}
+const vehAlerts=()=>S.vehicles.filter(x=>x.active!==false).flatMap(x=>[...VEXP.filter(([k])=>x[k]&&daysTo(x[k])<=30).map(([k,l])=>({x,l,d:x[k],n:daysTo(x[k])})),...(['due','soon'].includes(oilStatus(x).stage)?[{x,oil:1,n:oilStatus(x).stage==='due'?-1:5}]:[])]).sort((a,b)=>a.n-b.n);
 const allTrips=()=>S.jobs.flatMap(j=>(j.trips||[]).map(t=>({...t,job:j})));
 function lastOdo(vid,skip){let m=null;allTrips().forEach(t=>{if(t.vehicleId===vid&&t.id!==skip&&t.endOdo!==''&&t.endOdo!=null&&(m==null||+t.endOdo>m))m=+t.endOdo});return m}
 
 function tripSection(j){const tr=j.trips||[];const tot=k=>tr.reduce((a,t)=>a+(+t[k]||0),0);
-  return `<div class="sec">Vehicle, Mileage & Tolls</div>${tr.length?`<table class="small"><tr><th>Date</th><th>Tech</th><th>Vehicle</th><th>Odometer</th><th class="r">Miles</th><th class="r">Tolls</th><th class="r">Gas</th><th class="r">$/mi</th><th class="r">Total</th><th></th></tr>
+  return `<div class="sec">Vehicle, Mileage & Tolls</div>${tr.length?`<table class="small"><tr><th>Date</th><th>Tech</th><th>Vehicle</th><th>Odometer</th><th class="r">Miles</th><th class="r">Tolls</th><th class="r">Gas</th><th class="r">Truck</th><th class="r">Total</th><th></th></tr>
    ${tr.map(t=>`<tr><td class="nowrap">${fdate(t.date)}</td><td>${esc(t.techName||techName(t.techId))}</td><td>${esc(t.vehicle||'')}</td><td class="nowrap">${t.startOdo!=null&&t.startOdo!==''?`${esc(t.startOdo)} → ${esc(t.endOdo??'')}`:'<span class="mut">—</span>'}</td>
    <td class="r">${(+t.miles||0).toFixed(1)}${t.gpsMiles!=null?`<div class="mut">GPS ${(+t.gpsMiles).toFixed(1)}</div>`:''}</td><td class="r">${money(t.tolls)}</td><td class="r" title="${esc(`${t.miles} mi ÷ ${t.mpg} mpg × ${money(t.fuelPrice)}/gal`)}">${money(t.gas)}</td><td class="r" title="${esc(`${t.miles} mi × ${money(t.perMile)}`)}">${money(t.wear)}</td><td class="r"><b>${money(t.total)}</b></td>
    <td class="r nowrap"><button class="sm" onclick="tripEdit('${t.id}')">Edit</button> <button class="sm" onclick="tripDel('${t.id}')">✕</button></td></tr>`).join('')}
@@ -2039,10 +2056,12 @@ function vFleet(){const f=UI.flFrom||today().slice(0,8)+'01',t=UI.flTo||today();
    <div class="card kpi"><div class="l">Truck cost (${money(mileRate())}/mi)</div><div class="v">${money(sum(tr,'wear'))}</div></div>
    <div class="card kpi"><div class="l">Tolls</div><div class="v">${money(sum(tr,'tolls'))}</div></div>
    <div class="card kpi"><div class="l">Total vehicle cost</div><div class="v">${money(tot)}</div><div class="s">${mi?money(tot/mi)+' per mile':''}</div></div></div>
-  <div class="card"><h3>Trucks</h3>${vrows.length?`<table><tr><th>Truck</th><th>Year / Make / Model</th><th>Color</th><th>Plate</th><th>Assigned to</th><th>Fuel · MPG</th><th class="r">Odometer</th><th class="r">Miles</th><th class="r">Cost</th></tr>
-   ${vrows.map(({x,ts,lo})=>`<tr class="click" onclick="openVeh('${x.id}')" style="opacity:${x.active===false?.5:1}"><td><b>${esc(x.name||'—')}</b></td><td>${esc([x.year,x.make,x.model].filter(Boolean).join(' '))}</td><td>${esc(x.color||'')}</td><td>${esc(x.plate||'')}</td><td>${esc(x.techId?techName(x.techId):'—')}</td><td>${esc(x.fuel||'Gas')} · ${esc(x.mpg||'15')}</td><td class="r">${lo!=null?lo.toLocaleString():'—'}</td><td class="r">${sum(ts,'miles').toFixed(0)}</td><td class="r">${money(sum(ts,'total'))}</td></tr>`).join('')}</table>`:'<div class="empty">No trucks yet — click “+ Add Vehicle”.</div>'}</div>
+  ${vehAlerts().length?`<div class="card" style="border-left:4px solid var(--bad);margin-bottom:14px"><h3>⚠️ Needs attention</h3>${vehAlerts().map(a=>`<div class="click" style="padding:4px 0" onclick="openVeh('${a.x.id}')"><b>${esc(a.x.name||vehLabel(a.x))}</b> — ${a.oil?oilBadge(a.x):xp(a.l,a.d)}</div>`).join('')}</div>`:''}
+  <div class="card"><h3>Trucks</h3>${vrows.length?`<table><tr><th>Truck</th><th>Year / Make / Model</th><th>Color</th><th>Plate</th><th>Assigned to</th><th>Fuel · MPG</th><th>Papers</th><th class="r">Odometer</th><th class="r">Miles</th><th class="r">Cost</th></tr>
+   ${vrows.map(({x,ts,lo})=>`<tr class="click" onclick="openVeh('${x.id}')" style="opacity:${x.active===false?.5:1}"><td><b>${esc(x.name||'—')}</b></td><td>${esc([x.year,x.make,x.model].filter(Boolean).join(' '))}</td><td>${esc(x.color||'')}</td><td>${esc(x.plate||'')}</td><td>${esc(x.techId?techName(x.techId):'—')}</td><td>${esc(x.fuel||'Gas')} · ${esc(x.mpg||'15')}</td><td>${VEXP.filter(([k])=>k!=='ezpassExp'||x[k])
+.map(([k,l])=>xp(l==='Registration'?'Reg':l==='Inspection'?'Insp':l==='Insurance'?'Ins':'EZ',x[k])).join('')}${oilBadge(x)}<div class="small mut">${(x.docs||[]).length} docs</div></td><td class="r">${oilStatus(x).odo!=null?oilStatus(x).odo.toLocaleString():'—'}</td><td class="r">${sum(ts,'miles').toFixed(0)}</td><td class="r">${money(sum(ts,'total'))}</td></tr>`).join('')}</table>`:'<div class="empty">No trucks yet — click “+ Add Vehicle”.</div>'}</div>
   ${byTech.length?`<div class="card" style="margin-top:14px"><h3>By technician</h3><table><tr><th>Tech</th><th class="r">Trips</th><th class="r">Miles</th><th class="r">Tolls</th><th class="r">Total cost</th></tr>${byTech.map(r=>`<tr><td>${esc(r[0])}</td><td class="r">${r[1]}</td><td class="r">${r[2].toFixed(0)}</td><td class="r">${money(r[3])}</td><td class="r">${money(r[4])}</td></tr>`).join('')}</table></div>`:''}
-  <div class="card" style="margin-top:14px"><h3>Mileage log</h3>${tr.length?`<table class="small"><tr><th>Date</th><th>Job</th><th>Customer</th><th>Tech</th><th>Vehicle</th><th class="r">Miles</th><th class="r">Tolls</th><th class="r">Gas</th><th class="r">$/mi</th><th class="r">Total</th></tr>
+  <div class="card" style="margin-top:14px"><h3>Mileage log</h3>${tr.length?`<table class="small"><tr><th>Date</th><th>Job</th><th>Customer</th><th>Tech</th><th>Vehicle</th><th class="r">Miles</th><th class="r">Tolls</th><th class="r">Gas</th><th class="r">Truck</th><th class="r">Total</th></tr>
    ${tr.map(x=>`<tr class="click" onclick="openJob('${x.job.id}')"><td class="nowrap">${fdate(x.date)}</td><td>${esc(x.job.number)}</td><td>${esc(custName(x.job.customerId))}</td><td>${esc(x.techName||techName(x.techId))}</td><td>${esc(x.vehicle||'')}</td><td class="r">${(+x.miles||0).toFixed(1)}</td><td class="r">${money(x.tolls)}</td><td class="r">${money(x.gas)}</td><td class="r">${money(x.wear)}</td><td class="r"><b>${money(x.total)}</b></td></tr>`).join('')}</table>`:'<div class="empty">No mileage in this period</div>'}</div>`}
 function exportTrips(){const f=UI.flFrom||today().slice(0,8)+'01',t=UI.flTo||today();
   exportCSV(`mileage-${f}-to-${t}.csv`,[['Date','Job','Customer','Tech','Vehicle','Start odometer','End odometer','Miles','GPS miles','MPG','Fuel $/gal','Gas $','Per mile $','Truck $','Tolls $','Total $','Note'],
@@ -2054,13 +2073,43 @@ function openVeh(id){const x=id?{...byId('vehicles',id)}:{id:uid(),active:true,f
   <div><label>Fuel</label><select id="f_fuel">${opts(['Gas','Diesel'],x.fuel||'Gas')}</select></div><div><label>MPG</label><input id="f_mpg" inputmode="decimal" value="${esc(x.mpg)}" placeholder="${g||15}"><div class="small mut" id="vmpg">${g?`Estimated for this model: ${g} mpg — leave blank to use it`:'Enter the truck’s MPG (default 15)'}</div></div>
   <div><label>Assigned technician</label><select id="f_techId"><option value="">— none —</option>${crew().map(c=>`<option value="${c.id}" ${c.id===x.techId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
   <div class="span2"><label>VIN</label><input id="f_vin" value="${esc(x.vin)}"></div><div><label>Status</label><select id="f_active">${opts(['Active','Inactive'],x.active===false?'Inactive':'Active')}</select></div>
-  <div class="span3"><label>Notes</label><input id="f_notes" value="${esc(x.notes)}" placeholder="insurance, registration renewal, E-ZPass tag #…"></div></div>
+  <div class="span3"><label>Notes</label><input id="f_notes" value="${esc(x.notes)}"></div></div>
+  <div class="sec">Registration & Inspection</div><div class="fg"><div><label>Registration date</label><input type="date" id="f_regDate" value="${esc(x.regDate)}"></div><div><label>Registration expires</label><input type="date" id="f_regExp" value="${esc(x.regExp)}"></div><div><label>Inspection expires</label><input type="date" id="f_inspExp" value="${esc(x.inspExp)}"></div></div>
+  <div class="sec">E-ZPass</div><div class="fg"><div class="span2"><label>E-ZPass tag #</label><input id="f_ezpassTag" value="${esc(x.ezpassTag)}"></div><div><label>Tag expires</label><input type="date" id="f_ezpassExp" value="${esc(x.ezpassExp)}"></div></div>
+  <div class="sec">Insurance</div><div class="fg"><div><label>Insurance company</label><input id="f_insCompany" value="${esc(x.insCompany)}"></div><div class="span2"><label>Policy #</label><input id="f_insPolicy" value="${esc(x.insPolicy)}"></div><div><label>Policy start</label><input type="date" id="f_insStart" value="${esc(x.insStart)}"></div><div><label>Policy expires</label><input type="date" id="f_insExp" value="${esc(x.insExp)}"></div></div>
+  <div class="sec">Oil change</div><div class="fg"><div><label>Last oil change</label><input type="date" id="f_oilDate" value="${esc(x.oilDate)}"></div><div><label>Odometer at oil change</label><input id="f_oilOdo" inputmode="decimal" value="${esc(x.oilOdo)}"></div><div><label>Current odometer</label><input id="f_odometer" inputmode="decimal" value="${esc(x.odometer)}" placeholder="${(oilStatus(x).odo??'')}"><div class="small mut">Updates itself from techs’ odometer entries</div></div>
+   <div><label>Change every (miles)</label><input id="f_oilEveryMiles" inputmode="numeric" value="${esc(x.oilEveryMiles||3000)}"></div><div><label>…or every (months)</label><input id="f_oilEveryMonths" inputmode="numeric" value="${esc(x.oilEveryMonths||3)}"></div>
+   <div><label>Status</label><div style="padding-top:8px">${oilBadge(x)} ${oilStatus(x).set?`<div class="small mut">${oilStatus(x).since} mi since last change</div>`:''}</div></div></div>
+  <div style="margin-top:6px"><button class="sm" onclick="oilDone()">🛢️ Oil changed today</button> <span class="small mut">fills today’s date and current odometer — then Save</span></div>
+  <p class="small mut" style="margin-top:6px">Admins and office get a 🔔 reminder 30 days and 7 days before anything expires, on the day, and the day after if it wasn’t renewed — and when an oil change is coming up (300 mi / 7 days left) or due.</p>
+  <div class="sec">Papers (insurance card, registration, inspection sticker…)</div><div id="vdocs">${vdocsHtml(x)}</div>
+  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px"><select id="vd_type" style="max-width:190px">${opts(VDOC_TYPES,'Insurance card')}</select>
+   <label class="btn sm" style="cursor:pointer">📎 Upload photo / PDF<input type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="vdocUpload(this.files)"></label><span class="small mut" id="vd_msg"></span></div>
   <datalist id="vmakes">${[...new Set(Object.keys(MPG_DB).map(n=>n.split(' ')[0]))].map(m=>`<option value="${m}">`).join('')}</datalist>
   <div class="mfoot">${id?`<button class="danger" onclick="delVeh('${x.id}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM()">Cancel</button><button class="pri" onclick="saveVeh()">Save</button></div>`)}
+function oilDone(){el('f_oilDate').value=today();const o=v('f_odometer')||oilStatus(edit.obj).odo;if(o!=null&&o!=='')el('f_oilOdo').value=o;else toast('Enter the odometer reading too');}
 function vehMpgHint(){const g=mpgGuess(v('f_make'),v('f_model'));el('f_mpg').placeholder=g||15;el('vmpg').textContent=g?`Estimated for this model: ${g} mpg — leave blank to use it`:'Enter the truck’s MPG (default 15)'}
-async function saveVeh(){const x=grab({...edit.obj},['name','year','color','make','model','plate','fuel','mpg','techId','vin','notes']);x.active=v('f_active')==='Active';
-  if(!x.make&&!x.name){toast('Enter a truck name or make');return}x.year=x.year?parseInt(x.year)||null:null;x.mpg=x.mpg?+x.mpg:(mpgGuess(x.make,x.model)||15);x.techId=x.techId||null;
-  try{await save('vehicles',x);closeM();toast('Vehicle saved')}catch(e){}}
+function vdocsHtml(x){const d=x.docs||[];return d.length?`<table class="small">${d.map(f=>`<tr><td><b>${esc(f.type)}</b></td><td>${esc(f.name)}</td><td class="mut">${fdate(f.at)}${f.by?' · '+esc(f.by):''}</td><td class="r nowrap"><button class="sm" onclick="vdocOpen('${f.id}')">View</button> <button class="sm" onclick="vdocDel('${f.id}')">✕</button></td></tr>`).join('')}</table>`:'<p class="small mut">No papers uploaded yet.</p>'}
+async function vdocUpload(files){if(!files||!files.length)return;const type=v('vd_type');const msg=el('vd_msg');
+  if(!byId('vehicles',edit.obj.id)){if(!(await saveVeh(true)))return}
+  const cur=JSON.parse(JSON.stringify(byId('vehicles',edit.obj.id)));cur.docs=cur.docs||[];
+  for(const f of files){if(f.size>15*1024*1024){toast(f.name+' is over 15 MB');continue}msg.textContent='Uploading '+f.name+'…';
+    const doc={id:uid(),type,name:f.name,size:f.size,mime:f.type,at:new Date().toISOString(),by:me&&me.name||''};
+    try{if(sb){const path=cur.id+'/'+Date.now()+'-'+f.name.replace(/[^\w.\-]+/g,'_').slice(-80);const{error}=await sb.storage.from('vehicle-docs').upload(path,f,{contentType:f.type||undefined});if(error)throw error;doc.path=path}
+      else{doc.url=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)})}
+      cur.docs.push(doc)}catch(e){toast('Upload failed: '+sbErr(e))}}
+  msg.textContent='';try{await save('vehicles',cur);edit.obj.docs=cur.docs;el('vdocs').innerHTML=vdocsHtml(cur);toast('Uploaded')}catch(e){}}
+async function vdocOpen(id){const f=(edit.obj.docs||[]).find(d=>d.id===id);if(!f)return;
+  if(f.url){const w=window.open();if(w)w.document.write(f.mime==='application/pdf'?`<iframe src="${f.url}" style="border:0;width:100%;height:100%"></iframe>`:`<img src="${f.url}" style="max-width:100%">`);return}
+  const w=window.open('about:blank');const{data,error}=await sb.storage.from('vehicle-docs').createSignedUrl(f.path,600);if(error){if(w)w.close();toast(sbErr(error));return}if(w)w.location=data.signedUrl;else location.href=data.signedUrl}
+async function vdocDel(id){const cur=JSON.parse(JSON.stringify(byId('vehicles',edit.obj.id)||edit.obj));const f=(cur.docs||[]).find(d=>d.id===id);if(!f||!confirm(`Delete ${f.type} — ${f.name}?`))return;
+  if(sb&&f.path){const{error}=await sb.storage.from('vehicle-docs').remove([f.path]);if(error){toast(sbErr(error));return}}
+  cur.docs=cur.docs.filter(d=>d.id!==id);try{await save('vehicles',cur);edit.obj.docs=cur.docs;el('vdocs').innerHTML=vdocsHtml(cur);toast('Deleted')}catch(e){}}
+async function saveVeh(keep){const x=grab({...edit.obj},['name','year','color','make','model','plate','fuel','mpg','techId','vin','notes','regDate','regExp','inspExp','ezpassTag','ezpassExp','insCompany','insPolicy','insStart','insExp','oilDate','oilOdo','odometer','oilEveryMiles','oilEveryMonths']);
+  ['oilOdo','odometer','oilEveryMiles','oilEveryMonths'].forEach(k=>{x[k]=x[k]===''||x[k]==null?null:+String(x[k]).replace(/[^0-9.]/g,'')});if(!x.oilEveryMiles)x.oilEveryMiles=3000;if(!x.oilEveryMonths)x.oilEveryMonths=3;
+  {const pv=byId('vehicles',x.id);if(!pv||pv.oilDate!==x.oilDate||pv.oilOdo!==x.oilOdo)x.oilAlert=null}{const cur=byId('vehicles',x.id);if(cur)x.docs=cur.docs||[]}x.active=v('f_active')==='Active';
+  if(!x.make&&!x.name){toast('Enter a truck name or make');return false}x.year=x.year?parseInt(x.year)||null:null;x.mpg=x.mpg?+x.mpg:(mpgGuess(x.make,x.model)||15);x.techId=x.techId||null;
+  try{await save('vehicles',x);if(keep){edit.obj={...x};return true}closeM();toast('Vehicle saved');return true}catch(e){return false}}
 async function delVeh(id){if(!confirm('Delete this vehicle? Past mileage stays on the jobs. (Tip: set it Inactive instead to keep it in reports.)'))return;await remove('vehicles',id);closeM();toast('Vehicle deleted')}
 
 /* ================= MODAL ================= */
