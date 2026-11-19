@@ -10,9 +10,11 @@
 /* ===================== SETTINGS — edit these ===================== */
 window.PORTAL_CONFIG = {
   company: 'KOR HVAC',
+  legalName: 'KOR HVAC LLC',
+  address: '1264 East 10th Street, Brooklyn, NY 11230',
   tagline: 'Heating · Cooling · Boilers · Chillers',
   phone: '(347) 744-6665', // shown for calls
-  email: 'service@korhvac.com',
+  email: 'info@korhvac.com',
   payLink: '',          // default online payment link (Stripe / QuickBooks / Square). Invoices can have their own.
   remitTo: '',          // check / ACH instructions
   supabaseUrl: 'https://bljdqwbbcfgouuekcqxl.supabase.co',
@@ -89,6 +91,11 @@ tr.click{cursor:pointer}tr.click:hover td{background:#fafbfd}
 header{position:relative}.bellp{position:absolute;right:16px;top:calc(100% - 6px);z-index:50;width:340px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;background:#fff;color:#111;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);text-align:left}
 .bph{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid #eee;position:sticky;top:0;background:#fff}.bph a{font-size:12px;color:#111}
 .bpi{padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer;font-size:13px}.bpi:hover{background:#f6f6f6}.bpi.unread{background:#f3f3f3;font-weight:600}.bpi.unread .small{font-weight:400}
+.invdoc{color:#111;font-size:13.5px;line-height:1.45}.invdoc .ih{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.invdoc .r{text-align:right}.invdoc .it{font-size:24px;font-weight:800;letter-spacing:.06em}
+.invdoc .ic{margin-top:10px;color:#333}.invdoc .ib{display:flex;gap:36px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:2px solid #111}.invdoc .il{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#777;margin-bottom:3px}
+.invdoc table{width:100%;border-collapse:collapse;margin-top:6px}.invdoc .isv td{padding:5px 8px;border:1px solid #e3e3e3;vertical-align:top}.invdoc .isv td:nth-child(odd){color:#666;width:18%;background:#fafafa}.invdoc .iit th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#666;padding:6px 8px;border-bottom:2px solid #111}
+.invdoc .iit{margin-top:16px}.invdoc .iit td{padding:7px 8px;border-bottom:1px solid #eee}.invdoc th.r,.invdoc td.r{text-align:right}.invdoc .itot{margin:12px 0 0 auto;max-width:280px}.invdoc .itot div{display:flex;justify-content:space-between;padding:3px 0}.invdoc .ibal{border-top:2px solid #111;margin-top:4px;padding-top:6px!important;font-weight:800;font-size:15px}
+@media(max-width:600px){.invdoc .ih svg{height:60px!important}.invdoc .it{font-size:19px}}
 </style>
 </head>
 <body>
@@ -119,7 +126,7 @@ const invStatus=i=>{if(invBal(i)<=0.005)return 'Paid';if(i.due&&i.due<today())re
 let api;
 function demoApi(){
   const t=today();
-  const KEY='jobswift_portal_demo_v1';
+  const KEY='jobswift_portal_demo_v2';
   const seed=()=>({
     me:{email:'maria@sunrise-living.com',name:'Maria Lopez'},
     customers:[{id:'c1',name:'Maria Lopez',company:'Sunrise Senior Living – Edison',address:'120 Oak St, Edison, NJ'},{id:'c2',name:'Maria Lopez',company:'Sunrise Senior Living – Woodbridge',address:'88 Main St, Woodbridge, NJ'}],
@@ -134,7 +141,7 @@ function demoApi(){
       {id:'j3',number:'J-1052',customerId:'c1',type:'Maintenance',status:'Scheduled',date:addDays(t,5),time:'08:00',tech:'Jim',description:'Quarterly PM – RTU-1, RTU-2 and boiler'},
       {id:'j4',number:'J-1003',customerId:'c2',equipmentId:'e4',type:'Repair',status:'Completed',date:addDays(t,-55),time:'13:00',tech:'Mike',description:'AHU-1 belt squeal',notes:'Replaced worn belt and adjusted tension. Greased bearings.',signedBy:'R. Patel'}],
     invoices:[
-      {id:'i1',number:'INV-5021',customerId:'c1',jobNumber:'J-1041',date:addDays(t,-6),due:addDays(t,24),taxRate:6.625,items:[{desc:'Service call – first hour',qty:1,price:195},{desc:'Run capacitor 45/5 MFD',qty:1,price:145}],payments:[]},
+      {id:'i1',number:'INV-5021',customerId:'c1',jobNumber:'J-1041',site:'120 Oak St, Edison, NJ',service:{date:addDays(t,-6),type:'Service Call',techs:'Jim',description:'RTU-2 not cooling, east wing warm.',notes:'Found failed run capacitor on condenser fan motor. Replaced capacitor, verified operation and pressures.',start:addDays(t,-6)+'T12:05:00Z',finish:addDays(t,-6)+'T13:15:00Z',hours:1.17},date:addDays(t,-6),due:addDays(t,24),taxRate:6.625,items:[{desc:'Service call – first hour',qty:1,price:195},{desc:'Run capacitor 45/5 MFD',qty:1,price:145}],payments:[]},
       {id:'i2',number:'INV-5004',customerId:'c1',jobNumber:'J-1012',date:addDays(t,-40),due:addDays(t,-10),taxRate:0,items:[{desc:'Quarterly maintenance agreement – Q3',qty:1,price:1200}],payments:[{date:addDays(t,-20),amount:600,method:'Check',ref:'10442'}]},
       {id:'i3',number:'INV-4990',customerId:'c2',jobNumber:'J-1003',date:addDays(t,-55),due:addDays(t,-25),taxRate:6.625,items:[{desc:'Labor',qty:1.5,price:135},{desc:'V-belt B48',qty:1,price:38}],payments:[{date:addDays(t,-30),amount:256.43,method:'ACH'}]}],
     estimates:[
@@ -288,13 +295,26 @@ function vInvoices(){
   ${CFG.remitTo?`<p class="small mut">Paying by check or ACH: ${esc(CFG.remitTo)}</p>`:''}`;
 }
 const payLink=i=>i.payLink||CFG.payLink;
-function openInv(id){const i=D.invoices.find(x=>x.id===id);if(!i)return;const s=sub(i.items),tax=s*(+i.taxRate||0)/100;
-  modal(`<h2><span>Invoice ${esc(i.number)} ${badge(invStatus(i))}</span><button class="sm" onclick="closeM()">✕</button></h2>
-  <div class="row small mut" style="margin-bottom:12px"><span>Date: <b>${fdate(i.date)}</b></span><span>Due: <b>${fdate(i.due)}</b></span>${i.jobNumber?`<span>Job: <b>${esc(i.jobNumber)}</b></span>`:''}${i.po?`<span>PO: <b>${esc(i.po)}</b></span>`:''}</div>
-  ${multi()?`<p class="small">${esc(locName(i.customerId))}</p>`:''}${i.notes?`<p class="small">${esc(i.notes)}</p>`:''}
-  <table><tr><th>Description</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr>${(i.items||[]).map(x=>`<tr><td>${esc(x.desc)}</td><td class="r">${esc(x.qty)}</td><td class="r">${money(x.price)}</td><td class="r">${money(x.qty*x.price)}</td></tr>`).join('')}</table>
-  <div class="tot">Subtotal ${money(s)}<br>${+i.taxRate?`Tax (${esc(i.taxRate)}%) ${money(tax)}<br>`:''}Total ${money(s+tax)}<br>${(i.payments||[]).map(p=>`<span class="mut small">Payment ${fdate(p.date)} · ${esc(p.method||'')}${p.ref?' #'+esc(p.ref):''}</span> −${money(p.amount)}<br>`).join('')}<b>Balance due ${money(invBal(i))}</b></div>
-  <div class="row" style="margin-top:16px"><span class="sp"></span>${invBal(i)?(payLink(i)?`<a class="btn pri" href="${esc(payLink(i))}" target="_blank" rel="noopener">💳 Pay ${money(invBal(i))} online</a>`:`<span class="small mut">${CFG.remitTo?'Remit to: '+esc(CFG.remitTo):'Please contact us to pay.'}</span>`):'<span class="badge b-Paid">Paid in full — thank you!</span>'}</div>`)}
+const INV_LOGO=`<svg style="height:86px;width:auto;display:block" role="img" aria-label="KOR HVAC" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450.9 268.3"><path d="M71.65 152.50L40 152.50L40 40L74.65 40L74.65 106L125.50 40L162.10 40L124.30 87.10L163.75 152.50L124.15 152.50L102.25 114.40" fill="#111111"/><circle cx="229" cy="96.25" r="44.82421875" fill="none" stroke="#111111" stroke-width="22.8515625"/><circle cx="229" cy="96.25" r="13.18359375" fill="#111111"/><path d="M343.15 113.50L329.20 113.50L329.20 152.50L294.25 152.50L294.25 40L362.95 40Q376 40 385.90 44.65Q395.80 49.30 401.35 57.55Q406.90 65.80 406.90 76.90Q406.90 87.70 401.35 96.03Q395.80 104.35 385.90 108.85Q383.35 110.20 380.50 110.95L410.95 152.50L370.90 152.50L343.15 113.50M329.20 65.20L329.20 88.60L357.70 88.60Q364.30 88.60 367.98 85.60Q371.65 82.60 371.65 76.90Q371.65 71.20 367.98 68.20Q364.30 65.20 357.70 65.20" fill="#111111"/><path d="M160.70 224.68L157.38 224.68L157.38 206.13L160.70 206.13L160.70 213.80L169.33 213.80L169.33 206.13L172.65 206.13L172.65 224.68L169.33 224.68L169.33 216.60L160.70 216.60M207.64 224.68L203.43 224.68L196.82 206.13L200.47 206.13L203.76 215.76Q204.22 217.21 204.75 219.09Q205.14 220.43 205.56 222.03Q205.98 220.41 206.36 219.08Q206.87 217.21 207.32 215.76L210.50 206.13L214.14 206.13M240.68 224.68L237.05 224.68L243.52 206.13L247.74 206.13L254.37 224.68L250.72 224.68L249.15 220.09L242.20 220.09L240.68 224.68M243.09 217.41L248.23 217.41L247.42 215.04Q246.93 213.55 246.41 211.66Q246.04 210.31 245.60 208.71Q245.19 210.34 244.83 211.69Q244.32 213.60 243.87 215.04M286.43 224.93Q283.99 224.93 282.07 223.80Q280.15 222.66 279.04 220.53Q277.93 218.40 277.93 215.42Q277.93 212.42 279.05 210.28Q280.16 208.14 282.09 207.01Q284.01 205.88 286.43 205.88Q287.95 205.88 289.27 206.31Q290.60 206.74 291.64 207.57Q292.68 208.39 293.35 209.59Q294.02 210.78 294.25 212.30L290.90 212.30Q290.73 211.47 290.34 210.83Q289.95 210.20 289.36 209.76Q288.78 209.32 288.04 209.08Q287.31 208.85 286.48 208.85Q284.96 208.85 283.78 209.62Q282.60 210.39 281.94 211.85Q281.27 213.31 281.27 215.42Q281.27 217.55 281.94 219Q282.62 220.46 283.79 221.21Q284.97 221.95 286.46 221.95Q287.30 221.95 288.03 221.72Q288.77 221.49 289.36 221.05Q289.95 220.61 290.35 219.97Q290.75 219.33 290.90 218.50L294.26 218.50Q294.07 219.84 293.44 221Q292.81 222.16 291.79 223.05Q290.77 223.93 289.42 224.43Q288.07 224.93 286.43 224.93" fill="#111111"/><rect x="67.0" y="214.0" width="67.5" height="3" fill="#111111"/><rect x="316.4" y="214.0" width="67.5" height="3" fill="#111111"/></svg>`;
+const ftm=iso=>iso?new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'—';
+const fdur=h=>{const m=Math.round((+h||0)*60);return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`};
+function invDoc(i){const s=sub(i.items),tax=s*(+i.taxRate||0)/100;const c=(D.customers||[]).find(x=>x.id===i.customerId)||{};const sv=i.service;
+  return `<div class="invdoc"><div class="ih"><div>${INV_LOGO}</div><div class="r"><div class="it">INVOICE</div><div><b>${esc(i.number)}</b></div><div>Date: ${fdate(i.date)}</div><div>Due: ${fdate(i.due)}</div>${i.po?`<div>PO: ${esc(i.po)}</div>`:''}${i.jobNumber?`<div>Job: ${esc(i.jobNumber)}</div>`:''}<div style="margin-top:6px">${badge(invStatus(i))}</div></div></div>
+  <div class="ic"><b>${esc(CFG.legalName||CFG.company)}</b>${CFG.address?'<br>'+esc(CFG.address):''}<br>${esc(CFG.phone||'')}${CFG.email?' · '+esc(CFG.email):''}</div>
+  <div class="ib"><div><div class="il">Bill to</div><b>${esc(c.company||c.name||'')}</b>${c.company&&c.name&&c.name!==c.company?'<br>'+esc(c.name):''}${c.address?'<br>'+esc(c.address):''}</div>${i.site?`<div><div class="il">Service location</div>${esc(i.site)}</div>`:''}</div>
+  ${sv?`<div class="il" style="margin-top:14px">Service details</div><table class="isv"><tr><td>Service date</td><td><b>${fdate(sv.date||(sv.start||'').slice(0,10))}</b></td><td>Technician</td><td><b>${esc(sv.techs||'—')}</b></td></tr>
+   ${sv.start?`<tr><td>Arrived / started</td><td><b>${ftm(sv.start)}</b></td><td>Finished</td><td><b>${sv.finish?ftm(sv.finish):'in progress'}</b></td></tr><tr><td>Total time on site</td><td colspan="3"><b>${fdur(sv.hours)}</b></td></tr>`:''}
+   ${sv.description?`<tr><td>Work requested</td><td colspan="3">${esc(sv.description)}</td></tr>`:''}${sv.notes?`<tr><td>Work performed</td><td colspan="3">${esc(sv.notes).replace(/\n/g,'<br>')}</td></tr>`:''}</table>`:''}
+  ${i.notes&&!(sv&&i.notes===sv.description)?`<p class="small">${esc(i.notes)}</p>`:''}
+  <table class="iit"><tr><th>Description</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr>${(i.items||[]).map(x=>`<tr><td>${esc(x.desc)}</td><td class="r">${esc(x.qty)}</td><td class="r">${money(x.price)}</td><td class="r">${money(x.qty*x.price)}</td></tr>`).join('')}</table>
+  <div class="itot"><div><span>Subtotal</span><span>${money(s)}</span></div>${+i.taxRate?`<div><span>Tax (${esc(i.taxRate)}%)</span><span>${money(tax)}</span></div>`:''}<div><span>Total</span><span>${money(s+tax)}</span></div>${(i.payments||[]).map(p=>`<div class="mut"><span>Payment ${fdate(p.date)} ${esc(p.method||'')}</span><span>−${money(p.amount)}</span></div>`).join('')}<div class="ibal"><span>Balance due</span><span>${money(invBal(i))}</span></div></div>
+  ${CFG.remitTo?`<p class="small mut">Remit to: ${esc(CFG.remitTo)}</p>`:''}</div>`}
+function openInv(id){const i=D.invoices.find(x=>x.id===id);if(!i)return;
+  modal(`<h2><span>Invoice ${esc(i.number)}</span><button class="sm" onclick="closeM()">✕</button></h2>${invDoc(i)}
+  <div class="row" style="margin-top:16px"><button class="sm" onclick="printInv('${i.id}')">🖨 Print / Save PDF</button><span class="sp"></span>${invBal(i)?(payLink(i)?`<a class="btn pri" href="${esc(payLink(i))}" target="_blank" rel="noopener">💳 Pay ${money(invBal(i))} online</a>`:`<span class="small mut">${CFG.remitTo?'Remit to: '+esc(CFG.remitTo):'Please contact us to pay.'}</span>`):'<span class="badge b-Paid">Paid in full — thank you!</span>'}</div>`)}
+function printInv(id){const i=D.invoices.find(x=>x.id===id);const w=window.open('','_blank');if(!w){toast('Allow pop-ups to print');return}
+  const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${esc(i.number)}</title><style>${css}@page{margin:14mm}body{background:#fff;padding:24px}</style></head><body>${invDoc(i)}<script>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
 
 /* ---------- Estimates ---------- */
 function vEstimates(){const es=D.estimates.filter(inLoc).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
