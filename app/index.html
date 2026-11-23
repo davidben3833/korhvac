@@ -1923,14 +1923,14 @@ async function proPdfDoc(e){const f=proFooter(company());
   try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Proposal ${e.number}${e.title?' - '+e.title.replace(/[\\/:*?"<>|]/g,''):''}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['li','.price','.ack','h5','h4']}}).from(box.lastElementChild).toPdf();
     await w.get('pdf').then(pdf=>{const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
        for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,13,H-13);pdf.text(`Page ${i} of ${n}`,W-13,H-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,H-8.5,{align:'center'})}});
-    return w}finally{setTimeout(()=>box.remove(),0)}}
+    return{w}}finally{setTimeout(()=>box.remove(),0)}}
 async function proPdf(){proSync();syncEst();proFinish(edit.obj);toast('Preparing PDF…');
-  try{const w=await proPdfDoc(edit.obj);await w.save();toast('PDF downloaded')}catch(err){toast('PDF failed — use Print → Save as PDF')}}
+  try{const{w}=await proPdfDoc(edit.obj);await w.save();toast('PDF downloaded')}catch(err){toast('PDF failed — use Print → Save as PDF')}}
 let PREV_URL=null;
 async function proPreview(){proSync();syncEst();proFinish(edit.obj);const e=edit.obj,m=$('#modal2');m.style.maxWidth='1000px';
   m.innerHTML=`<h2>Preview — Proposal ${esc(e.number)}<span><button class="sm" onclick="proPdf()">📄 Download PDF</button> <button class="sm" onclick="proPrint()">🖨 Print</button> <button class="sm" onclick="closeM2()">✕</button></span></h2><div id="pv_box" style="height:78vh;background:#525659;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff">Building preview…</div><div class="small mut" style="margin-top:6px">This is exactly what the customer gets. Close to keep editing.</div>`;
   $('#ov2').classList.add('show');
-  try{const w=await proPdfDoc(e);const blob=await w.outputPdf('blob');if(PREV_URL)URL.revokeObjectURL(PREV_URL);PREV_URL=URL.createObjectURL(blob);
+  try{const{w}=await proPdfDoc(e);const blob=await w.outputPdf('blob');if(PREV_URL)URL.revokeObjectURL(PREV_URL);PREV_URL=URL.createObjectURL(blob);
     const b=el('pv_box');if(b)b.innerHTML=`<iframe src="${PREV_URL}#view=FitH" style="width:100%;height:100%;border:0;border-radius:8px;background:#fff"></iframe>`}
   catch(err){const b=el('pv_box');if(b){b.style.cssText='height:78vh;overflow:auto;background:#525659;border-radius:8px;padding:20px';b.innerHTML=`<style>${PRO_CSS}</style><div style="background:#fff;max-width:816px;margin:0 auto;padding:48px 52px;box-shadow:0 2px 10px rgba(0,0,0,.4)">${proDoc(e)}</div>`}}}
 
@@ -1989,7 +1989,7 @@ async function emailEst(){if(deny('send_estimates'))return;const e=finishEst();c
     const toList=(e.emailTo||'').trim()||c.email||c.billEmail;if(!toList){toast('Add an email in “Email to”');return}const who=toList+(e.emailCc?' (cc '+e.emailCc+')':'');
     if(e.pro){if(!byId('estimates',e.id)){try{await save('estimates',e)}catch(_){return}}
       if(!e.viewToken){const a=new Uint8Array(24);crypto.getRandomValues(a);e.viewToken=[...a].map(x=>x.toString(16).padStart(2,'0')).join('')}
-      toast('Making the proposal PDF…');try{const w=await proPdfDoc(e);const blob=await w.outputPdf('blob');const{error}=await sb.storage.from('proposal-pdfs').upload(e.id+'.pdf',blob,{contentType:'application/pdf',upsert:true});if(error)throw error}
+      toast('Making the proposal PDF…');try{const{w}=await proPdfDoc(e);const blob=await w.outputPdf('blob');const{error}=await sb.storage.from('proposal-pdfs').upload(e.id+'.pdf',blob,{contentType:'application/pdf',upsert:true});if(error)throw error}
       catch(err){toast('Could not make the PDF — '+(err.message||err)+'. Not sent.');return}}
     if(e.status==='Draft'||!byId('estimates',e.id)){e.status='Sent';e.followUp=e.followUp||addDays(today(),3);save('estimates',e).then(()=>{toast('✉️ Sending proposal to '+who+' from estimating@');drawEst()}).catch(()=>{})}
     else{save('estimates',e).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'estimate',p_id:e.id});toast(error?sbErr(error):'✉️ Proposal re-sent to '+who)}).catch(()=>{})}
