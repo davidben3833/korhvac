@@ -1766,7 +1766,9 @@ async function proAI(btn){proSync();const e=edit.obj;const c=byId('customers',e.
 /* ---- Units on the estimate: unit info + photos; AI reads the photos and fills the unit ---- */
 const UF=[['tag','Tag','RTU-1'],['type','Type','RTU, Boiler, Split…'],['make','Make',''],['model','Model',''],['serial','Serial',''],['capacity','Size / tons / MBH',''],['fuel','Fuel',''],['voltage','Voltage',''],['refrigerant','Refrigerant',''],['mfg_year','Year',''],['mounting','Location / mounting','Rooftop, mech room…'],['orientation','Orientation','']];
 const UTHUMB={};
-async function unitThumbs(paths){const need=paths.filter(p=>!UTHUMB[p]);if(!need.length||!sb)return;const{data}=await sb.storage.from('estimate-files').createSignedUrls(need,3600);(data||[]).forEach(x=>{if(x.signedUrl)UTHUMB[x.path]=x.signedUrl})}
+// photo refs: 'jp:<path>' = technician's job photo (job-photos bucket); otherwise estimate-files
+const ubk=p=>p.startsWith('jp:')?['job-photos',p.slice(3)]:['estimate-files',p];
+async function unitThumbs(paths){const need=paths.filter(p=>!UTHUMB[p]);if(!need.length||!sb)return;for(const bk of ['estimate-files','job-photos']){const ps=need.filter(p=>ubk(p)[0]===bk);if(!ps.length)continue;const{data}=await sb.storage.from(bk).createSignedUrls(ps.map(p=>ubk(p)[1]),3600);(data||[]).forEach((x,k)=>{if(x.signedUrl)UTHUMB[ps[k]]=x.signedUrl})}}
 function proUnitsHtml(){const e=edit.obj,U=e.pro.units||[],cs=S.equipment.filter(x=>x.customerId===e.customerId);
   return `<div class="sec">Units <span class="mut small" style="font-weight:400">— add photos (nameplate + how it's installed) and the AI fills in the unit</span></div>
   ${U.map((u,i)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px">
@@ -1788,10 +1790,10 @@ async function unitAddPhotos(i,files){const e=edit.obj,u=e.pro.units[i];u.photos
   for(const f of fs){const b=await shrink(f),path=`${e.id}/${u.id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.jpg`;
     const{error}=await sb.storage.from('estimate-files').upload(path,b,{contentType:'image/jpeg'});if(error){toast('Upload failed: '+error.message);continue}u.photos.push(path);(u._new=u._new||{})[path]=b}
   await proUnitsDraw();toast('Photos added — tap ✨ Read photos')}
-async function unitDelPhoto(i,j){const u=edit.obj.pro.units[i],p=u.photos[j];u.photos.splice(j,1);try{await sb.storage.from('estimate-files').remove([p])}catch(_){}proUnitsDraw()}
+async function unitDelPhoto(i,j){const u=edit.obj.pro.units[i],p=u.photos[j];u.photos.splice(j,1);if(!p.startsWith('jp:'))try{await sb.storage.from('estimate-files').remove([p])}catch(_){}proUnitsDraw()}
 const b64=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(b)});
 async function unitRead(i,btn){const u=edit.obj.pro.units[i];if(!(u.photos||[]).length)return;btn.disabled=true;btn.textContent='✨ Reading…';
-  try{const images=[];for(const p of u.photos.slice(-10)){let b=u._new&&u._new[p];if(!(b instanceof Blob)){const{data}=await sb.storage.from('estimate-files').download(p);b=data}if(b)images.push({media_type:'image/jpeg',data:await b64(b)})}
+  try{const images=[];for(const p of u.photos.slice(-10)){let b=u._new&&u._new[p];if(!(b instanceof Blob)){const[bk,pp]=ubk(p);const{data}=await sb.storage.from(bk).download(pp);b=data}if(b)images.push({media_type:'image/jpeg',data:await b64(b)})}
     const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'nameplate',images}});if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch(_){}throw new Error(m)}
     const a=data.unit||{};const map={type:'equipment_type',make:'make',model:'model',serial:'serial',capacity:'capacity',fuel:'fuel',voltage:'voltage',refrigerant:'refrigerant',mfg_year:'mfg_year',mounting:'mounting',orientation:'orientation',install_notes:'install_notes',difficulty:'difficulty'};
     let n=0;Object.entries(map).forEach(([k,ak])=>{if((u[k]==null||u[k]==='')&&a[ak]!=null&&a[ak]!==''){u[k]=String(a[ak]);n++}});if(!u.capacity&&a.tonnage){u.capacity=a.tonnage+' Ton';n++}if(a.notes)u.ai_notes=a.notes;
