@@ -824,7 +824,7 @@ const JOB_TYPES=['Service Call','Repair','Maintenance','Install','Emergency','Es
 const PRIOS=['Normal','High','Emergency','Low'];
 const EQ_TYPES=['Rooftop Unit (RTU)','Split System','Heat Pump','Furnace','Boiler','Chiller','Air Handler','Mini-Split','PTAC','Cooling Tower','Exhaust Fan','Make-Up Air','Water Heater','Controls/BMS','Other'];
 const REBATE_ST=['Pre-approval','Approved','Installed','Submitted','Paid','Denied'];
-const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Proposals'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
+const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Proposals'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['suppliers','🏭','Suppliers'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
 const VIEWS=NAV.filter(n=>n.length>1);
 let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null;
 const isAdmin=()=>!sb||(me&&(me.base||me.role)==='Admin');
@@ -1152,7 +1152,7 @@ function render(){
   const a=document.activeElement,aid=a&&a.id,sel=a&&a.selectionStart;
   if(!isAdmin()&&!canSee(view))view=VIEWS.map(n=>n[0]).find(k=>canSee(k))||'dashboard';
   $('#nav').innerHTML=NAV.filter(n=>n.length===1||isAdmin()||canSee(n[0])).map(n=>n.length===1?`<div class="grp">${n[0]}</div>`:`<a href="#${n[0]}" class="${n[0]===view?'on':''}"><span>${n[1]}</span>${n[2]}</a>`).join('');
-  const fn={dashboard:vDash,calls:vCalls,dispatch:vDispatch,map:vMap,messages:vMsgs,users:vUsers,jobs:vJobs,tech:vTech,customers:vCust,equipment:vEquip,agreements:vAgr,estimates:vEst,invoices:vInv,rebates:vReb,prices:vPrices,reports:vReports,payroll:vPayroll,techs:vTechs,fleet:vFleet,pricebook:vPB,settings:vSettings}[view]||vDash;
+  const fn={dashboard:vDash,calls:vCalls,dispatch:vDispatch,map:vMap,messages:vMsgs,users:vUsers,jobs:vJobs,tech:vTech,customers:vCust,equipment:vEquip,agreements:vAgr,estimates:vEst,invoices:vInv,rebates:vReb,prices:vPrices,suppliers:vSup,reports:vReports,payroll:vPayroll,techs:vTechs,fleet:vFleet,pricebook:vPB,settings:vSettings}[view]||vDash;
   $('#main').innerHTML=fn();
   if(aid&&!$('#ov').contains(a)&&!$('#ov2').contains(a)){const e=document.getElementById(aid);if(e){e.focus();try{if(sel!=null)e.setSelectionRange(sel,sel)}catch(_){}}}
   if(view==='dispatch'){wireDnD();loadDispAlerts()}
@@ -2346,6 +2346,36 @@ const PR={rows:null,loading:false,q:'',cat:'',sup:'',changed:false,last:null};
 async function loadPrices(force){if(!sb||PR.loading)return;if(PR.rows&&!force&&Date.now()-(PR.at||0)<60000)return;PR.loading=true;PR.at=Date.now();
   try{const[a,b]=await Promise.all([sb.from('equipment_price_latest').select('*').order('quote_date',{ascending:false}).limit(5000),sb.from('company_settings').select('price_watch_last').limit(1).maybeSingle()]);
     PR.rows=a.data||[];PR.last=b.data&&b.data.price_watch_last}catch(e){PR.rows=[]}PR.loading=false;if(view==='prices')render()}
+
+/* ================= SUPPLIERS ================= */
+const SUP={rows:null,q:''};
+async function loadSup(force){if(!sb)return;if(SUP.rows&&!force)return;const{data,error}=await sb.from('suppliers').select('*').order('company');if(error){toast(sbErr(error));SUP.rows=[];return}SUP.rows=data||[];if(view==='suppliers')render()}
+function supStats(s){const rows=(PR.rows||[]).filter(r=>r.supplier_id===s.id||(r.supplier||'').toLowerCase()===(s.company||'').toLowerCase());return{n:rows.length,last:rows.reduce((a,r)=>r.quote_date&&r.quote_date>a?r.quote_date:a,'')}}
+function vSup(){if(!sb)return '<div class="top"><h1>Suppliers</h1></div><div class="card">Available once the office system is live.</div>';
+  if(!SUP.rows){loadSup();if(!(PR.rows||[]).length)loadPrices().then(()=>view==='suppliers'&&render()).catch(()=>{});return '<div class="top"><h1>Suppliers</h1></div><div class="card">Loading…</div>'}
+  const q=SUP.q.toLowerCase(),list=SUP.rows.filter(s=>!q||[s.company,s.contact_name,s.email,s.phone,(s.categories||[]).join(' '),(s.brands||[]).join(' '),(s.regions||[]).join(' ')].join(' ').toLowerCase().includes(q));
+  const ed=can('suppliers')||isAdmin();
+  return `<div class="top"><h1>Suppliers <span class="mut small">(${SUP.rows.length})</span></h1>${ed?`<button class="pri" onclick="openSup()">+ New Supplier</button>`:''}</div>
+  <div class="card"><input placeholder="Search company, contact, brand, equipment type, state…" value="${esc(SUP.q)}" oninput="SUP.q=this.value;clearTimeout(SUP._t);SUP._t=setTimeout(()=>{render();const x=document.querySelector('.card input');if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length)}},250)"></div>
+  <div class="card" style="overflow-x:auto"><table><tr><th>Company</th><th>Contact</th><th>Email / phone</th><th>Equipment & brands</th><th>States</th><th class="r">Quotes</th><th></th></tr>
+  ${list.map(s=>{const st=supStats(s);return `<tr class="click" onclick="${ed?`openSup('${s.id}')`:''}"><td><b>${esc(s.company)}</b>${s.active===false?' <span class="badge">inactive</span>':''}</td><td>${esc(s.contact_name||'')}</td>
+   <td>${s.email?`<a href="mailto:${esc(s.email)}" onclick="event.stopPropagation()">${esc(s.email)}</a>`:'<span class="mut small">no email</span>'}${s.phone?`<div class="small">${esc(s.phone)}</div>`:''}</td>
+   <td class="small">${esc((s.categories||[]).join(', '))}${(s.brands||[]).length?`<div class="mut">${esc(s.brands.join(', '))}</div>`:''}</td><td class="small">${esc((s.regions||[]).join(', '))}</td>
+   <td class="r">${st.n?`<a href="#" onclick="event.stopPropagation();PR.sup='${esc(s.company).replace(/'/g,"\\'")}';location.hash='prices';return false">${st.n}</a><div class="small mut">${fdate(st.last)}</div>`:'—'}</td><td>${ed?'✏️':''}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No suppliers</td></tr>'}</table></div>`}
+function openSup(id){const s=id?SUP.rows.find(x=>x.id===id):{company:'',active:true,categories:[],brands:[],regions:[]};const j=a=>(a||[]).join(', ');
+  modal(`<h2>${id?esc(s.company):'New supplier'}<button class="sm" onclick="closeM()">✕</button></h2>
+  <div class="fg"><div class="span2"><label>Company *</label><input id="su_company" value="${esc(s.company)}"></div><div><label>Active</label><select id="su_active"><option value="1" ${s.active!==false?'selected':''}>Yes</option><option value="0" ${s.active===false?'selected':''}>No</option></select></div>
+  <div><label>Contact</label><input id="su_contact_name" value="${esc(s.contact_name||'')}"></div><div><label>Email (pricing requests go here)</label><input id="su_email" value="${esc(s.email||'')}"></div><div><label>Phone</label><input id="su_phone" value="${esc(s.phone||'')}"></div>
+  <div class="span3"><label>Equipment they sell (comma separated)</label><input id="su_categories" value="${esc(j(s.categories))}" placeholder="RTU, Split system, Boiler, PTAC, VRF, Parts…"></div>
+  <div class="span2"><label>Brands</label><input id="su_brands" value="${esc(j(s.brands))}" placeholder="Lennox, Daikin…"></div><div><label>States</label><input id="su_regions" value="${esc(j(s.regions))}" placeholder="NY, NJ"></div>
+  <div class="span3"><label>Notes</label><textarea id="su_notes">${esc(s.notes||'')}</textarea></div></div>
+  <div class="mfoot">${id?`<button class="danger" onclick="delSup('${id}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM()">Cancel</button><button class="pri" onclick="saveSup('${id||''}')">Save</button></div>`)}
+async function saveSup(id){const a=k=>(v('su_'+k)||'').split(',').map(x=>x.trim()).filter(Boolean);const r={company:(v('su_company')||'').trim(),contact_name:v('su_contact_name')||null,email:(v('su_email')||'').trim()||null,phone:v('su_phone')||null,
+  categories:a('categories'),brands:a('brands'),regions:a('regions').map(x=>x.toUpperCase()),notes:v('su_notes')||null,active:v('su_active')==='1',updated_at:new Date().toISOString()};
+  if(!r.company)return toast('Enter the company name');if(r.email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email))return toast('Check the email');
+  const{error}=id?await sb.from('suppliers').update(r).eq('id',id):await sb.from('suppliers').insert({...r,source:'office'});if(error)return toast(sbErr(error));closeM();toast('Supplier saved');loadSup(true)}
+async function delSup(id){if(!confirm('Delete this supplier? Their saved prices stay in the price list.'))return;const{error}=await sb.from('suppliers').delete().eq('id',id);if(error)return toast(sbErr(error));closeM();toast('Supplier deleted');loadSup(true)}
+
 function vPrices(){if(!sb)return '<div class="top"><h1>Equipment Prices</h1></div><div class="card">Available once the office system is live.</div>';
   if(!PR.rows){setTimeout(loadPrices,0);return '<div class="top"><h1>Equipment Prices</h1></div><div class="card mut">Loading…</div>'}
   if(Date.now()-(PR.at||0)>60000)setTimeout(()=>loadPrices(),0);
