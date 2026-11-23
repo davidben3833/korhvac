@@ -1717,11 +1717,33 @@ function proRevise(){proSync();syncEst();const e=edit.obj,base=/^(\d{2}-\d+)-(\d
 function proSync(){const e=edit.obj;if(!e.pro)return;['markup','tax','roundTo'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value===''?PRO_DEF[k]:+x.value});
   ['scope','exclusions','site','drawings','dated','pay','jobdesc'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value});{const x=el('pp_terms');if(x)e.pro.terms=x.value.trim()===PRO_TERMS_STD.trim()?'':x.value}
   e.options.forEach((o,n)=>{const f=el('pf_'+n);if(f)o.final=f.value.replace(/[^\d.]/g,'')})}
+/* ---- Parts & equipment price memory: supplier prices saved per part # and per unit model ---- */
+const NK=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const PSTOP=new Set(['THE','AND','FOR','WITH','NEW','KIT','ASSEMBLY','ASSY','REPLACEMENT','REPLACE','UNIT','BOILER','MODEL','PART','ENTER','PRICE']);
+const pwords=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!PSTOP.has(w));
+function lineUnit(e,l){const U=(e.pro&&e.pro.units)||[];return U.length===1?U[0]:(l.unit!=null&&U[+l.unit])?U[+l.unit]:null}
+function priceMatch(e,l){const rows=PR.rows||[];if(!rows.length)return null;const pick=a=>a.sort((x,y)=>String(y.quote_date||'').localeCompare(String(x.quote_date||'')))[0]||null;
+  if(l.model){const k=NK(l.model),u=lineUnit(e,l),fm=u&&NK(u.model);const a=rows.filter(r=>r.model_key===k||NK(r.model)===k);if(a.length)return pick(fm&&a.some(r=>NK(r.fits_model)===fm)?a.filter(r=>NK(r.fits_model)===fm):a)}
+  const u=lineUnit(e,l),U=(e.pro&&e.pro.units)||[];const models=(u?[u]:U).map(x=>NK(x.model)).filter(Boolean);const w=pwords(l.desc);if(!w.length)return null;
+  const sc=r=>{const rw=new Set(pwords([r.description,r.part_type,r.model].join(' ')));return w.filter(x=>rw.has(x)).length};
+  if(models.length){const a=rows.filter(r=>r.fits_model&&models.includes(NK(r.fits_model))).map(r=>[r,sc(r)]).filter(x=>x[1]>=Math.min(2,w.length));if(a.length){const best=Math.max(...a.map(x=>x[1]));return pick(a.filter(x=>x[1]===best).map(x=>x[0]))}}
+  return null}
+function useMatch(n,i){const e=edit.obj,l=e.options[n].lines[i],m=priceMatch(e,l);if(!m)return;l.cost=+m.price;l.supplier=l.supplier||m.supplier||'';l.model=l.model||m.model;l.src=`${m.supplier||'Supplier'} ${fdate(m.quote_date)}${m.fits_model?' · for '+m.fits_model:''}`;l.fromList=1;proLines(n)}
+function autoPrice(e){(e.options||[]).forEach(o=>(o.lines||[]).forEach(l=>{if(l.kind==='labor'||(l.cost!==''&&l.cost!=null))return;const m=priceMatch(e,l);if(m){l.cost=+m.price;l.supplier=l.supplier||m.supplier||'';l.src=`Last price: ${m.supplier||''} ${fdate(m.quote_date)}${m.fits_model?' · for '+m.fits_model:''}`;l.fromList=1}}))}
+async function proLearn(e){if(!e.pro||!sb)return;const rows=[];
+  (e.options||[]).forEach(o=>(o.lines||[]).forEach(l=>{if(l.kind==='labor'||l.fromList||!(+l.cost>0)||!(l.supplier||'').trim())return;const u=lineUnit(e,l);
+    const key=[NK(l.model||l.desc),l.supplier,+l.cost,u&&u.model].join('|');if(l.learned===key)return;
+    rows.push({model:(l.model||'').trim()||(l.desc+(u&&u.model?' — '+u.model:'')).slice(0,120),description:l.desc,supplier:l.supplier.trim(),price:+l.cost,quote_date:today(),
+      category:l.kind==='equip'?'Equipment':'Part',brand:u&&u.make||null,fits_model:u&&u.model||null,fits_make:u&&u.make||null,part_type:pwords(l.desc).slice(0,4).join(' ').toLowerCase()||null,
+      source:'proposal',source_ref:e.number,job:e.title||''});l.learned=key}));
+  if(!rows.length)return;try{const{data,error}=await sb.rpc('equipment_prices_upsert',{p_rows:rows,p_by:(me&&me.name)||'office'});if(!error&&data){PR.at=0;toast(`💾 ${data} supplier price(s) saved for next time`)}}catch(_){}}
 function proLines(n){const e=edit.obj,o=e.options[n],p={...PRO_DEF,...e.pro};o.lines=o.lines||[];
   const box=el('oi_'+n);if(!box)return;const c=proCalc(e,o);
-  box.innerHTML=`<table class="items"><tr><th style="width:38%">Item</th><th>Type</th><th>Qty</th><th>Your price ea</th><th>Markup %</th><th class="r">Sell</th><th></th></tr>
-  ${o.lines.map((l,i)=>{const mk=(l.mk===''||l.mk==null)?(l.kind==='labor'?0:+p.markup):+l.mk;const sell=(+l.qty||0)*(+l.cost||0)*(1+mk/100);const need=l.cost===''||l.cost==null;
-   return `<tr><td><input data-l="${i}" data-k="desc" value="${esc(l.desc)}" placeholder="e.g. Heat exchanger Lochinvar AWH1250">${l.src?`<div class="small mut">${esc(l.src)}</div>`:''}</td>
+  const supl=[...new Set((PR.rows||[]).map(r=>r.supplier).filter(Boolean))].sort();
+  box.innerHTML=`<datalist id="supl">${supl.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><table class="items"><tr><th style="width:38%">Item</th><th>Type</th><th>Qty</th><th>Your price ea</th><th>Markup %</th><th class="r">Sell</th><th></th></tr>
+  ${o.lines.map((l,i)=>{const mk=(l.mk===''||l.mk==null)?(l.kind==='labor'?0:+p.markup):+l.mk;const sell=(+l.qty||0)*(+l.cost||0)*(1+mk/100);const need=l.cost===''||l.cost==null;if(!need&&l.fromList&&l._c!=null&&+l._c!==+l.cost)l.fromList=0;l._c=l.cost;
+   return `<tr><td><input data-l="${i}" data-k="desc" value="${esc(l.desc)}" placeholder="e.g. Heat exchanger Lochinvar AWH1250"><div style="display:flex;gap:4px;margin-top:3px">${l.kind==='labor'?'':`<input data-l="${i}" data-k="model" value="${esc(l.model||'')}" placeholder="Part # / model" style="font-size:12px;padding:3px 6px"><input data-l="${i}" data-k="supplier" value="${esc(l.supplier||'')}" placeholder="Supplier" style="font-size:12px;padding:3px 6px" list="supl">`}${(e.pro.units||[]).length>1&&l.kind!=='labor'?`<select data-l="${i}" data-k="unit" style="font-size:12px;padding:2px;width:auto"><option value="">unit…</option>${e.pro.units.map((u,k)=>`<option value="${k}" ${String(l.unit)===String(k)?'selected':''}>${esc(u.tag||u.model||'Unit '+(k+1))}</option>`).join('')}</select>`:''}</div>
+   ${l.src?`<div class="small mut">${esc(l.src)}</div>`:''}${need&&l.kind!=='labor'?(m=>m?`<div class="small" style="color:#0a7"><a href="#" onclick="useMatch(${n},${i});return false">💡 ${money(m.price)} · ${esc(m.supplier||'')} ${fdate(m.quote_date)}${m.fits_model?' · for '+esc(m.fits_model):''} — use</a></div>`:'')(priceMatch(e,l)):''}</td>
    <td><select data-l="${i}" data-k="kind" style="width:auto;padding:4px">${[['equip','Equipment'],['material','Material'],['labor','Labor'],['other','Other (no tax)']].map(([k,t])=>`<option value="${k}" ${(l.kind||'equip')===k?'selected':''}>${t}</option>`).join('')}</select></td>
    <td><input data-l="${i}" data-k="qty" value="${esc(l.qty)}" style="width:55px"></td><td><input data-l="${i}" data-k="cost" value="${esc(l.cost??'')}" style="width:100px;${need?'background:#fff7d6':''}" placeholder="enter price"></td>
    <td><input data-l="${i}" data-k="mk" value="${esc(l.mk??'')}" placeholder="${l.kind==='labor'?0:p.markup}" style="width:60px"></td>
@@ -1732,8 +1754,8 @@ function proLines(n){const e=edit.obj,o=e.options[n],p={...PRO_DEF,...e.pro};o.l
   <div class="tot" style="text-align:right;margin-top:8px;line-height:1.7">Equipment & materials with markup: ${money(c.equip+c.other)}<br>Sales tax ${p.tax}%: ${money(c.tax)}<br>Labor: ${money(c.labor)}<br>Calculated ${money(c.raw)} → rounded <b>${money(c.calcd)}</b><br>
    <span style="display:inline-flex;gap:6px;align-items:center">Final price to customer <input id="pf_${n}" value="${esc(o.final??'')}" placeholder="${c.calcd}" style="width:120px;font-weight:700"><button class="sm" data-bump="5">+5%</button><button class="sm" data-bump="10">+10%</button>${o.final?'<button class="sm" data-bump="0">Reset</button>':''}</span><br>
    <span class="mut small">Your cost ${money(c.cost)} · profit ${money(c.profit)} (${c.margin.toFixed(1)}%) — not shown to customer</span></div>`;
-  box.oninput=ev=>{const t=ev.target;if(t.id==='pf_'+n){o.final=t.value.replace(/[^\d.]/g,'');return}if(t.dataset.l==null)return;o.lines[+t.dataset.l][t.dataset.k]=t.value;clearTimeout(box._t);box._t=setTimeout(()=>{const a=document.activeElement,id=a&&a.dataset&&a.dataset.l,k=a&&a.dataset&&a.dataset.k,ss=a&&a.selectionStart;proLines(n);if(id!=null){const x=box.querySelector(`[data-l="${id}"][data-k="${k}"]`);if(x){x.focus();try{x.setSelectionRange(ss,ss)}catch(_){}}}},600)};
-  box.onchange=ev=>{const t=ev.target;if(t.dataset.k==='kind'){o.lines[+t.dataset.l].kind=t.value;proLines(n)}
+  box.oninput=ev=>{const t=ev.target;if(t.id==='pf_'+n){o.final=t.value.replace(/[^\d.]/g,'');return}if(t.dataset.l==null)return;o.lines[+t.dataset.l][t.dataset.k]=t.value;if(t.dataset.k==='cost'||t.dataset.k==='supplier')o.lines[+t.dataset.l].fromList=0;clearTimeout(box._t);box._t=setTimeout(()=>{const a=document.activeElement,id=a&&a.dataset&&a.dataset.l,k=a&&a.dataset&&a.dataset.k,ss=a&&a.selectionStart;proLines(n);if(id!=null){const x=box.querySelector(`[data-l="${id}"][data-k="${k}"]`);if(x){x.focus();try{x.setSelectionRange(ss,ss)}catch(_){}}}},600)};
+  box.onchange=ev=>{const t=ev.target;if(t.dataset.k==='kind'){o.lines[+t.dataset.l].kind=t.value;proLines(n)}if(t.dataset.k==='unit'){o.lines[+t.dataset.l].unit=t.value;proLines(n)}
     if(t.hasAttribute('data-tpl')&&t.value){const[g,k]=t.value.split('|');proTemplate(n,g,k)}
     if(t.hasAttribute('data-pb')&&t.value){const x=byId('pricebook',t.value);o.lines.push({desc:x.name,qty:1,cost:+x.cost||+x.price||0,kind:/labor/i.test(x.category||'')?'labor':'material',src:'Pricebook'});proLines(n)}};
   box.onclick=ev=>{const b=ev.target.closest('[data-add],[data-del],[data-bump]');if(!b)return;
@@ -1743,7 +1765,7 @@ function proLines(n){const e=edit.obj,o=e.options[n],p={...PRO_DEF,...e.pro};o.l
 function proTemplate(n,g,k){const t=JOB_LIB[g]&&JOB_LIB[g][k];if(!t)return;proSync();const e=edit.obj,o=e.options[n];o.lines=o.lines||[];
   t.lines.forEach(([d,q,kind])=>o.lines.push({desc:d,qty:q,cost:'',kind,src:k+' — enter your price'}));
   const cur=L_(e.pro.scope),ex=L_(e.pro.exclusions);e.pro.scope=[...cur,...t.scope.filter(s=>!cur.includes(s))].join('\n');e.pro.exclusions=[...ex,...t.excl.filter(s=>!ex.includes(s))].join('\n');
-  if(!e.title)e.title=k;drawEst();toast(k+' added — enter the price for each item')}
+  if(!e.title)e.title=k;autoPrice(e);drawEst();toast(k+' added — enter the price for each item (known supplier prices filled in)')}
 function proScopeFromItems(){proSync();const e=edit.obj;const cur=L_(e.pro.scope);
   const add=e.options.flatMap(o=>(o.lines||[]).filter(l=>(l.kind==='equip'||!l.kind)&&l.desc).map(l=>`Furnish and Install (${+l.qty||1}) ${l.desc.replace(/\s+—\s+(model|enter).*$/i,'')}`)).filter(s=>!cur.includes(s));
   e.pro.scope=[...add,...cur].join('\n');drawEst();toast(add.length?add.length+' line(s) added at the top of the scope':'Nothing new to add')}
@@ -1753,7 +1775,7 @@ async function pickPrice(n){await loadPrices();
 function pickPriceList(n){const q=(v('pp_q')||'').toLowerCase().split(/\s+/).filter(Boolean);const rows=(PR.rows||[]).filter(r=>{const s=[r.model,r.description,r.brand,r.supplier,r.category,r.tonnage&&r.tonnage+' ton',r.tonnage&&r.tonnage+'ton'].join(' ').toLowerCase();return q.every(w=>s.includes(w))}).slice(0,150);
   el('pp_list').innerHTML=rows.map(r=>`<div style="padding:8px;border-bottom:1px solid var(--line);cursor:pointer" onclick="addPriceLine(${n},'${r.id}')"><b>${esc(r.model)}</b> <span class="mut small">${esc(r.description||'')}${r.tonnage?' · '+(+r.tonnage)+' ton':''}</span><div class="small">${esc(r.supplier||'')} · <b>${money(r.price)}</b> · ${fdate(r.quote_date)}${r.change?` · ${r.change>0?'▲':'▼'} ${r.change_pct}%`:''}</div></div>`).join('')||'<div class="empty">No match</div>'}
 function addPriceLine(n,id){const r=(PR.rows||[]).find(x=>x.id===id);if(!r)return;const o=edit.obj.options[n];o.lines=o.lines||[];
-  o.lines.push({desc:[r.brand,r.tonnage?(+r.tonnage)+' Ton':'',r.model,r.description||r.category].filter(Boolean).join(' '),model:r.model,qty:1,cost:+r.price,kind:'equip',src:`${r.supplier} quote ${fdate(r.quote_date)}`});
+  o.lines.push({desc:[r.brand,r.tonnage?(+r.tonnage)+' Ton':'',r.model,r.description||r.category].filter(Boolean).join(' '),model:r.model,supplier:r.supplier||'',fromList:1,qty:1,cost:+r.price,kind:r.fits_model?'material':'equip',src:`${r.supplier} quote ${fdate(r.quote_date)}`});
   closeM2();proLines(n);toast('Added — price '+money(r.price))}
 async function proAI(btn,mode){proSync();const e=edit.obj;const c=byId('customers',e.customerId)||{};
   const items=e.options.flatMap(o=>(o.lines||[]).map(l=>({option:o.name,item:l.desc,qty:+l.qty||1,type:l.kind})));
@@ -1767,7 +1789,7 @@ async function proAI(btn,mode){proSync();const e=edit.obj;const c=byId('customer
     const adds=(data.add_lines||[]).filter(a=>a&&a.desc),o=e.options[0];o.lines=o.lines||[];let n=0;
     adds.forEach(a=>{if(o.lines.some(l=>(l.desc||'').toLowerCase()===a.desc.toLowerCase()))return;const m=a.model&&(PR.rows||[]).find(r=>(r.model||'').toUpperCase()===String(a.model).toUpperCase());
       o.lines.push({desc:a.desc,qty:a.qty||1,cost:m?+m.price:'',kind:['equip','material','labor','other'].includes(a.kind)?a.kind:'material',model:a.model||'',src:m?`${m.supplier} quote ${fdate(m.quote_date)}`:('AI: '+(a.why||'enter your price'))});n++});
-    drawEst();toast('Done — '+n+' item(s) added; enter the prices and review the scope')}
+    autoPrice(e);drawEst();toast('Done — '+n+' item(s) added; known supplier prices filled in — enter the rest')}
   catch(err){toast('AI: '+(err.message||err))}btn.disabled=false;btn.textContent=t0}
 /* ---- Units on the estimate: unit info + photos; AI reads the photos and fills the unit ---- */
 const UF=[['tag','Tag','RTU-1'],['type','Type','RTU, Boiler, Split…'],['make','Make',''],['model','Model',''],['serial','Serial',''],['capacity','Size / tons / MBH',''],['fuel','Fuel',''],['voltage','Voltage',''],['refrigerant','Refrigerant',''],['mfg_year','Year',''],['mounting','Location / mounting','Rooftop, mech room…'],['orientation','Orientation','']];
@@ -1943,10 +1965,10 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   ${!isNew?`<button onclick="emailEst()">✉️ Email to customer</button>`:''}
   ${!isNew&&!e.jobId?`<button onclick="estToJob()">Approve → Create Job</button>`:''}${e.jobId?`<button onclick="openJob('${e.jobId}')">View Job</button>`:''}
   <button onclick="closeM()">Cancel</button><button class="pri" onclick="saveEst()">Save</button></div>`);
-  e.options.forEach((o,n)=>e.pro?proLines(n):itemsEditor('oi_'+n,o.items,()=>0));if(e.pro)proUnitsDraw();}
+  e.options.forEach((o,n)=>e.pro?proLines(n):itemsEditor('oi_'+n,o.items,()=>0));if(e.pro){proUnitsDraw();if(!(PR.rows||[]).length)loadPrices().then(()=>{if(edit.obj===e)e.options.forEach((o,n)=>proLines(n))}).catch(()=>{})}}
 function syncEst(){const e=edit.obj;proSync();grab(e,['customerId','status','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
 function finishEst(){syncEst();const e=edit.obj;proFinish(e);e.options.forEach(o=>o.items=o.items.filter(i=>i.desc||+i.price));if(e.status==='Sent'&&!e.followUp)e.followUp=addDays(today(),3);if(e.status==='Sent'&&!e.sentAt)e.sentAt=today();if(['Approved','Declined'].includes(e.status)&&!e.closedAt)e.closedAt=today();return e}
-async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Proposal saved')}catch(x){}}
+async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Proposal saved');proLearn(e).then(()=>e.pro&&save('estimates',e).catch(()=>{}))}catch(x){}}
 async function followedUp(id){const e=byId('estimates',id);try{await save('estimates',{...e,followUp:addDays(today(),4),followUps:(e.followUps||0)+1});toast('Next follow-up in 4 days')}catch(x){}}
 async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a customer');return}
   if(e.options.length>1&&e.selected==null){toast('Mark which option the customer picked first');return}
