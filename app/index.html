@@ -1752,10 +1752,10 @@ function addPriceLine(n,id){const r=(PR.rows||[]).find(x=>x.id===id);if(!r)retur
   closeM2();proLines(n);toast('Added — price '+money(r.price))}
 async function proAI(btn){proSync();const e=edit.obj;const c=byId('customers',e.customerId)||{};
   const items=e.options.flatMap(o=>(o.lines||[]).map(l=>({option:o.name,item:l.desc,qty:+l.qty||1,type:l.kind})));
-  if(!items.length&&!e.title&&!e.pro.jobdesc)return toast('Describe the job (or add items) so the assistant knows what to build');
+  if(!items.length&&!e.title&&!e.pro.jobdesc&&!(e.pro.units||[]).length)return toast('Describe the job (or add items) so the assistant knows what to build');
   btn.disabled=true;const t0=btn.textContent;btn.textContent='✨ Working…';
   try{try{await loadPrices()}catch(_){}
-    const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'proposal',describe:e.pro.jobdesc||'',title:e.title,site:e.pro.site||c.address||'',customer:c.company||c.name||'',ctype:c.ctype||'',units:items,scope:e.pro.scope,exclusions:e.pro.exclusions}});
+    const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'proposal',describe:e.pro.jobdesc||'',title:e.title,site:e.pro.site||c.address||'',customer:c.company||c.name||'',ctype:c.ctype||'',units:items,surveyed:(e.pro.units||[]).map(u=>{const{photos,_new,id,equipmentId,...r}=u;return r}),scope:e.pro.scope,exclusions:e.pro.exclusions}});
     if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch(_){}throw new Error(m)}
     if(data.scope&&data.scope.length)e.pro.scope=data.scope.join('\n');if(data.exclusions&&data.exclusions.length)e.pro.exclusions=data.exclusions.join('\n');if(!e.title&&data.title)e.title=data.title;
     const adds=(data.add_lines||[]).filter(a=>a&&a.desc),o=e.options[0];o.lines=o.lines||[];let n=0;
@@ -1763,9 +1763,47 @@ async function proAI(btn){proSync();const e=edit.obj;const c=byId('customers',e.
       o.lines.push({desc:a.desc,qty:a.qty||1,cost:m?+m.price:'',kind:['equip','material','labor','other'].includes(a.kind)?a.kind:'material',model:a.model||'',src:m?`${m.supplier} quote ${fdate(m.quote_date)}`:('AI: '+(a.why||'enter your price'))});n++});
     drawEst();toast('Done — '+n+' item(s) added; enter the prices and review the scope')}
   catch(err){toast('AI: '+(err.message||err))}btn.disabled=false;btn.textContent=t0}
+/* ---- Units on the estimate: unit info + photos; AI reads the photos and fills the unit ---- */
+const UF=[['tag','Tag','RTU-1'],['type','Type','RTU, Boiler, Split…'],['make','Make',''],['model','Model',''],['serial','Serial',''],['capacity','Size / tons / MBH',''],['fuel','Fuel',''],['voltage','Voltage',''],['refrigerant','Refrigerant',''],['mfg_year','Year',''],['mounting','Location / mounting','Rooftop, mech room…'],['orientation','Orientation','']];
+const UTHUMB={};
+async function unitThumbs(paths){const need=paths.filter(p=>!UTHUMB[p]);if(!need.length||!sb)return;const{data}=await sb.storage.from('estimate-files').createSignedUrls(need,3600);(data||[]).forEach(x=>{if(x.signedUrl)UTHUMB[x.path]=x.signedUrl})}
+function proUnitsHtml(){const e=edit.obj,U=e.pro.units||[],cs=S.equipment.filter(x=>x.customerId===e.customerId);
+  return `<div class="sec">Units <span class="mut small" style="font-weight:400">— add photos (nameplate + how it's installed) and the AI fills in the unit</span></div>
+  ${U.map((u,i)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px">
+   <div class="fg" style="grid-template-columns:repeat(4,1fr)">${UF.map(([k,l,ph])=>`<div><label>${l}</label><input data-u="${i}" data-f="${k}" value="${esc(u[k]??'')}" placeholder="${ph}"></div>`).join('')}
+   <div class="span2" style="grid-column:span 2"><label>Problem / what needs to be done</label><input data-u="${i}" data-f="issue" value="${esc(u.issue||'')}" placeholder="e.g. cracked heat exchanger, replace unit, compressor grounded"></div>
+   <div style="grid-column:span 2"><label>Install / access notes ${u.difficulty?`<span class="mut">(${esc(u.difficulty)})</span>`:''}</label><input data-u="${i}" data-f="install_notes" value="${esc(u.install_notes||'')}"></div></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${(u.photos||[]).map((p,j)=>`<div style="position:relative"><img src="${esc(UTHUMB[p]||'')}" style="width:74px;height:74px;object-fit:cover;border-radius:6px;background:#eee;cursor:pointer" onclick="UTHUMB['${p}']&&window.open(UTHUMB['${p}'])"><button class="sm" style="position:absolute;top:0;right:0;padding:0 5px" onclick="unitDelPhoto(${i},${j})">✕</button></div>`).join('')}</div>
+   <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><label class="btn sm" style="cursor:pointer;margin:0">📷 Add photos<input type="file" accept="image/*" multiple hidden onchange="unitAddPhotos(${i},this.files);this.value=''"></label>
+    <button class="sm pri" onclick="unitRead(${i},this)" ${(u.photos||[]).length?'':'disabled'}>✨ Read photos</button>
+    ${e.customerId&&!u.equipmentId?`<button class="sm" onclick="unitToEquip(${i})">Save to customer's equipment</button>`:''}<span class="sp"></span><button class="sm" onclick="edit.obj.pro.units.splice(${i},1);proUnitsDraw()">Remove unit</button></div></div>`).join('')}
+  <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="sm" onclick="(edit.obj.pro.units=edit.obj.pro.units||[]).push({id:uid(),photos:[]});proUnitsDraw()">+ Unit</button>
+   ${cs.length?`<select class="sm" style="width:auto;padding:5px" onchange="unitFromEquip(this.value);this.value=''"><option value="">+ From customer's equipment…</option>${cs.map(x=>`<option value="${x.id}">${esc([x.tag,x.type,x.make,x.model].filter(Boolean).join(' · '))}</option>`).join('')}</select>`:''}
+   <label style="display:flex;gap:6px;align-items:center;margin-left:8px" class="small"><input type="checkbox" style="width:auto" ${e.pro.showUnits!==false?'checked':''} onchange="edit.obj.pro.showUnits=this.checked"> Show unit info on proposal</label></div>`}
+async function proUnitsDraw(){const box=el('pp_units');if(!box||!edit.obj.pro)return;const U=edit.obj.pro.units||[];
+  box.innerHTML=proUnitsHtml();box.oninput=ev=>{const t=ev.target;if(t.dataset.u==null)return;U[+t.dataset.u][t.dataset.f]=t.value};
+  const ps=U.flatMap(u=>u.photos||[]);if(ps.some(p=>!UTHUMB[p])){await unitThumbs(ps);box.querySelectorAll('img').forEach((im,k)=>{const p=ps[k];if(p&&UTHUMB[p])im.src=UTHUMB[p]})}}
+function unitFromEquip(id){const x=byId('equipment',id);if(!x)return;const e=edit.obj;(e.pro.units=e.pro.units||[]).push({id:uid(),equipmentId:x.id,tag:x.tag||'',type:x.type||'',make:x.make||'',model:x.model||'',serial:x.serial||'',capacity:x.capacity||'',refrigerant:x.refrigerant||'',mounting:x.location||'',photos:[]});proUnitsDraw()}
+async function unitAddPhotos(i,files){const e=edit.obj,u=e.pro.units[i];u.photos=u.photos||[];const fs=[...files].slice(0,20);if(!fs.length)return;toast('Uploading '+fs.length+' photo(s)…');
+  for(const f of fs){const b=await shrink(f),path=`${e.id}/${u.id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.jpg`;
+    const{error}=await sb.storage.from('estimate-files').upload(path,b,{contentType:'image/jpeg'});if(error){toast('Upload failed: '+error.message);continue}u.photos.push(path);(u._new=u._new||{})[path]=b}
+  await proUnitsDraw();toast('Photos added — tap ✨ Read photos')}
+async function unitDelPhoto(i,j){const u=edit.obj.pro.units[i],p=u.photos[j];u.photos.splice(j,1);try{await sb.storage.from('estimate-files').remove([p])}catch(_){}proUnitsDraw()}
+const b64=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(b)});
+async function unitRead(i,btn){const u=edit.obj.pro.units[i];if(!(u.photos||[]).length)return;btn.disabled=true;btn.textContent='✨ Reading…';
+  try{const images=[];for(const p of u.photos.slice(-10)){let b=u._new&&u._new[p];if(!(b instanceof Blob)){const{data}=await sb.storage.from('estimate-files').download(p);b=data}if(b)images.push({media_type:'image/jpeg',data:await b64(b)})}
+    const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'nameplate',images}});if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch(_){}throw new Error(m)}
+    const a=data.unit||{};const map={type:'equipment_type',make:'make',model:'model',serial:'serial',capacity:'capacity',fuel:'fuel',voltage:'voltage',refrigerant:'refrigerant',mfg_year:'mfg_year',mounting:'mounting',orientation:'orientation',install_notes:'install_notes',difficulty:'difficulty'};
+    let n=0;Object.entries(map).forEach(([k,ak])=>{if((u[k]==null||u[k]==='')&&a[ak]!=null&&a[ak]!==''){u[k]=String(a[ak]);n++}});if(!u.capacity&&a.tonnage){u.capacity=a.tonnage+' Ton';n++}if(a.notes)u.ai_notes=a.notes;
+    await proUnitsDraw();toast(n?`Filled ${n} field(s) — check them`:'Nothing new read — try a closer nameplate photo')}
+  catch(err){toast('AI: '+(err.message||err))}btn.disabled=false;btn.textContent='✨ Read photos'}
+async function unitToEquip(i){const e=edit.obj,u=e.pro.units[i];const q={id:uid(),customerId:e.customerId,tag:u.tag||'',type:u.type||'',make:u.make||'',model:u.model||'',serial:u.serial||'',capacity:u.capacity||'',refrigerant:u.refrigerant||'',location:u.mounting||'',notes:[u.voltage&&'Voltage '+u.voltage,u.fuel,u.mfg_year&&'Year '+u.mfg_year].filter(Boolean).join(' · ')};
+  try{await save('equipment',q);u.equipmentId=q.id;proUnitsDraw();toast('Saved to customer equipment')}catch(_){}}
+const unitLine=u=>[u.tag&&u.tag+':',[u.make,u.model].filter(Boolean).join(' '),u.capacity,u.type,u.serial&&'S/N '+u.serial,u.mounting].filter(Boolean).join(', ').replace(':,',':');
+
 function proSection(){const e=edit.obj,p={...PRO_DEF,...e.pro},c=byId('customers',e.customerId)||{};
-  return `<div class="sec">✨ Build this job <span class="mut small" style="font-weight:400">— describe it and the assistant adds the items, scope and exclusions (needs the AI key). Or use “+ Job template” under the items.</span></div>
-  <div style="display:flex;gap:6px"><input id="pp_jobdesc" value="${esc(e.pro.jobdesc||'')}" placeholder="e.g. Replace heat exchanger on Boiler 1, Lochinvar AWH1250, nursing home mechanical room"><button class="sm pri" onclick="proAI(this)" style="white-space:nowrap">✨ AI build job</button></div>
+  return `<div id="pp_units"></div><div class="sec">✨ Build this job <span class="mut small" style="font-weight:400">— describe it and the assistant adds the items, scope and exclusions (needs the AI key). Or use “+ Job template” under the items.</span></div>
+  <div style="display:flex;gap:6px"><input id="pp_jobdesc" value="${esc(e.pro.jobdesc||'')}" placeholder="e.g. Replace heat exchanger on Boiler 1 — or leave empty and the AI uses the units above"><button class="sm pri" onclick="proAI(this)" style="white-space:nowrap">✨ AI build job</button></div>
   <div class="sec">Pricing</div>
   <div class="fg"><div><label>Markup % (each item can override)</label><input id="pp_markup" value="${esc(p.markup)}"></div><div><label>Sales tax % (equipment & materials)</label><input id="pp_tax" value="${esc(p.tax)}"></div><div><label>Round up to nearest $</label><input id="pp_roundTo" value="${esc(p.roundTo)}"></div></div>
   <div class="sec">Proposal details</div>
@@ -1775,7 +1813,7 @@ function proSection(){const e=edit.obj,p={...PRO_DEF,...e.pro},c=byId('customers
   <div style="display:flex;gap:6px;margin-bottom:6px"><button class="sm" onclick="proScopeFromItems()">+ “Furnish and Install” lines from equipment items</button></div>
   <textarea id="pp_scope" style="min-height:180px">${esc(e.pro.scope||'')}</textarea>
   <div class="fg"><div class="span3"><label>Exclusions (one per line)</label><textarea id="pp_exclusions" style="min-height:130px">${esc(e.pro.exclusions??PRO_EXCL.join('\n'))}</textarea></div></div>`}
-function proFinish(e){if(!e.pro)return;e.options.forEach(o=>{const c=proCalc(e,o);o.items=[{desc:(o.name&&e.options.length>1?o.name+' — ':'')+(e.title||'HVAC work')+' (per proposal)',qty:1,price:c.price,cost:c.cost}]})}
+function proFinish(e){if(!e.pro)return;(e.pro.units||[]).forEach(u=>{delete u._new});e.options.forEach(o=>{const c=proCalc(e,o);o.items=[{desc:(o.name&&e.options.length>1?o.name+' — ':'')+(e.title||'HVAC work')+' (per proposal)',qty:1,price:c.price,cost:c.cost}]})}
 const PRO_CSS=`.pdoc{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:#000;font-size:11pt;line-height:1.35}
 .pdoc .lh{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #000;padding-bottom:2px}.pdoc .lh svg,.pdoc .lh img{height:62px!important;width:auto!important}
 .pdoc .lh .r{text-align:right;font-size:10.5pt}.pdoc .sub{display:flex;justify-content:space-between;font-size:10.5pt;margin:4px 0 8px}
@@ -1810,7 +1848,7 @@ function proDoc(e){const c=byId('customers',e.customerId)||{},co=company(),p={..
   <div class="pbox"><b>PROPOSAL #${esc(e.number)}</b><span>${fdate(e.date)}</span></div>
   <div class="ct"><div><b>Contact:</b> ${esc(c.contact||c.name||'')}<br><b>Company:</b> ${esc(c.company||c.name||'')}${addr.map(a=>'<br>'+esc(a)).join('')}${c.phone?'<br>'+esc(c.phone):''}</div>
    <div class="r"><b>Project:</b> ${esc(e.title||'')}<br>${c.email?`<b>Email:</b> ${esc(c.email)}<br>`:''}${saddr.map(a=>esc(a)+'<br>').join('')}<b>Estimator:</b> ${esc(est)}</div></div>
-  <h4>SCOPE OF WORK</h4><div class="ar"><p>To be done at ${esc(String(site).replace(/\n/g,', '))}</p><p>Based on Mechanical drawings: ${esc(p.drawings||'N/A')}</p><p>Dated: ${esc(p.dated||'N/A')}</p></div>
+  <h4>SCOPE OF WORK</h4><div class="ar"><p>To be done at ${esc(String(site).replace(/\n/g,', '))}</p><p>Based on Mechanical drawings: ${esc(p.drawings||'N/A')}</p><p>Dated: ${esc(p.dated||'N/A')}</p>${p.showUnits!==false&&(p.units||[]).some(u=>u.make||u.model||u.tag)?`<p style="margin-bottom:2px"><b>Existing equipment:</b></p><ul style="margin:0 0 10px;padding-left:30px">${p.units.filter(u=>u.make||u.model||u.tag).map(u=>`<li>${esc(unitLine(u))}</li>`).join('')}</ul>`:''}</div>
   <div style="font-weight:700;margin-top:6px">We will:</div><ul>${L_(p.scope).map(s=>/^—.*—$/.test(s)?`<li class="g">${esc(s.replace(/—/g,'').trim())}</li>`:`<li>${esc(s)}</li>`).join('')}</ul>
   <h4 style="margin-top:34px">EXCLUSIONS</h4><ul>${L_(p.exclusions??PRO_EXCL.join('\n')).map(s=>`<li>${esc(s)}</li>`).join('')}</ul>
   <h4>PRICING</h4>${sel.map(({o,c:cc})=>`<div class="price">${opts.length>1&&sel.length>1?esc(o.name)+' — ':''}Total cost of project installation including labor and materials………………${money(cc.price)}</div>`).join('')}
@@ -1863,7 +1901,7 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   ${!isNew?`<button onclick="emailEst()">✉️ Email to customer</button>`:''}
   ${!isNew&&!e.jobId?`<button onclick="estToJob()">Approve → Create Job</button>`:''}${e.jobId?`<button onclick="openJob('${e.jobId}')">View Job</button>`:''}
   <button onclick="closeM()">Cancel</button><button class="pri" onclick="saveEst()">Save</button></div>`);
-  e.options.forEach((o,n)=>e.pro?proLines(n):itemsEditor('oi_'+n,o.items,()=>0));}
+  e.options.forEach((o,n)=>e.pro?proLines(n):itemsEditor('oi_'+n,o.items,()=>0));if(e.pro)proUnitsDraw();}
 function syncEst(){const e=edit.obj;proSync();grab(e,['customerId','status','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
 function finishEst(){syncEst();const e=edit.obj;proFinish(e);e.options.forEach(o=>o.items=o.items.filter(i=>i.desc||+i.price));if(e.status==='Sent'&&!e.followUp)e.followUp=addDays(today(),3);if(e.status==='Sent'&&!e.sentAt)e.sentAt=today();if(['Approved','Declined'].includes(e.status)&&!e.closedAt)e.closedAt=today();return e}
 async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Estimate saved')}catch(x){}}
