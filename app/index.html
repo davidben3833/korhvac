@@ -1674,7 +1674,9 @@ async function runAgreements(){const da=dueAgreements();let nj=0,ni=0;const t=to
 function estValue(e){const o=(e.options||[]);if(!o.length)return calc(e.items,0).sub;const s=o[e.selected??-1];return s?calc(s.items,0).sub:Math.max(...o.map(x=>calc(x.items,0).sub))}
 /* ================= PROPOSAL BUILDER (estimates) — David's proposal layout ================= */
 // Pricing: each item = your price × (1 + markup%) ; sales tax on equipment & materials ; labor added ; rounded up. Customer sees only the final price.
-const PRO_DEF={markup:20,tax:8.875,roundTo:100};
+const PRO_DEF={markup:20,tax:8.875,roundTo:100,deposit:30};
+// Deposit rule: equipment & parts ≥ 50% of the price → 50% deposit (high equipment cost is paid up front)
+function proDepositRec(e){let eq=0,price=0;(e.options||[]).forEach(o=>{const c=proCalc(e,o);eq+=c.equip+c.tax;price+=c.price});const share=price>0?eq/price:0;return{share,pct:share>=.5?50:30}}
 // Job templates: picking one adds the items (you enter each price) + scope bullets + exclusions. kind: equip|material|labor|other
 const JOB_LIB={
  Install:{
@@ -1715,7 +1717,7 @@ function proRevise(){proSync();syncEst();const e=edit.obj,base=/^(\d{2}-\d+)-(\d
   const n=JSON.parse(JSON.stringify(e));Object.assign(n,{id:uid(),number:num,status:'Draft',date:today(),sentAt:null,closedAt:null,approvedBy:null,approvedAt:null,jobId:null,selected:null,revOf:e.id});
   (n.pro&&n.pro.units||[]).forEach(u=>{delete u._new});edit.obj=n;drawEst();toast('Revision '+num+' — edit and save')}
 function proSync(){const e=edit.obj;if(!e.pro)return;['markup','tax','roundTo'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value===''?PRO_DEF[k]:+x.value});
-  ['scope','exclusions','site','drawings','dated','pay','jobdesc'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value});{const x=el('pp_terms');if(x)e.pro.terms=x.value.trim()===PRO_TERMS_STD.trim()?'':x.value}
+  ['scope','exclusions','site','drawings','dated','pay','jobdesc'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value});{const x=el('pp_deposit');if(x){const d=Math.round(+x.value);const nd=d>=5&&d<=100?d:30;if(nd!==(+e.pro.deposit||30))e.pro.depositManual=1;e.pro.deposit=nd}}{const x=el('pp_terms');if(x)e.pro.terms=x.value.trim()===PRO_TERMS_STD.trim()?'':x.value}
   e.options.forEach((o,n)=>{const f=el('pf_'+n);if(f)o.final=f.value.replace(/[^\d.]/g,'')})}
 /* ---- Parts & equipment price memory: supplier prices saved per part # and per unit model ---- */
 const NK=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -1782,9 +1784,9 @@ async function proAI(btn,mode){proSync();const e=edit.obj;const c=byId('customer
   if(!items.length&&!e.title&&!e.pro.jobdesc&&!(e.pro.units||[]).length)return toast('Describe the job (or add items) so the assistant knows what to build');
   btn.disabled=true;const t0=btn.textContent;btn.textContent='✨ Working…';
   try{try{await loadPrices()}catch(_){}
-    const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'proposal',mode:mode||'job',terms:(e.pro.terms||'').trim()||PRO_TERMS_STD,pay:PRO_PAY[e.pro.pay||'deposit'],rebate:!!e.rebate,describe:e.pro.jobdesc||'',title:e.title,site:e.pro.site||c.address||'',customer:c.company||c.name||'',ctype:c.ctype||'',units:items,surveyed:(e.pro.units||[]).map(u=>{const{photos,_new,id,equipmentId,...r}=u;return r}),scope:e.pro.scope,exclusions:e.pro.exclusions}});
+    const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'proposal',mode:mode||'job',deposit:+e.pro.deposit||30,equip_share:Math.round(proDepositRec(e).share*100),terms:(e.pro.terms||'').trim()||PRO_TERMS_STD,pay:PRO_PAY[e.pro.pay||'deposit'],rebate:!!e.rebate,describe:e.pro.jobdesc||'',title:e.title,site:e.pro.site||c.address||'',customer:c.company||c.name||'',ctype:c.ctype||'',units:items,surveyed:(e.pro.units||[]).map(u=>{const{photos,_new,id,equipmentId,...r}=u;return r}),scope:e.pro.scope,exclusions:e.pro.exclusions}});
     if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch(_){}throw new Error(m)}
-    if(data.terms&&data.terms.trim())e.pro.terms=data.terms;if(mode==='terms'){drawEst();toast('Terms fitted to this job — review them');btn.disabled=false;btn.textContent=t0;return}
+    if(data.terms&&data.terms.trim())e.pro.terms=data.terms;if(+data.deposit_pct>=10&&+data.deposit_pct<=100&&(e.pro.pay||'deposit')==='deposit'){e.pro.deposit=Math.round(+data.deposit_pct);e.pro.depositManual=1}if(mode==='terms'){drawEst();toast('Terms fitted to this job — review them');btn.disabled=false;btn.textContent=t0;return}
     if(data.scope&&data.scope.length)e.pro.scope=data.scope.join('\n');if(data.exclusions&&data.exclusions.length)e.pro.exclusions=data.exclusions.join('\n');if(!e.title&&data.title)e.title=data.title;
     const adds=(data.add_lines||[]).filter(a=>a&&a.desc),o=e.options[0];o.lines=o.lines||[];let n=0;
     adds.forEach(a=>{if(o.lines.some(l=>(l.desc||'').toLowerCase()===a.desc.toLowerCase()))return;const m=a.model&&(PR.rows||[]).find(r=>(r.model||'').toUpperCase()===String(a.model).toUpperCase());
@@ -1837,7 +1839,8 @@ function proSection(){const e=edit.obj,p={...PRO_DEF,...e.pro},c=byId('customers
   <div class="sec">Pricing</div>
   <div class="fg"><div><label>Markup % (each item can override)</label><input id="pp_markup" value="${esc(p.markup)}"></div><div><label>Sales tax % (equipment & materials)</label><input id="pp_tax" value="${esc(p.tax)}"></div><div><label>Round up to nearest $</label><input id="pp_roundTo" value="${esc(p.roundTo)}"></div></div>
   <div class="sec">Proposal details</div>
-  <div class="fg"><div class="span2"><label>To be done at (site)</label><input id="pp_site" value="${esc(e.pro.site??c.address??'')}"></div><div><label>Payment terms</label><select id="pp_pay">${Object.entries(PRO_PAY).map(([k,t])=>`<option value="${k}" ${(e.pro.pay||'deposit')===k?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="fg"><div class="span2"><label>To be done at (site)</label><input id="pp_site" value="${esc(e.pro.site??c.address??'')}"></div><div><label>Payment terms</label><select id="pp_pay" onchange="proSync();drawEst()">${Object.entries(PRO_PAY).map(([k,t])=>`<option value="${k}" ${(e.pro.pay||'deposit')===k?'selected':''}>${(k==='deposit'?t.replace('30%',(+e.pro.deposit||30)+'%'):t)}</option>`).join('')}</select>
+   ${(e.pro.pay||'deposit')==='deposit'?(()=>{const r=proDepositRec(e),cur=+e.pro.deposit||30;return `<div style="display:flex;gap:6px;align-items:center;margin-top:4px"><span class="small">Deposit %</span><input id="pp_deposit" value="${cur}" style="width:60px" onchange="proSync();drawEst()">${r.share>0&&r.pct!==cur?`<a href="#" class="small" onclick="proSync();edit.obj.pro.deposit=${r.pct};edit.obj.pro.depositManual=1;drawEst();return false">Equipment is ${Math.round(r.share*100)}% of the price → use ${r.pct}%</a>`:''}</div>`})():''}</div>
   <div class="span2"><label>Based on Mechanical drawings</label><input id="pp_drawings" value="${esc(e.pro.drawings||'')}" placeholder="N/A"></div><div><label>Dated</label><input id="pp_dated" value="${esc(e.pro.dated||'')}" placeholder="N/A"></div></div>
   <div class="sec">Scope of work — “We will:” <span class="mut small" style="font-weight:400">one bullet per line</span></div>
   <div style="display:flex;gap:6px;margin-bottom:6px"><button class="sm" onclick="proScopeFromItems()">+ “Furnish and Install” lines from equipment items</button></div>
@@ -1846,7 +1849,7 @@ function proSection(){const e=edit.obj,p={...PRO_DEF,...e.pro},c=byId('customers
   <div class="sec">Terms & conditions <span class="mut small" style="font-weight:400">— “# ” starts a section, “- ” a bullet; {price}, {company} and {payment} fill in automatically</span></div>
   <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap"><button class="sm pri" onclick="proAI(this,'terms')">✨ AI: fit terms to this job</button><button class="sm" onclick="proSync();edit.obj.pro.terms='';drawEst()">Reset to standard terms</button></div>
   <textarea id="pp_terms" style="min-height:220px;font-size:12px">${esc((e.pro.terms||'').trim()||PRO_TERMS_STD)}</textarea>`}
-function proFinish(e){if(!e.pro)return;(e.pro.units||[]).forEach(u=>{delete u._new});e.options.forEach(o=>{const c=proCalc(e,o);o.items=[{desc:(o.name&&e.options.length>1?o.name+' — ':'')+(e.title||'HVAC work')+' (per proposal)',qty:1,price:c.price,cost:c.cost}]})}
+function proFinish(e){if(!e.pro)return;if((e.pro.pay||'deposit')==='deposit'&&!e.pro.depositManual){const r=proDepositRec(e);if(r.share>0)e.pro.deposit=r.pct}(e.pro.units||[]).forEach(u=>{delete u._new});e.options.forEach(o=>{const c=proCalc(e,o);o.items=[{desc:(o.name&&e.options.length>1?o.name+' — ':'')+(e.title||'HVAC work')+' (per proposal)',qty:1,price:c.price,cost:c.cost}]})}
 const PRO_CSS=`.pdoc{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:#000;font-size:11pt;line-height:1.35}
 .pdoc .lh{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #000;padding-bottom:2px}.pdoc .lh svg,.pdoc .lh img{height:62px!important;width:auto!important}
 .pdoc .lh .r{text-align:right;font-size:10.5pt}.pdoc .sub{display:flex;justify-content:space-between;font-size:10.5pt;margin:4px 0 8px}
@@ -1885,7 +1888,7 @@ The Purchaser may cancel this agreement within three (3) business days of accept
 function proPayTxt(e){const pay=(e.pro||{}).pay||'deposit';
   return pay==='requisition'?['Requisitions: Payments are due based on monthly requisitions for work completed and equipment/materials delivered to the site, payable within 30 days of submission.']
    :pay==='completion'?['Payment in full is due upon completion of the work.']
-   :['Deposit: A 30% deposit is required upon issuance of the Purchase Order.',`Final Payment: The remaining balance is due within 30 days after completion of installation and final system testing${e.rebate?', and is not contingent upon the utility rebate program or any rebate disbursement':''}.`]}
+   :[`Deposit: A ${+((e.pro||{}).deposit)||30}% deposit is required upon issuance of the Purchase Order.`,`Final Payment: The remaining balance is due within 30 days after completion of installation and final system testing${e.rebate?', and is not contingent upon the utility rebate program or any rebate disbursement':''}.`]}
 function proTerms(e,co,price){const L=co.legalName||co.name||'KOR HVAC LLC',txt=((e.pro||{}).terms||'').trim()||PRO_TERMS_STD;let out='',ul=false;
   const close=()=>{if(ul){out+='</ul>';ul=false}};
   txt.split('\n').map(x=>x.trim()).filter(Boolean).forEach(l=>{
