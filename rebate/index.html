@@ -238,7 +238,7 @@ function pricingTab(){
   const{p,reqs,units}=P;const sup=id=>D.suppliers.find(s=>s.id===id)||{};
   const unitName=id=>{const u=units.find(x=>x.id===id);return u?(u.tag||u.equipment_type)+(u.model?' ('+u.model+')':''):''};
   $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="ai">✨ AI: pick suppliers & draft pricing emails</button><button id="man">+ Manual request</button><span class="sp"></span><button class="sm" id="chk">Check mailbox now</button></div>
-  <div class="mut small" style="margin-bottom:10px">Emails go out from rebates@korhvac.com only after you approve them. Supplier replies and attached quotes/submittals are filed here automatically.</div>
+  <div class="mut small" style="margin-bottom:10px">Emails go out from the person who filed the project (cc rebates@korhvac.com), only after you approve them. Supplier replies and attached quotes/submittals are filed here automatically.</div>
   ${reqs.map(r=>`<div class="req"><div class="row"><b>${esc(sup(r.supplier_id).company||r.to_addr)}</b><span class="b ${esc(r.status)}">${esc(r.status)}</span>${r.quote_total?`<b>${money(r.quote_total)}</b>`:''}<span class="sp"></span><span class="small mut">${r.sent_at?'Sent '+when(r.sent_at):'Created '+when(r.created_at)}</span></div>
    <div class="small mut">To: ${esc(r.to_addr||'')}${r.cc?' · Cc: '+esc(r.cc):''} · Ref KOR-${esc(r.token)}</div>
    ${r.ai_reason?`<div class="ai" style="margin:6px 0">AI: ${esc(r.ai_reason)}</div>`:''}
@@ -257,7 +257,7 @@ function pricingTab(){
   document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=async()=>{await q(sb.from('supplier_requests').update({status:'Declined'}).eq('id',b.dataset.dec));projectView()});
 }
 async function approve(r,btn){
-  if(!confirm(`Send this pricing request to ${r.to_addr} from rebates@korhvac.com?`))return;
+  if(!confirm(`Send this pricing request to ${r.to_addr} from the project owner's email (cc rebates@)?`))return;
   if(btn){btn.disabled=true;btn.textContent='Sending…'}
   try{await fn('rebate-mail',{action:'send',id:r.id});toast('Sent');}catch(e){toast(e.message)}
   projectView();
