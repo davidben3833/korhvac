@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KOR HVAC · Rebate Portal</title>
+<link rel="icon" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--ink:#111;--bg:#f4f6fa;--card:#fff;--line:#e3e7ef;--txt:#1b2333;--mut:#6b7488;--ok:#1f9d55;--warn:#b77400;--bad:#d64545;--blue:#2f6fde}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+a{color:var(--blue)}
+button{font:inherit;border:1px solid var(--line);background:#fff;padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:600;color:var(--txt);display:inline-flex;align-items:center;gap:6px}
+button:hover{border-color:#c3cad8}button:disabled{opacity:.5;cursor:default}
+.pri{background:var(--ink);border-color:var(--ink);color:#fff}.pri:hover{background:#333}
+.grn{background:var(--ok);border-color:var(--ok);color:#fff}.red{color:var(--bad)}
+.sm{padding:5px 10px;font-size:13px}
+input,select,textarea{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;width:100%;background:#fff;color:var(--txt)}
+textarea{min-height:90px;resize:vertical}
+label{display:block;font-size:12px;font-weight:600;color:var(--mut);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.03em}
+header{background:var(--ink);color:#fff;position:sticky;top:0;z-index:5}
+.hw{max-width:1200px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:12px}
+.hw b{font-size:17px}.hw .sp{flex:1}
+.hw nav button{background:transparent;color:#ccc;border:0}.hw nav button.on{color:#fff;background:#2a2a2a}
+main{max-width:1200px;margin:0 auto;padding:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sp{flex:1}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px}
+@media(max-width:700px){.g2,.g3{grid-template-columns:1fr}.hw nav{display:none}.mnav{display:flex!important}}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:14px}
+th{font-size:12px;color:var(--mut);text-transform:uppercase}
+tr.click{cursor:pointer}tr.click:hover{background:#f8f9fc}
+.b{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700;background:#eef1f6;color:#3b4459;white-space:nowrap}
+.b.Draft{background:#fff4dd;color:#8a5a00}.b.Approved,.b.Sending{background:#e8f0ff;color:#1f4fb0}.b.Sent{background:#e8f0ff;color:#1f4fb0}
+.b.Replied{background:#efe8ff;color:#5b2fb0}.b.Quoted,.b.Pre-approved,.b.Paid{background:#e3f6eb;color:#17713f}.b.Failed,.b.Declined{background:#fde8e8;color:#a32626}
+.mut{color:var(--mut)}.small{font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow:auto}
+.tabs button{border:0;border-radius:0;border-bottom:2px solid transparent;background:none;color:var(--mut)}.tabs button.on{color:var(--txt);border-bottom-color:var(--ink)}
+.units{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.unit{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;cursor:pointer}
+.unit img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#eee}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:8px;cursor:pointer}
+.modal{position:fixed;inset:0;background:rgba(10,14,24,.5);display:flex;align-items:flex-start;justify-content:center;z-index:20;overflow:auto;padding:30px 12px}
+.mb{background:#fff;border-radius:16px;max-width:760px;width:100%;padding:20px}
+.mb h3{margin:0 0 6px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;z-index:50;font-weight:600}
+.login{max-width:380px;margin:9vh auto}.err{color:var(--bad);font-size:14px;margin-top:8px}
+.ai{background:#f3f0ff;border:1px solid #ddd3ff;border-radius:10px;padding:8px 10px;font-size:13px}
+.req{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
+.mnav{display:none;gap:6px;margin-bottom:12px}
+.stage{display:flex;gap:4px;flex-wrap:wrap}.stage span{font-size:12px;padding:3px 8px;border-radius:6px;background:#eef1f6;color:var(--mut)}.stage span.on{background:var(--ink);color:#fff}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const SB_URL='https://bljdqwbbcfgouuekcqxl.supabase.co', SB_KEY='sb_publishable_0s8YO90VzMEQRijvflJH3Q_p7rODDYS';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const STAGES=['Survey','Pricing requested','Quotes received','Submitted','Pre-approved','Installed','Paid','Closed'];
+const TYPES=['RTU','Split AC','Heat pump','Furnace','Boiler','Steam boiler','Chiller','AHU','DOAS','PTAC','Fan coil','Mini split','VRF','Water heater','Other'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>n==null?'':'$'+Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
+const when=d=>d?new Date(d).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+let ME=null, V={page:'projects',pid:null,tab:'survey'}, D={projects:[],suppliers:[],customers:[]}, P=null, chan=null;
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3200)}
+async function q(p){const{data,error}=await p;if(error)throw new Error(error.message);return data}
+function modal(html){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="mb">${html}</div>`;m.addEventListener('mousedown',e=>{if(e.target===m)m.remove()});document.body.appendChild(m);return m}
+async function fn(name,body){const{data:{session}}=await sb.auth.getSession();const r=await fetch(`${SB_URL}/functions/v1/${name}`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token,apikey:SB_KEY},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Error '+r.status));return d}
+async function signed(path){const{data}=await sb.storage.from('rebate-files').createSignedUrl(path,3600);return data?.signedUrl}
+const urlCache={};async function thumb(path){if(!urlCache[path])urlCache[path]=await signed(path);return urlCache[path]}
+async function shrink(file,max=1600){if(!file.type.startsWith('image/'))return file;const img=await createImageBitmap(file).catch(()=>null);if(!img)return file;const k=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(b=>r(b),'image/jpeg',.85))}
+async function upload(rid,file,folder){const blob=await shrink(file);const ext=blob.type==='image/jpeg'?'jpg':(file.name.split('.').pop()||'bin');const path=`${rid}/${folder}/${crypto.randomUUID()}.${ext}`;const{error}=await sb.storage.from('rebate-files').upload(path,blob,{contentType:blob.type||file.type});if(error)throw new Error(error.message);return{path,size:blob.size,mime:blob.type||file.type,name:file.name}}
+async function event(rid,text){await sb.from('rebate_events').insert({rebate_id:rid,who:ME.name,text})}
+
+/* ───────── auth ───────── */
+function loginView(msg=''){
+  $('#app').innerHTML=`<div class="login card"><h2 style="margin-top:0">KOR HVAC · Rebate Portal</h2>
+  <label>Email</label><input id="em" type="email" autocomplete="username"><label>Password</label><input id="pw" type="password" autocomplete="current-password">
+  <div class="row" style="margin-top:14px"><button class="pri" id="go">Sign in</button><span class="sp"></span><a href="#" id="fp" class="small">Forgot password?</a></div><div class="err" id="er">${esc(msg)}</div></div>`;
+  $('#go').onclick=async()=>{$('#er').textContent='';const{error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error)$('#er').textContent=error.message;else boot()};
+  $('#pw').onkeydown=e=>{if(e.key==='Enter')$('#go').click()};
+  $('#fp').onclick=async e=>{e.preventDefault();const em=$('#em').value.trim();if(!em)return $('#er').textContent='Type your email first';await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+'/app/'});$('#er').textContent='Check your email for a reset link.'};
+}
+async function boot(){
+  const{data:{session}}=await sb.auth.getSession();if(!session)return loginView();
+  const{data,error}=await sb.rpc('rebate_me');
+  if(error||!data){await sb.auth.signOut();return loginView('This account does not have rebate portal access.')}
+  ME=data;await loadAll();route();
+}
+async function loadAll(){
+  [D.projects,D.suppliers,D.customers]=await Promise.all([
+    q(sb.from('rebates').select('*').order('created_at',{ascending:false})),
+    q(sb.from('suppliers').select('*').order('company')),
+    q(sb.from('customers').select('id,name,company,address').order('name'))]);
+}
+function shell(inner){
+  const nav=[['projects','Projects'],['suppliers','Suppliers']];
+  $('#app').innerHTML=`<header><div class="hw"><b>KOR HVAC · Rebates</b><nav>${nav.map(([k,l])=>`<button data-nav="${k}" class="${V.page===k?'on':''}">${l}</button>`).join('')}</nav><span class="sp"></span><span class="small" style="color:#bbb">${esc(ME.name)}</span><button class="sm" id="lo">Sign out</button></div></header>
+  <main><div class="mnav">${nav.map(([k,l])=>`<button data-nav="${k}" class="sm ${V.page===k?'pri':''}">${l}</button>`).join('')}</div>${inner}</main>`;
+  document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{V={page:b.dataset.nav};location.hash=b.dataset.nav;route()});
+  $('#lo').onclick=async()=>{await sb.auth.signOut();loginView()};
+}
+function route(){
+  const h=location.hash.slice(1);
+  if(h.startsWith('p/')){V.page='project';V.pid=h.slice(2)}else if(h==='suppliers')V.page='suppliers';else V.page='projects';
+  if(V.page==='project')return projectView();
+  if(V.page==='suppliers')return suppliersView();
+  projectsView();
+}
+window.onhashchange=()=>ME&&route();
+
+/* ───────── projects ───────── */
+function projectsView(){
+  const f=V.f||'', st=V.st||'';
+  const list=D.projects.filter(p=>(!st||p.stage===st)&&(!f||[p.number,p.title,p.site,p.company,p.program].join(' ').toLowerCase().includes(f.toLowerCase())));
+  shell(`<div class="row" style="margin-bottom:12px"><h2 style="margin:0">Projects</h2><span class="sp"></span><button class="pri" id="np">+ New project</button></div>
+  <div class="card"><div class="row" style="margin-bottom:10px"><input id="f" placeholder="Search…" value="${esc(f)}" style="max-width:280px"><select id="st" style="max-width:200px"><option value="">All stages</option>${STAGES.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select></div>
+  <table><tr><th>#</th><th>Project</th><th>Site</th><th>Program / company</th><th>Stage</th><th>Survey</th></tr>
+  ${list.map(p=>`<tr class="click" data-id="${p.id}"><td>${esc(p.number)}</td><td><b>${esc(p.title||'(untitled)')}</b></td><td>${esc(p.site||'')}</td><td>${esc([p.program,p.company].filter(Boolean).join(' · '))}</td><td><span class="b ${esc(p.stage)}">${esc(p.stage)}</span></td><td>${esc(p.survey_date||'')}</td></tr>`).join('')||'<tr><td colspan=6 class="mut">No projects yet.</td></tr>'}</table></div>`);
+  $('#f').oninput=e=>{V.f=e.target.value;clearTimeout(V.t);V.t=setTimeout(()=>{projectsView();$('#f').focus();$('#f').setSelectionRange(99,99)},250)};
+  $('#st').onchange=e=>{V.st=e.target.value;projectsView()};
+  document.querySelectorAll('tr[data-id]').forEach(r=>r.onclick=()=>location.hash='p/'+r.dataset.id);
+  $('#np').onclick=()=>editProject();
+}
+function editProject(p={}){
+  const m=modal(`<h3>${p.id?'Edit project':'New project'}</h3>
+  <label>Project name</label><input id="t" value="${esc(p.title||'')}" placeholder="e.g. Sunrise Nursing Home – RTU replacement">
+  <label>Site address</label><input id="s" value="${esc(p.site||'')}">
+  <div class="g2"><div><label>Customer (optional)</label><select id="c"><option value="">—</option>${D.customers.map(c=>`<option value="${c.id}" ${c.id===p.customer_id?'selected':''}>${esc(c.company||c.name)}</option>`).join('')}</select></div>
+  <div><label>Survey date</label><input id="d" type="date" value="${esc(p.survey_date||new Date().toISOString().slice(0,10))}"></div>
+  <div><label>Rebate program</label><input id="pg" value="${esc(p.program||'')}" placeholder="e.g. NJ Clean Energy / PSE&G"></div>
+  <div><label>Rebate company</label><input id="co" value="${esc(p.company||'')}"></div>
+  <div><label>Application #</label><input id="an" value="${esc(p.app_no||'')}"></div>
+  <div><label>Stage</label><select id="sg">${STAGES.map(s=>`<option ${s===(p.stage||'Survey')?'selected':''}>${s}</option>`).join('')}</select></div></div>
+  <label>Notes</label><textarea id="n">${esc(p.notes||'')}</textarea>
+  <div class="row" style="margin-top:14px"><button class="pri" id="sv">Save</button><button id="cx">Cancel</button></div>`);
+  m.querySelector('#cx').onclick=()=>m.remove();
+  m.querySelector('#sv').onclick=async()=>{
+    const o={title:m.querySelector('#t').value.trim(),site:m.querySelector('#s').value.trim(),customer_id:m.querySelector('#c').value||null,survey_date:m.querySelector('#d').value||null,program:m.querySelector('#pg').value.trim()||null,company:m.querySelector('#co').value.trim()||null,app_no:m.querySelector('#an').value.trim()||null,stage:m.querySelector('#sg').value,notes:m.querySelector('#n').value.trim()||null,updated_at:new Date().toISOString()};
+    if(!o.title)return toast('Add a project name');
+    try{if(p.id){await q(sb.from('rebates').update(o).eq('id',p.id));if(o.stage!==p.stage)await event(p.id,`Stage → ${o.stage}`)}
+      else{o.surveyor_id=ME.id;const r=await q(sb.from('rebates').insert(o).select().single());await event(r.id,'Project created');p=r}
+      m.remove();await loadAll();location.hash='p/'+p.id;route()}catch(e){toast(e.message)}
+  };
+}
+
+/* ───────── project ───────── */
+async function projectView(){
+  const p=D.projects.find(x=>x.id===V.pid);if(!p){location.hash='';return}
+  const [units,reqs,files,events]=await Promise.all([
+    q(sb.from('rebate_units').select('*').eq('rebate_id',p.id).order('created_at')),
+    q(sb.from('supplier_requests').select('*').eq('rebate_id',p.id).order('created_at',{ascending:false})),
+    q(sb.from('rebate_files').select('*').eq('rebate_id',p.id).order('created_at',{ascending:false})),
+    q(sb.from('rebate_events').select('*').eq('rebate_id',p.id).order('at',{ascending:false}).limit(200))]);
+  P={p,units,reqs,files,events};
+  if(chan)sb.removeChannel(chan);
+  chan=sb.channel('rb-'+p.id).on('postgres_changes',{event:'*',schema:'public',table:'supplier_requests',filter:'rebate_id=eq.'+p.id},()=>refresh())
+    .on('postgres_changes',{event:'*',schema:'public',table:'rebate_files',filter:'rebate_id=eq.'+p.id},()=>refresh()).subscribe();
+  drawProject();
+}
+let rt;function refresh(){clearTimeout(rt);rt=setTimeout(async()=>{if(V.page==='project'&&!document.querySelector('.modal')){await loadAll();projectView()}},800)}
+function drawProject(){
+  const{p,units,reqs,files,events}=P, tab=V.tab||'survey';
+  const cust=D.customers.find(c=>c.id===p.customer_id);
+  const drafts=reqs.filter(r=>r.status==='Draft').length;
+  shell(`<div class="row" style="margin-bottom:6px"><a href="#" id="bk">← Projects</a></div>
+  <div class="card"><div class="row"><div><div class="mut small">${esc(p.number||'')}</div><h2 style="margin:2px 0">${esc(p.title||'')}</h2><div class="mut">${esc(p.site||'')}${cust?' · '+esc(cust.company||cust.name):''}</div>
+  <div class="small mut">${esc([p.program,p.company,p.app_no&&('App # '+p.app_no)].filter(Boolean).join(' · '))}</div></div><span class="sp"></span><button class="sm" id="ed">Edit</button></div>
+  <div class="stage" style="margin-top:10px">${STAGES.map(s=>`<span class="${s===p.stage?'on':''}" data-stage="${s}" style="cursor:pointer">${s}</span>`).join('')}</div></div>
+  <div class="tabs">${[['survey',`Survey (${units.length})`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['files',`Files (${files.length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
+  <div id="tb"></div>`);
+  $('#bk').onclick=e=>{e.preventDefault();location.hash=''};
+  $('#ed').onclick=()=>editProject(p);
+  document.querySelectorAll('[data-stage]').forEach(s=>s.onclick=async()=>{if(s.dataset.stage===p.stage)return;await q(sb.from('rebates').update({stage:s.dataset.stage,updated_at:new Date().toISOString()}).eq('id',p.id));await event(p.id,'Stage → '+s.dataset.stage);await loadAll();projectView()});
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{V.tab=b.dataset.tab;drawProject()});
+  ({survey:surveyTab,pricing:pricingTab,files:filesTab,activity:activityTab})[tab]();
+}
+
+/* survey */
+function surveyTab(){
+  const{p,units}=P;
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="snap">📷 Snap nameplate (AI fills it)</button><button id="add">+ Add unit manually</button><span class="sp"></span><span class="mut small">${units.reduce((a,u)=>a+(u.qty||1),0)} units</span></div>
+  <input type="file" id="cam" accept="image/*" capture="environment" multiple hidden>
+  <div class="units">${units.map(u=>`<div class="unit" data-u="${u.id}"><div class="row" style="align-items:flex-start"><img data-th="${esc((u.photos||[])[0]?.path||'')}" alt=""><div style="flex:1;min-width:0">
+   <b>${esc(u.tag||u.equipment_type||'Unit')}</b> ${u.qty>1?`<span class="b">×${u.qty}</span>`:''}<div class="small">${esc([u.make,u.model].filter(Boolean).join(' '))||'<span class="mut">no model yet</span>'}</div>
+   <div class="small mut">${esc([u.equipment_type,u.tonnage&&(u.tonnage+' ton'),u.capacity,u.fuel,u.mfg_year].filter(Boolean).join(' · '))}</div>
+   <div class="small mut">${esc(u.location||'')}</div>${u.ai_status==='reading'?'<div class="small" style="color:#5b2fb0">AI reading…</div>':''}</div></div></div>`).join('')||'<div class="mut">No units yet. Walk the site and snap each nameplate — the AI fills in make, model, serial, size and year.</div>'}</div>`;
+  document.querySelectorAll('img[data-th]').forEach(async i=>{if(i.dataset.th)i.src=await thumb(i.dataset.th)});
+  document.querySelectorAll('[data-u]').forEach(c=>c.onclick=()=>editUnit(units.find(u=>u.id===c.dataset.u)));
+  $('#add').onclick=()=>editUnit({});
+  $('#snap').onclick=()=>$('#cam').click();
+  $('#cam').onchange=async e=>{
+    const files=[...e.target.files];if(!files.length)return;
+    toast(`Uploading ${files.length} photo(s)…`);
+    for(const f of files){
+      try{const up=await upload(p.id,f,'units');
+        const u=await q(sb.from('rebate_units').insert({rebate_id:p.id,photos:[{path:up.path}],ai_status:'reading',tag:`Unit ${P.units.length+1}`}).select().single());
+        P.units.push(u);surveyTab();
+        fn('ai-assist',{action:'nameplate',paths:[up.path],unit_id:u.id}).then(()=>refreshUnits()).catch(err=>{toast('AI: '+err.message);sb.from('rebate_units').update({ai_status:'failed'}).eq('id',u.id).then(refreshUnits)});
+      }catch(err){toast(err.message)}
+    }
+    await event(p.id,`Added ${files.length} unit photo(s)`);
+  };
+}
+async function refreshUnits(){P.units=await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at'));if(V.tab==='survey'&&!document.querySelector('.modal'))surveyTab()}
+function editUnit(u){
+  const F=(k,l,t='text')=>`<div><label>${l}</label><input id="u_${k}" type="${t}" value="${esc(u[k]??'')}"></div>`;
+  const m=modal(`<h3>${u.id?'Unit':'New unit'}</h3>
+  <div class="thumbs" id="th"></div><div class="row" style="margin-top:8px"><button class="sm" id="ph">📷 Add photo</button>${u.id?'<button class="sm" id="air">✨ Read nameplate with AI</button>':''}<input type="file" id="pf" accept="image/*" capture="environment" multiple hidden></div>
+  ${u.ai?`<div class="ai" style="margin-top:8px">AI read (${esc(u.ai.confidence||'')} confidence)${u.ai.notes?': '+esc(u.ai.notes):''}</div>`:''}
+  <div class="g3">${F('tag','Tag / name')}${F('location','Location')}<div><label>Type</label><select id="u_equipment_type"><option value=""></option>${TYPES.map(t=>`<option ${t===u.equipment_type?'selected':''}>${t}</option>`).join('')}</select></div>
+  ${F('make','Make')}${F('model','Model')}${F('serial','Serial')}${F('capacity','Capacity')}${F('tonnage','Tons','number')}${F('fuel','Fuel')}
+  ${F('refrigerant','Refrigerant')}${F('voltage','Voltage')}${F('mfg_year','Year','number')}${F('efficiency','Efficiency')}${F('condition','Condition')}${F('qty','Qty','number')}</div>
+  <label>Notes</label><textarea id="u_notes">${esc(u.notes||'')}</textarea>
+  <div class="row" style="margin-top:14px"><button class="pri" id="sv">Save</button><button id="cx">Close</button><span class="sp"></span>${u.id?'<button class="red" id="dl">Delete</button>':''}</div>`);
+  let photos=[...(u.photos||[])];
+  const drawTh=()=>{const t=m.querySelector('#th');t.innerHTML=photos.map((p,i)=>`<img data-i="${i}">`).join('');photos.forEach(async(p,i)=>{const im=t.querySelector(`[data-i="${i}"]`);im.src=await thumb(p.path);im.onclick=()=>window.open(im.src)})};drawTh();
+  const val=()=>{const o={};['tag','location','equipment_type','make','model','serial','capacity','fuel','refrigerant','voltage','efficiency','condition','notes'].forEach(k=>o[k]=m.querySelector('#u_'+k).value.trim()||null);['tonnage','mfg_year','qty'].forEach(k=>{const v=m.querySelector('#u_'+k).value;o[k]=v===''?null:Number(v)});o.qty=o.qty||1;o.photos=photos;return o};
+  m.querySelector('#cx').onclick=()=>{m.remove();refreshUnits()};
+  m.querySelector('#ph').onclick=()=>m.querySelector('#pf').click();
+  m.querySelector('#pf').onchange=async e=>{for(const f of e.target.files){try{const up=await upload(P.p.id,f,'units');photos.push({path:up.path})}catch(err){toast(err.message)}}drawTh()};
+  if(u.id)m.querySelector('#air').onclick=async e=>{
+    if(!photos.length)return toast('Add a nameplate photo first');
+    e.target.disabled=true;e.target.textContent='Reading…';
+    try{await q(sb.from('rebate_units').update({photos}).eq('id',u.id));const r=await fn('ai-assist',{action:'nameplate',paths:photos.slice(-3).map(p=>p.path)});
+      const a=r.unit||{};for(const k of ['equipment_type','make','model','serial','capacity','tonnage','fuel','refrigerant','voltage','mfg_year','efficiency']){const el=m.querySelector('#u_'+k);if(el&&a[k]!=null&&a[k]!=='')el.value=a[k]}
+      u.ai=a;toast('Filled from nameplate — check and save')}catch(err){toast(err.message)}
+    e.target.disabled=false;e.target.textContent='✨ Read nameplate with AI'};
+  m.querySelector('#sv').onclick=async()=>{const o=val();try{if(u.id)await q(sb.from('rebate_units').update({...o,ai:u.ai??null,updated_at:new Date().toISOString()}).eq('id',u.id));else await q(sb.from('rebate_units').insert({...o,rebate_id:P.p.id}));m.remove();refreshUnits()}catch(e){toast(e.message)}};
+  if(u.id)m.querySelector('#dl').onclick=async()=>{if(!confirm('Delete this unit?'))return;await q(sb.from('rebate_units').delete().eq('id',u.id));m.remove();refreshUnits()};
+}
+
+/* pricing */
+function pricingTab(){
+  const{p,reqs,units}=P;const sup=id=>D.suppliers.find(s=>s.id===id)||{};
+  const unitName=id=>{const u=units.find(x=>x.id===id);return u?(u.tag||u.equipment_type)+(u.model?' ('+u.model+')':''):''};
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="ai">✨ AI: pick suppliers & draft pricing emails</button><button id="man">+ Manual request</button><span class="sp"></span><button class="sm" id="chk">Check mailbox now</button></div>
+  <div class="mut small" style="margin-bottom:10px">Emails go out from rebates@korhvac.com only after you approve them. Supplier replies and attached quotes/submittals are filed here automatically.</div>
+  ${reqs.map(r=>`<div class="req"><div class="row"><b>${esc(sup(r.supplier_id).company||r.to_addr)}</b><span class="b ${esc(r.status)}">${esc(r.status)}</span>${r.quote_total?`<b>${money(r.quote_total)}</b>`:''}<span class="sp"></span><span class="small mut">${r.sent_at?'Sent '+when(r.sent_at):'Created '+when(r.created_at)}</span></div>
+   <div class="small mut">To: ${esc(r.to_addr||'')}${r.cc?' · Cc: '+esc(r.cc):''} · Ref KOR-${esc(r.token)}</div>
+   ${r.ai_reason?`<div class="ai" style="margin:6px 0">AI: ${esc(r.ai_reason)}</div>`:''}
+   <div class="small">Units: ${(r.unit_ids||[]).map(unitName).filter(Boolean).map(esc).join(', ')||'—'}</div>
+   ${r.reply_snippet?`<div class="small" style="margin-top:6px;border-left:3px solid #ddd;padding-left:8px"><b>${esc(r.reply_from||'')}</b> ${when(r.replied_at)}<br>${esc(r.reply_snippet)}</div>`:''}
+   ${r.error?`<div class="err">${esc(r.error)}</div>`:''}
+   <div class="row" style="margin-top:8px">${['Draft','Failed'].includes(r.status)?`<button class="sm" data-open="${r.id}">Review / edit</button><button class="sm grn" data-send="${r.id}">Approve & send</button><button class="sm red" data-del="${r.id}">Discard</button>`:`<button class="sm" data-open="${r.id}">View email</button>`}
+   ${['Sent','Replied'].includes(r.status)?`<button class="sm" data-mark="${r.id}">Mark quoted</button>`:''}${!['Declined','Draft'].includes(r.status)?`<button class="sm" data-dec="${r.id}">Declined</button>`:''}</div></div>`).join('')||'<div class="card mut">No pricing requests yet. Add units in Survey, then let the AI pick suppliers and draft the emails.</div>'}`;
+  $('#ai').onclick=async e=>{if(!units.length)return toast('Add units first');e.target.disabled=true;e.target.textContent='Drafting…';try{const r=await fn('ai-assist',{action:'rebate_plan',rebate_id:p.id});toast(`${r.drafted} draft(s) ready for approval`);await projectView()}catch(err){toast(err.message);e.target.disabled=false}};
+  $('#man').onclick=()=>editReq({rebate_id:p.id,status:'Draft',unit_ids:units.map(u=>u.id),subject:`Pricing needed for job ${p.site||p.title}`,body:''});
+  $('#chk').onclick=async e=>{e.target.disabled=true;try{const r=await fn('rebate-mail',{action:'poll'});toast(`Checked: ${r.matched} new repl${r.matched===1?'y':'ies'}, ${r.files} file(s)`);projectView()}catch(err){toast(err.message)}e.target.disabled=false};
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>editReq(reqs.find(r=>r.id===b.dataset.open)));
+  document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>approve(reqs.find(r=>r.id===b.dataset.send),b));
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Discard this draft?'))return;await q(sb.from('supplier_requests').delete().eq('id',b.dataset.del));projectView()});
+  document.querySelectorAll('[data-mark]').forEach(b=>b.onclick=async()=>{const t=prompt('Quote total (optional)');await q(sb.from('supplier_requests').update({status:'Quoted',quote_total:t?Number(t.replace(/[^\d.]/g,''))||null:null}).eq('id',b.dataset.mark));projectView()});
+  document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=async()=>{await q(sb.from('supplier_requests').update({status:'Declined'}).eq('id',b.dataset.dec));projectView()});
+}
+async function approve(r,btn){
+  if(!confirm(`Send this pricing request to ${r.to_addr} from rebates@korhvac.com?`))return;
+  if(btn){btn.disabled=true;btn.textContent='Sending…'}
+  try{await fn('rebate-mail',{action:'send',id:r.id});toast('Sent');}catch(e){toast(e.message)}
+  projectView();
+}
+function editReq(r){
+  const ro=!['Draft','Failed'].includes(r.status)&&r.id;
+  const m=modal(`<h3>${ro?'Pricing request':'Review pricing email'}</h3>
+  <div class="g2"><div><label>Supplier</label><select id="s" ${ro?'disabled':''}><option value="">—</option>${D.suppliers.filter(s=>s.active||s.id===r.supplier_id).map(s=>`<option value="${s.id}" ${s.id===r.supplier_id?'selected':''}>${esc(s.company)}${s.contact_name?' – '+esc(s.contact_name):''}</option>`).join('')}</select></div>
+  <div><label>To</label><input id="to" value="${esc(r.to_addr||'')}" ${ro?'disabled':''}></div></div>
+  <label>Cc</label><input id="cc" value="${esc(r.cc||'')}" ${ro?'disabled':''}>
+  <label>Units</label><div class="small">${P.units.map(u=>`<label style="display:inline-flex;gap:4px;text-transform:none;font-weight:500;margin-right:10px;color:var(--txt)"><input type="checkbox" style="width:auto" value="${u.id}" ${(r.unit_ids||[]).includes(u.id)?'checked':''} ${ro?'disabled':''}>${esc(u.tag||u.equipment_type||'Unit')}</label>`).join('')}</div>
+  <label>Subject</label><input id="sj" value="${esc(r.subject||'')}" ${ro?'disabled':''}>
+  <label>Message</label><textarea id="bd" style="min-height:260px" ${ro?'disabled':''}>${esc(r.body||'')}</textarea>
+  <div class="small mut">Nameplate photos of the selected units are attached automatically. Reference [KOR-${esc(r.token||'xxxxxx')}] is added to the subject so replies are matched.</div>
+  <div class="row" style="margin-top:14px">${ro?'':'<button class="pri" id="sv">Save draft</button><button class="grn" id="sd">Approve & send</button>'}<button id="cx">Close</button></div>`);
+  const sel=m.querySelector('#s');sel.onchange=()=>{const s=D.suppliers.find(x=>x.id===sel.value);if(s)m.querySelector('#to').value=s.email||''};
+  m.querySelector('#cx').onclick=()=>m.remove();
+  if(ro)return;
+  const save=async()=>{const o={supplier_id:sel.value||null,to_addr:m.querySelector('#to').value.trim(),cc:m.querySelector('#cc').value.trim()||null,subject:m.querySelector('#sj').value.trim(),body:m.querySelector('#bd').value,unit_ids:[...m.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value),status:'Draft',updated_at:new Date().toISOString()};
+    if(!o.supplier_id||!o.to_addr||!o.subject||!o.body.trim())throw new Error('Supplier, To, subject and message are required');
+    if(r.id){await q(sb.from('supplier_requests').update(o).eq('id',r.id));return{...r,...o}}const n=await q(sb.from('supplier_requests').insert({...o,rebate_id:P.p.id}).select().single());return n};
+  m.querySelector('#sv').onclick=async()=>{try{await save();m.remove();projectView()}catch(e){toast(e.message)}};
+  m.querySelector('#sd').onclick=async()=>{try{const n=await save();m.remove();approve(n)}catch(e){toast(e.message)}};
+}
+
+/* files */
+function filesTab(){
+  const{p,files}=P;
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="up">Upload files</button><input type="file" id="ff" multiple hidden><select id="k" style="max-width:180px"><option>Quote</option><option>Submittal</option><option>Application</option><option>Pre-approval</option><option>Invoice</option><option>Photo</option><option>Other</option></select></div>
+  <div class="card"><table><tr><th>File</th><th>Type</th><th>From</th><th>Added</th><th></th></tr>${files.map(f=>`<tr><td><a href="#" data-f="${esc(f.path)}">${esc(f.name)}</a></td><td>${esc(f.kind||'')}</td><td class="small">${esc(f.email_from||'upload')}</td><td class="small">${when(f.created_at)}</td><td><button class="sm red" data-x="${f.id}">✕</button></td></tr>`).join('')||'<tr><td colspan=5 class="mut">No files yet.</td></tr>'}</table></div>`;
+  $('#up').onclick=()=>$('#ff').click();
+  $('#ff').onchange=async e=>{for(const f of e.target.files){try{const path=`${p.id}/files/${Date.now()}-${f.name.replace(/[^\w.\- ]+/g,'_')}`;const{error}=await sb.storage.from('rebate-files').upload(path,f,{contentType:f.type});if(error)throw error;await q(sb.from('rebate_files').insert({rebate_id:p.id,name:f.name,path,mime:f.type,size:f.size,kind:$('#k').value}))}catch(err){toast(err.message)}}await event(p.id,`Uploaded ${e.target.files.length} file(s)`);projectView()};
+  document.querySelectorAll('[data-f]').forEach(a=>a.onclick=async e=>{e.preventDefault();const u=await signed(a.dataset.f);if(u)window.open(u)});
+  document.querySelectorAll('[data-x]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this file?'))return;const f=files.find(x=>x.id===b.dataset.x);await sb.storage.from('rebate-files').remove([f.path]);await q(sb.from('rebate_files').delete().eq('id',f.id));projectView()});
+}
+function activityTab(){
+  $('#tb').innerHTML=`<div class="card"><div class="row"><input id="nt" placeholder="Add a note…"><button class="pri" id="an">Add</button></div></div>
+  <div class="card">${P.events.map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="small mut">${when(e.at)} · ${esc(e.who||'')}</span><div>${esc(e.text)}</div></div>`).join('')||'<span class="mut">Nothing yet.</span>'}</div>`;
+  $('#an').onclick=async()=>{const t=$('#nt').value.trim();if(!t)return;await event(P.p.id,t);projectView()};
+}
+
+/* ───────── suppliers ───────── */
+function suppliersView(){
+  shell(`<div class="row" style="margin-bottom:12px"><h2 style="margin:0">Suppliers</h2><span class="sp"></span><button class="pri" id="ns">+ Add supplier</button></div>
+  <div class="mut small" style="margin-bottom:10px">The AI picks suppliers from this list by equipment type, brand and region, and learns from who replies and quotes.</div>
+  <div class="card" style="overflow:auto"><table><tr><th>Company</th><th>Contact</th><th>Equipment</th><th>Brands</th><th>Regions</th><th>Record</th></tr>
+  ${D.suppliers.map(s=>`<tr class="click" data-s="${s.id}" style="${s.active?'':'opacity:.5'}"><td><b>${esc(s.company)}</b></td><td class="small">${esc(s.contact_name||'')}<br>${esc(s.email||'')}</td><td class="small">${esc((s.categories||[]).join(', '))}</td><td class="small">${esc((s.brands||[]).join(', '))}</td><td class="small">${esc((s.regions||[]).join(', '))}</td>
+  <td class="small">${s.stats?.sent?`${s.stats.sent} sent · ${s.stats.quoted||0} quoted${s.stats.avgReplyHrs!=null?' · ~'+s.stats.avgReplyHrs+'h reply':''}`:'<span class="mut">new</span>'}</td></tr>`).join('')}</table></div>`);
+  $('#ns').onclick=()=>editSupplier({active:true});
+  document.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>editSupplier(D.suppliers.find(s=>s.id===r.dataset.s)));
+}
+function editSupplier(s){
+  const arr=v=>(v||[]).join(', '), split=v=>v.split(',').map(x=>x.trim()).filter(Boolean);
+  const m=modal(`<h3>${s.id?'Supplier':'New supplier'}</h3><div class="g2">
+  <div><label>Company</label><input id="c" value="${esc(s.company||'')}"></div><div><label>Contact name</label><input id="n" value="${esc(s.contact_name||'')}"></div>
+  <div><label>Email</label><input id="e" type="email" value="${esc(s.email||'')}"></div><div><label>Phone</label><input id="p" value="${esc(s.phone||'')}"></div></div>
+  <label>Equipment types (comma separated)</label><input id="cat" value="${esc(arr(s.categories))}" placeholder="RTU, Split system, Boiler, PTAC…">
+  <label>Brands</label><input id="br" value="${esc(arr(s.brands))}"><label>Regions / states</label><input id="rg" value="${esc(arr(s.regions))}" placeholder="NJ, NY, MA">
+  <label>Notes (the AI reads these)</label><textarea id="nt">${esc(s.notes||'')}</textarea>
+  ${s.learned?.quoted?`<div class="ai">Learned: quoted ${esc(Object.entries(s.learned.quoted).map(([k,v])=>k+' ×'+v).join(', '))}</div>`:''}
+  <label style="text-transform:none"><input type="checkbox" id="ac" style="width:auto" ${s.active!==false?'checked':''}> Active</label>
+  <div class="row" style="margin-top:14px"><button class="pri" id="sv">Save</button><button id="cx">Close</button></div>`);
+  m.querySelector('#cx').onclick=()=>m.remove();
+  m.querySelector('#sv').onclick=async()=>{const o={company:m.querySelector('#c').value.trim(),contact_name:m.querySelector('#n').value.trim()||null,email:m.querySelector('#e').value.trim()||null,phone:m.querySelector('#p').value.trim()||null,categories:split(m.querySelector('#cat').value),brands:split(m.querySelector('#br').value),regions:split(m.querySelector('#rg').value),notes:m.querySelector('#nt').value.trim()||null,active:m.querySelector('#ac').checked,updated_at:new Date().toISOString()};
+    if(!o.company)return toast('Company is required');
+    try{if(s.id)await q(sb.from('suppliers').update(o).eq('id',s.id));else await q(sb.from('suppliers').insert({...o,source:'manual'}));m.remove();await loadAll();suppliersView()}catch(e){toast(e.message)}};
+}
+boot();
+</script>
+</body>
+</html>

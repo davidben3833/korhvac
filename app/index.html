@@ -824,12 +824,15 @@ const JOB_TYPES=['Service Call','Repair','Maintenance','Install','Emergency','Es
 const PRIOS=['Normal','High','Emergency','Low'];
 const EQ_TYPES=['Rooftop Unit (RTU)','Split System','Heat Pump','Furnace','Boiler','Chiller','Air Handler','Mini-Split','PTAC','Cooling Tower','Exhaust Fan','Make-Up Air','Water Heater','Controls/BMS','Other'];
 const REBATE_ST=['Pre-approval','Approved','Installed','Submitted','Paid','Denied'];
-const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Estimates'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
+const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Estimates'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
 const VIEWS=NAV.filter(n=>n.length>1);
 let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null;
-const isAdmin=()=>!sb||(me&&me.role==='Admin');
+const isAdmin=()=>!sb||(me&&(me.base||me.role)==='Admin');
+const roleBase=r=>{const x=(S.roles||[]).find(y=>y.name===r);return x?x.base:(r||'Technician')};
+const roleNames=()=>(S.roles&&S.roles.length?S.roles.map(r=>r.name):['Technician','Office','Dispatcher','Rebate','Admin']);
+const canSee=v=>{if(!sb||isAdmin())return true;const a=(me&&me.areas)||[];return a.includes('*')||a.includes(v)};
 const ADMIN_VIEWS=['reports','payroll','settings','users'];
-const crew=()=>S.techs.filter(t=>!t.access||t.access==='Technician');
+const crew=()=>S.techs.filter(t=>!t.access||roleBase(t.access)==='Technician');
 const UI={jobQ:'',jobSt:'Open',custQ:'',invSt:'All',estSt:'All',date:today(),pbQ:'',pbCat:'',pbNeeds:false,sampleMap:false,routeTech:'',mapCenter:null,mapZoom:null,eqQ:'',rbSt:'All',from:today().slice(0,8)+'01',to:today(),tech:lsGet('tech')||'',tdate:today(),callQ:''};
 let edit=null;
 
@@ -996,6 +999,7 @@ async function sbLoadAll(){
   const jobs=Object.entries(TBL).map(async([col,m])=>{let q=sb.from(m.t).select('*').limit(m.limit||10000);if(m.order)q=q.order(m.order[0],{ascending:m.order[1]});const{data,error}=await q;if(error)throw new Error(m.t+': '+error.message);S[col]=(data||[]).map(r=>fromRow(col,r))});
   jobs.push((async()=>{const{data}=await sb.from('company_settings').select('*').eq('id',1).maybeSingle();if(data)setSettings(data)})());
   jobs.push(loadPortalUsers());
+  jobs.push((async()=>{const{data}=await sb.from('app_roles').select('*').order('builtin',{ascending:false});S.roles=data||[]})());
   await Promise.all(jobs)}
 async function loadPortalUsers(){if(!isAdmin()){S.portalUsers=[];return}const{data}=await sb.from('portal_users').select('*');S.portalUsers=data||[]}
 function sbRealtime(){
@@ -1046,6 +1050,8 @@ async function doSetPw(){const a=$('#au_np').value,b=$('#au_np2').value;if(a.len
 async function enter(){
   const{data,error}=await sb.rpc('office_me');
   if(error||!data){let t=null;try{const r=await sb.rpc('tech_me');t=r.data}catch(e){}
+    if(t&&['Rebate'].includes(roleBase(t.role))||t&&t.role==='Rebate'){location.href='/rebate/';return}
+    try{const rb=await sb.rpc('rebate_me');if(rb.data){location.href='/rebate/';return}}catch(e){}
     authScreen(t?`<h2>You’re all set, ${esc(t.name)}</h2><p>Your password is saved. Sign in on the <b>KOR HVAC Tech</b> app on your phone with this email and password.</p><button onclick="signOut()">Sign out</button>`
       :`<h2>No office access</h2><p>This login isn’t set up for the office system. If you’re a customer, use the customer portal${KOR.portalUrl?` at <a href="${esc(KOR.portalUrl)}">${esc(KOR.portalUrl.replace(/^https?:\/\//,''))}</a>`:''}. Otherwise ask an Admin to give you access.</p><button onclick="signOut()">Sign out</button>`);return}
   me=data;setSync('Loading…');
@@ -1061,30 +1067,46 @@ async function callAdmin(action,body){const{data,error}=await sb.functions.invok
   if(data&&data.error)throw new Error(data.error);return data}
 function vUsers(){
   if(!sb)return `<div class="top"><h1>Users & Access</h1></div><div class="card"><p>Logins for office staff, technicians and customers are managed here once the office system is live on the KOR HVAC database.</p><p class="small mut">Admins (David, Avi): add/remove people, change access, see payroll and settings. Office: day-to-day work. Technicians: the phone app only. Customers: the portal only.</p></div>`;
-  const staff=[...S.techs].sort((a,b)=>({Admin:0,Office:1,Technician:2}[a.access]-{Admin:0,Office:1,Technician:2}[b.access])||(a.name||'').localeCompare(b.name||''));
+  const RANK={Admin:0,Office:1,Dispatcher:2,Rebate:3,Technician:4};const staff=[...S.techs].sort((a,b)=>(RANK[roleBase(a.access)]??5)-(RANK[roleBase(b.access)]??5)||(a.name||'').localeCompare(b.name||''));
   const pu={};(S.portalUsers||[]).forEach(r=>{(pu[r.user_id]=pu[r.user_id]||{email:r.email,name:r.name,cids:[]}).cids.push(r.customer_id)});
   return `<div class="top"><h1>Users & Access</h1><button class="pri" onclick="openAddUser()">+ Add person</button><button onclick="openPortalInvite()">+ Give a customer portal access</button></div>
   <div class="card" style="padding:0;overflow-x:auto"><table><tr><th>Name</th><th>Email</th><th>Access</th><th>Status</th><th>Location notice</th><th></th></tr>
   ${staff.map(t=>`<tr><td><b>${esc(t.name)}</b><div class="mut small">${esc(t.title||'')}</div></td><td>${esc(t.email||'')}${t.userId?'':' <span class="badge b-Unpaid">no login</span>'}</td><td>${badge(t.access||'Technician')}</td><td>${t.active===false?'<span class="badge b-Canceled">Disabled</span>':'<span class="badge b-Active">Active</span>'}</td>
    <td class="small">${t.access==='Technician'?(t.locationAckAt?'✓ '+fdate(t.locationAckAt):'<span style="color:var(--warn)">Not yet</span>'):'—'}</td>
    <td class="r nowrap"><button class="sm" onclick="openUser('${t.id}')">Edit</button>${t.email?` <button class="sm" onclick="sendReset('${esc(t.email)}',false)">Reset password</button>`:''}</td></tr>`).join('')}</table></div>
+  <h3 style="margin:22px 0 10px">Roles <button class="sm" onclick="openRole()">+ New role</button></h3>
+  <div class="card" style="padding:0;overflow-x:auto"><table><tr><th>Role</th><th>Works like</th><th>Can see</th><th class="r">People</th><th></th></tr>
+  ${(S.roles||[]).map(r=>`<tr><td><b>${esc(r.name)}</b>${r.builtin?' <span class="mut small">built-in</span>':''}</td><td>${esc(r.base)}</td><td class="small">${(r.areas||[]).includes('*')?'Everything':(r.areas||[]).map(a=>esc((VIEWS.find(n=>n[0]===a)||[0,0,a==='rebate'?'Rebate portal':a])[2])).join(', ')}</td><td class="r">${S.techs.filter(t=>t.access===r.name).length}</td><td class="r">${r.builtin?'':`<button class="sm" onclick="openRole('${esc(r.name)}')">Edit</button>`}</td></tr>`).join('')}</table></div>
   <h3 style="margin:22px 0 10px">Customer portal access</h3>
   <div class="card" style="padding:0">${Object.keys(pu).length?`<table><tr><th>Email</th><th>Name</th><th>Locations</th><th></th></tr>${Object.entries(pu).map(([uid_,u])=>`<tr><td>${esc(u.email||'')}</td><td>${esc(u.name||'')}</td><td class="small">${u.cids.map(c=>esc(custName(c))).join('<br>')}</td><td class="r nowrap">${u.email?`<button class="sm" onclick="sendReset('${esc(u.email)}',true)">Send sign-in link</button> `:''}<button class="sm danger" onclick="removePortal('${uid_}')">Remove access</button></td></tr>`).join('')}</table>`:'<div class="empty">No customers have portal access yet.</div>'}</div>
-  <p class="small mut">Admins: everything incl. users, prices, payroll, reports and settings. Office: calls, dispatch, jobs, customers, estimates, invoices — no payroll/settings/price changes. Technicians: the KOR HVAC Tech phone app only (their own jobs, no prices). Customers: the portal only (their own locations).</p>`}
+  <p class="small mut">Admin: everything. Office: calls, dispatch, jobs, customers, estimates, invoices. Dispatcher: calls, dispatch board, map, jobs, customers, techs, fleet — no money. Rebate: the rebate portal only (korhvac.com/rebate). Technicians: the Tech app only (their own jobs, no prices). Customers: the customer portal only (their own locations). Make your own roles above.</p>`}
+const AREA_OPTS=()=>[...VIEWS.filter(n=>!ADMIN_VIEWS.includes(n[0])).map(n=>[n[0],n[2]]),['rebate','Rebate portal']];
+function openRole(name){const r=name?(S.roles||[]).find(x=>x.name===name):{name:'',base:'Office',areas:['dashboard','jobs','customers']};
+  $('#modal2').innerHTML=`<h2>${name?'Edit role':'New role'}<button class="sm" onclick="closeM2()">✕</button></h2>
+  <div class="fg"><div><label>Role name *</label><input id="ro_name" value="${esc(r.name)}" ${name?'disabled':''} placeholder="Estimator, Service Manager…"></div>
+   <div><label>Works like</label><select id="ro_base">${opts(['Office','Dispatcher','Rebate','Technician'],r.base)}</select><div class="small mut">Decides which app they sign into and what data they can reach.</div></div></div>
+  <label style="margin-top:12px">Can see these areas</label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 14px">${AREA_OPTS().map(([k,l])=>`<label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt)"><input type="checkbox" class="ro_area" value="${k}" style="width:auto" ${(r.areas||[]).includes(k)?'checked':''}> ${esc(l)}</label>`).join('')}</div>
+  <p class="small mut">Payroll, Reports, Settings and Users & Access are always Admin-only. Technicians never see prices.</p>
+  <div class="mfoot">${name?`<button class="danger" onclick="delRole('${esc(name)}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" onclick="saveRole(${name?`'${esc(name)}'`:'null'})">Save</button></div>`;$('#ov2').classList.add('show')}
+async function saveRole(name){const n=name||v('ro_name');if(!n){toast('Enter a role name');return}if(!name&&roleNames().some(x=>x.toLowerCase()===n.toLowerCase())){toast('That role already exists');return}
+  const row={name:n,base:v('ro_base'),areas:[...document.querySelectorAll('.ro_area:checked')].map(x=>x.value)};
+  const{error}=await sb.from('app_roles').upsert(row);if(error){toast(sbErr(error));return}const{data}=await sb.from('app_roles').select('*').order('builtin',{ascending:false});S.roles=data||[];closeM2();render();toast('Role saved')}
+async function delRole(name){if(S.techs.some(t=>t.access===name)){toast('Move the people in this role to another role first');return}if(!confirm('Delete role '+name+'?'))return;
+  const{error}=await sb.from('app_roles').delete().eq('name',name);if(error){toast(sbErr(error));return}S.roles=(S.roles||[]).filter(r=>r.name!==name);closeM2();render();toast('Role deleted')}
 function openAddUser(){$('#modal2').innerHTML=`<h2>Add a person<button class="sm" onclick="closeM2()">✕</button></h2>
-  <div class="fg"><div><label>Full name *</label><input id="nu_name"></div><div><label>Email *</label><input id="nu_email" type="email"></div><div><label>Access</label><select id="nu_access">${opts(['Technician','Office','Admin'],'Technician')}</select></div>
+  <div class="fg"><div><label>Full name *</label><input id="nu_name"></div><div><label>Email *</label><input id="nu_email" type="email"></div><div><label>Access</label><select id="nu_access">${opts(roleNames(),'Technician')}</select></div>
   <div><label>Mobile</label><input id="nu_phone"></div><div><label>Job title</label><input id="nu_title" placeholder="Service Tech, Dispatcher…"></div><div><label>Board color</label><input type="color" id="nu_color" value="${['#2f6fde','#1f9d55','#8e44ad','#d35400','#16a085','#c0392b'][S.techs.length%6]}" style="height:38px"></div>
   <div class="span3"><label>How do they get their password?</label>
    <label style="display:flex;gap:8px;font-weight:400;color:var(--txt)"><input type="radio" name="nu_how" value="invite" checked style="width:auto"> Email them an invite link to create their own password</label>
    <label style="display:flex;gap:8px;font-weight:400;color:var(--txt);align-items:center"><input type="radio" name="nu_how" value="pw" style="width:auto"> I’ll give them a temporary password: <input id="nu_pw" placeholder="at least 8 characters" style="max-width:220px"></label></div></div>
-  <p class="small mut">Technicians sign in on the KOR HVAC Tech app. Office and Admins sign in here.</p>
+  <p class="small mut">Technicians sign in on the KOR HVAC Tech app (korhvac.com/tech). Rebate team signs in at korhvac.com/rebate. Office, Dispatchers and Admins sign in here.</p>
   <div class="mfoot"><span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" id="nu_btn" onclick="addUser()">Add person</button></div>`;$('#ov2').classList.add('show')}
 async function addUser(){const name=v('nu_name'),email=v('nu_email'),how=(document.querySelector('input[name=nu_how]:checked')||{}).value,pw=v('nu_pw');
   if(!name||!/\S+@\S+\.\S+/.test(email)){toast('Enter a name and a valid email');return}if(how==='pw'&&pw.length<8){toast('Temporary password must be at least 8 characters');return}
   el('nu_btn').disabled=true;try{await callAdmin('create_staff',{name,email,access:v('nu_access'),phone:v('nu_phone'),title:v('nu_title'),color:v('nu_color'),password:how==='pw'?pw:null,redirectTo:location.origin+location.pathname});
     closeM2();toast(how==='pw'?name+' added — give them their temporary password':'Invite emailed to '+email)}catch(e){toast(e.message);el('nu_btn').disabled=false}}
 function openUser(id){const t=byId('techs',id);if(!t)return;$('#modal2').innerHTML=`<h2>${esc(t.name)}<button class="sm" onclick="closeM2()">✕</button></h2>
-  <div class="fg"><div><label>Full name</label><input id="eu_name" value="${esc(t.name)}"></div><div><label>Access</label><select id="eu_access" ${me&&me.id===id?'disabled':''}>${opts(['Technician','Office','Admin'],t.access||'Technician')}</select></div><div><label>Status</label><select id="eu_active" ${me&&me.id===id?'disabled':''}>${opts(['Active','Disabled'],t.active===false?'Disabled':'Active')}</select></div>
+  <div class="fg"><div><label>Full name</label><input id="eu_name" value="${esc(t.name)}"></div><div><label>Access</label><select id="eu_access" ${me&&me.id===id?'disabled':''}>${opts(roleNames(),t.access||'Technician')}</select></div><div><label>Status</label><select id="eu_active" ${me&&me.id===id?'disabled':''}>${opts(['Active','Disabled'],t.active===false?'Disabled':'Active')}</select></div>
   <div><label>Mobile</label><input id="eu_phone" value="${esc(t.phone||'')}"></div><div><label>Job title</label><input id="eu_title" value="${esc(t.title||'')}"></div><div><label>Board color</label><input type="color" id="eu_color" value="${esc(t.color||'#2f6fde')}" style="height:38px"></div></div>
   ${me&&me.id===id?'<p class="small mut">You can’t change your own access or disable yourself.</p>':'<p class="small mut">Disabled people can’t sign in anywhere, but their history stays.</p>'}
   <div class="mfoot"><span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" onclick="saveUser('${id}')">Save</button></div>`;$('#ov2').classList.add('show')}
@@ -1105,18 +1127,18 @@ async function removePortal(userId){if(pendingDel!=='pu'+userId){pendingDel='pu'
 /* ================= RENDER ================= */
 function render(){
   const a=document.activeElement,aid=a&&a.id,sel=a&&a.selectionStart;
-  if(!isAdmin()&&ADMIN_VIEWS.includes(view))view='dashboard';
-  $('#nav').innerHTML=NAV.filter(n=>n.length===1||isAdmin()||!ADMIN_VIEWS.includes(n[0])).map(n=>n.length===1?`<div class="grp">${n[0]}</div>`:`<a href="#${n[0]}" class="${n[0]===view?'on':''}"><span>${n[1]}</span>${n[2]}</a>`).join('');
+  if(!isAdmin()&&(ADMIN_VIEWS.includes(view)||!canSee(view)))view=VIEWS.map(n=>n[0]).find(k=>!ADMIN_VIEWS.includes(k)&&canSee(k))||'dashboard';
+  $('#nav').innerHTML=NAV.filter(n=>n.length===1||isAdmin()||(!ADMIN_VIEWS.includes(n[0])&&canSee(n[0]))).map(n=>n.length===1?`<div class="grp">${n[0]}</div>`:`<a href="#${n[0]}" class="${n[0]===view?'on':''}"><span>${n[1]}</span>${n[2]}</a>`).join('');
   const fn={dashboard:vDash,calls:vCalls,dispatch:vDispatch,map:vMap,messages:vMsgs,users:vUsers,jobs:vJobs,tech:vTech,customers:vCust,equipment:vEquip,agreements:vAgr,estimates:vEst,invoices:vInv,rebates:vReb,reports:vReports,payroll:vPayroll,techs:vTechs,fleet:vFleet,pricebook:vPB,settings:vSettings}[view]||vDash;
   $('#main').innerHTML=fn();
   if(aid&&!$('#ov').contains(a)&&!$('#ov2').contains(a)){const e=document.getElementById(aid);if(e){e.focus();try{if(sel!=null)e.setSelectionRange(sel,sel)}catch(_){}}}
-  if(view==='dispatch')wireDnD();
+  if(view==='dispatch'){wireDnD();loadDispAlerts()}
   if(view==='tech')wireTech();
   if(view==='map')initMap();
   hydratePhotos();
   if(sb&&view==='map')pollLive();
 }
-function route(){const h=location.hash.slice(1);view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
+function route(){const h=location.hash.slice(1);if(h==='rebateportal'){window.open('/rebate/','_blank');history.replaceState(null,'','#'+(view||'dashboard'));render();return}view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);
 
 /* ================= DASHBOARD ================= */
@@ -1195,6 +1217,13 @@ async function bookCall(outcome){
 }
 
 /* ================= DISPATCH ================= */
+async function suggestTech(jid){const b=$('#sugBox');if(!b)return;b.innerHTML='<span class="mut">Ranking technicians…</span>';
+  const{data,error}=await sb.rpc('dispatch_suggest',{p_job:jid});if(error){b.innerHTML=`<span style="color:var(--bad)">${esc(error.message)}</span>`;return}
+  if(!data?.length){b.innerHTML='<span class="mut">No active technicians.</span>';return}
+  b.innerHTML='<div class="mut" style="margin:6px 0 2px">Suggestions (you decide):</div>'+data.slice(0,4).map((t,i)=>`<div style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;margin-top:4px;cursor:pointer${t.clash?';opacity:.6':''}" onclick="$('#f_techId').value='${t.techId}';toast('Selected — click Save to assign')"><b>${i===0?'⭐ ':''}${esc(t.name)}</b> <span class="mut">${esc((t.reasons||[]).join(' · '))}</span></div>`).join('')}
+async function loadDispAlerts(){const el=$('#dispAlerts');if(!el||typeof sb==='undefined'||!sb)return;const{data}=await sb.rpc('dispatch_alerts');
+  if(!data?.length){el.innerHTML='';return}
+  el.innerHTML=`<div class="card" style="border-left:4px solid var(--warn);margin-bottom:10px"><b>⚠️ Needs attention</b>${data.map(a=>`<div class="small" style="margin-top:4px;cursor:pointer" onclick="openJob('${a.jobId}')">${esc(a.number)} · ${a.kind==='late'?`${esc(a.tech||'')} not en route — ${a.minutes} min past start`:a.kind==='unassigned'?`no tech assigned — ${a.minutes} min past start`:`${esc(a.tech||'')} on site longer than planned`}</div>`).join('')}</div>`}
 function vDispatch(){
   const techs=crew().filter(t=>t.active!==false);
   const day=S.jobs.filter(j=>j.date===UI.date&&j.status!=='Canceled');
@@ -1207,7 +1236,7 @@ function vDispatch(){
   const colH=(id,name,color,list)=>`<div class="col" data-tech="${id}"><h4><i style="background:${color}"></i>${esc(name)}<em>${list.length} · ${list.reduce((a,j)=>a+(+j.duration||0),0)}h</em></h4>${list.sort((a,b)=>(a.time||'99').localeCompare(b.time||'99')).map(card).join('')}</div>`;
   return `<div class="top"><h1>Dispatch Board</h1>
    <button onclick="UI.date=addDays(UI.date,-1);render()">‹</button><input type="date" id="dd" value="${UI.date}" style="width:160px" onchange="UI.date=this.value;render()"><button onclick="UI.date=addDays(UI.date,1);render()">›</button><button onclick="UI.date=today();render()">Today</button><button class="pri" onclick="openJob(null,{date:UI.date,status:'Scheduled'})">+ New Job</button></div>
-   <p class="mut small" style="margin-top:-6px">Drag jobs between columns to assign. ⭐ = agreement customer.</p>
+   <p class="mut small" style="margin-top:-6px">Drag jobs between columns to assign. ⭐ = agreement customer.</p><div id="dispAlerts"></div>
    ${!techs.length?'<div class="card empty">Add technicians first — <a href="#techs">go to Technicians</a></div>':''}
    <div class="disp">
     <div class="col" data-tech="__unsched" style="background:#efefef"><h4><i style="background:var(--accent)"></i>Unscheduled<em>${unsched.length}</em></h4>${unsched.map(card).join('')||'<div class="mut" style="padding:6px">None</div>'}</div>
@@ -1379,7 +1408,7 @@ function drawJob(){
    <div><label>Job type</label><select id="f_type">${opts(JOB_TYPES,j.type)}</select></div>
    <div><label>Priority</label><select id="f_priority">${opts(PRIOS,j.priority)}</select></div>
    <div><label>Status</label><select id="f_status">${opts(JOB_ST,j.status)}</select></div>
-   <div><label>Technician</label><select id="f_techId">${techOpts(j.techId)}</select></div>
+   <div><label>Technician ${j.id&&typeof sb!=='undefined'&&sb?`<a href="#" style="float:right;text-transform:none;font-weight:600" onclick="event.preventDefault();suggestTech('${j.id}')">✨ Suggest best tech</a>`:''}</label><select id="f_techId">${techOpts(j.techId)}</select><div id="sugBox" class="small"></div></div>
    <div><label>Date</label><input type="date" id="f_date" value="${esc(j.date)}"></div>
    <div style="display:flex;gap:8px"><div style="flex:1"><label>Time</label><input type="time" id="f_time" value="${esc(j.time)}"></div><div style="width:64px"><label>Hrs</label><input id="f_duration" value="${esc(j.duration)}"></div></div>
    <div class="span3"><label>Problem / work description</label><textarea id="f_description">${esc(j.description)}</textarea></div>
@@ -1752,7 +1781,7 @@ const INV_CSS=`.invdoc{font-family:Inter,Arial,sans-serif;color:#111;font-size:1
 .invdoc table{width:100%;border-collapse:collapse;margin-top:6px}.invdoc .isv td{padding:5px 8px;border:1px solid #e3e3e3;vertical-align:top}.invdoc .isv td:nth-child(odd){color:#666;width:16%;background:#fafafa}.invdoc .isv th,.invdoc .iit th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#666;padding:6px 8px;border-bottom:2px solid #111}
 .invdoc .iit{margin-top:16px}.invdoc .iit td{padding:7px 8px;border-bottom:1px solid #eee}.invdoc th.r,.invdoc td.r{text-align:right}.invdoc .itot{margin:12px 0 0 auto;width:280px}.invdoc .itot div{display:flex;justify-content:space-between;padding:3px 0}.invdoc .ibal{border-top:2px solid #111;margin-top:4px;padding-top:6px!important;font-weight:800;font-size:15px}.invdoc .mut{color:#777}.invdoc .small{font-size:11.5px}`;
 function printInv(){syncInv();const i=edit.obj;const w=window.open('','_blank');if(!w){toast('Allow pop-ups to print');return}
-  w.document.write(`<!DOCTYPE html><html><head><meta name="robots" content="noindex"><meta charset="utf-8"><title>Invoice ${esc(i.number)} – ${esc(company().name||'KOR HVAC')}</title><style>@page{margin:14mm}body{margin:0;padding:24px}${INV_CSS}@media print{body{padding:0}}</style></head><body>${invDoc(i)}<script>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${esc(i.number)} – ${esc(company().name||'KOR HVAC')}</title><style>@page{margin:14mm}body{margin:0;padding:24px}${INV_CSS}@media print{body{padding:0}}</style></head><body>${invDoc(i)}<script>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
 
 function previewInv(){syncInv();const i=edit.obj;
   $('#modal2').innerHTML=`<h2>Invoice Preview<button class="sm" onclick="closeM2()">✕</button></h2><style>${INV_CSS}</style><div style="border:1px solid var(--line);border-radius:10px;padding:22px;background:#fff">${invDoc(i)}</div>
