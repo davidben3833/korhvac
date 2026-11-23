@@ -1608,13 +1608,15 @@ function vEst(){const t=today();
   return `<div class="top"><h1>Estimates</h1><button class="pri" onclick="openEst()">+ New Estimate</button></div>
   <div class="filters"><select onchange="UI.estSt=this.value;render()">${opts(['All','Draft','Sent','Approved','Declined'],UI.estSt)}</select></div>
   <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Estimate #</th><th>Customer</th><th>Title</th><th>Options</th><th>Date</th><th>Follow-up</th><th>Status</th><th class="r">Value</th></tr>
-  ${list.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b></td><td>${esc(custName(e.customerId))}</td><td>${esc(e.title)}</td><td>${(e.options||[]).length}</td><td>${fdate(e.date)}</td><td>${e.status==='Sent'&&e.followUp?(e.followUp<=t?`<b style="color:var(--bad)">${fdate(e.followUp)}</b>`:fdate(e.followUp)):'—'}</td><td>${badge(e.status)}</td><td class="r">${money(estValue(e))}</td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
+  ${list.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b>${e.byTech?` <span class="badge" title="Requested by ${esc(e.techName||'tech')}">🛠️ Tech</span>`:''}</td><td>${esc(custName(e.customerId))}</td><td>${esc(e.title)}</td><td>${(e.options||[]).length}</td><td>${fdate(e.date)}</td><td>${e.status==='Sent'&&e.followUp?(e.followUp<=t?`<b style="color:var(--bad)">${fdate(e.followUp)}</b>`:fdate(e.followUp)):'—'}</td><td>${badge(e.status)}</td><td class="r">${money(estValue(e))}</td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
 function openEst(id,pre){
   let e=id?JSON.parse(JSON.stringify(byId('estimates',id))):{id:uid(),number:nextNum('estimates','EST-',2001),status:'Draft',date:today(),options:[{name:'Option 1',desc:'',items:[]}],selected:null,...(pre||{})};
   if(!e.options){e.options=[{name:'Option 1',desc:'',items:e.items||[]}]}
   edit={col:'estimates',obj:e};drawEst();}
 function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   modal(`<h2>${isNew?'New Estimate':'Estimate '+esc(e.number)} ${!isNew?badge(e.status):''}<button class="sm" onclick="closeM()">✕</button></h2>
+  ${e.byTech?`<div class="treq pending" style="margin-bottom:10px">🛠️ <b>Requested by ${esc(e.techName||'technician')}</b> from job <a href="#" onclick="${e.jobId&&byId('jobs',e.jobId)?`openJob('${e.jobId}')`:''};return false">#${esc(e.jobNumber||'')}</a> · Urgency: <b>${esc(e.urgency||'Normal')}</b>${e.techHours?` · ${esc(e.techHours)} hrs labor`:''}
+    ${e.techNotes?`<div style="margin-top:4px">“${esc(e.techNotes)}”</div>`:''}<div class="small mut" style="margin-top:4px">Prices were filled from the price book — review them, then email it. It goes out from service@korhvac.com. The tech never sees prices.</div></div>`:''}
   <div class="fg"><div class="span2"><label>Customer *</label><select id="f_customerId">${custOpts(e.customerId)}</select></div>
    <div><label>Status</label><select id="f_status">${opts(['Draft','Sent','Approved','Declined'],e.status)}</select></div>
    <div class="span2"><label>Title / scope</label><input id="f_title" value="${esc(e.title)}" placeholder="Replace RTU-2 with new 10-ton unit"></div>
