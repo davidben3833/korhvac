@@ -824,7 +824,7 @@ const JOB_TYPES=['Service Call','Repair','Maintenance','Install','Emergency','Es
 const PRIOS=['Normal','High','Emergency','Low'];
 const EQ_TYPES=['Rooftop Unit (RTU)','Split System','Heat Pump','Furnace','Boiler','Chiller','Air Handler','Mini-Split','PTAC','Cooling Tower','Exhaust Fan','Make-Up Air','Water Heater','Controls/BMS','Other'];
 const REBATE_ST=['Pre-approval','Approved','Installed','Submitted','Paid','Denied'];
-const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Estimates'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
+const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Estimates'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
 const VIEWS=NAV.filter(n=>n.length>1);
 let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null;
 const isAdmin=()=>!sb||(me&&(me.base||me.role)==='Admin');
@@ -1150,9 +1150,9 @@ async function removePortal(userId){if(pendingDel!=='pu'+userId){pendingDel='pu'
 /* ================= RENDER ================= */
 function render(){
   const a=document.activeElement,aid=a&&a.id,sel=a&&a.selectionStart;
-  if(!isAdmin()&&(ADMIN_VIEWS.includes(view)||!canSee(view)))view=VIEWS.map(n=>n[0]).find(k=>!ADMIN_VIEWS.includes(k)&&canSee(k))||'dashboard';
-  $('#nav').innerHTML=NAV.filter(n=>n.length===1||isAdmin()||(!ADMIN_VIEWS.includes(n[0])&&canSee(n[0]))).map(n=>n.length===1?`<div class="grp">${n[0]}</div>`:`<a href="#${n[0]}" class="${n[0]===view?'on':''}"><span>${n[1]}</span>${n[2]}</a>`).join('');
-  const fn={dashboard:vDash,calls:vCalls,dispatch:vDispatch,map:vMap,messages:vMsgs,users:vUsers,jobs:vJobs,tech:vTech,customers:vCust,equipment:vEquip,agreements:vAgr,estimates:vEst,invoices:vInv,rebates:vReb,reports:vReports,payroll:vPayroll,techs:vTechs,fleet:vFleet,pricebook:vPB,settings:vSettings}[view]||vDash;
+  if(!isAdmin()&&!canSee(view))view=VIEWS.map(n=>n[0]).find(k=>canSee(k))||'dashboard';
+  $('#nav').innerHTML=NAV.filter(n=>n.length===1||isAdmin()||canSee(n[0])).map(n=>n.length===1?`<div class="grp">${n[0]}</div>`:`<a href="#${n[0]}" class="${n[0]===view?'on':''}"><span>${n[1]}</span>${n[2]}</a>`).join('');
+  const fn={dashboard:vDash,calls:vCalls,dispatch:vDispatch,map:vMap,messages:vMsgs,users:vUsers,jobs:vJobs,tech:vTech,customers:vCust,equipment:vEquip,agreements:vAgr,estimates:vEst,invoices:vInv,rebates:vReb,prices:vPrices,reports:vReports,payroll:vPayroll,techs:vTechs,fleet:vFleet,pricebook:vPB,settings:vSettings}[view]||vDash;
   $('#main').innerHTML=fn();
   if(aid&&!$('#ov').contains(a)&&!$('#ov2').contains(a)){const e=document.getElementById(aid);if(e){e.focus();try{if(sel!=null)e.setSelectionRange(sel,sel)}catch(_){}}}
   if(view==='dispatch'){wireDnD();loadDispAlerts()}
@@ -2068,6 +2068,47 @@ async function tpNew(id){if(deny('pricebook'))return;const name=v('tp_name');if(
   await tpSave(id,items);toast(dup?'Part already on the list — added to job':'New part added to the shared list')}
 
 /* ================= SETTINGS ================= */
+/* ================= EQUIPMENT PRICES (from supplier quotes; AI keeps it updated) ================= */
+const PR={rows:null,loading:false,q:'',cat:'',sup:'',changed:false,last:null};
+async function loadPrices(force){if(!sb||PR.loading)return;if(PR.rows&&!force)return;PR.loading=true;
+  try{const[a,b]=await Promise.all([sb.from('equipment_price_latest').select('*').order('quote_date',{ascending:false}).limit(5000),sb.from('company_settings').select('price_watch_last').limit(1).maybeSingle()]);
+    PR.rows=a.data||[];PR.last=b.data&&b.data.price_watch_last}catch(e){PR.rows=[]}PR.loading=false;if(view==='prices')render()}
+function vPrices(){if(!sb)return '<div class="top"><h1>Equipment Prices</h1></div><div class="card">Available once the office system is live.</div>';
+  if(!PR.rows){setTimeout(loadPrices,0);return '<div class="top"><h1>Equipment Prices</h1></div><div class="card mut">Loading…</div>'}
+  const q=PR.q.toLowerCase();
+  const rows=PR.rows.filter(r=>(!PR.cat||r.category===PR.cat)&&(!PR.sup||r.supplier===PR.sup)&&(!PR.changed||r.change)&&(!q||[r.model,r.description,r.brand,r.supplier,r.job,r.tonnage&&r.tonnage+' ton'].join(' ').toLowerCase().includes(q)));
+  const best={};PR.rows.forEach(r=>{if(!best[r.model_key]||+r.price<+best[r.model_key])best[r.model_key]=+r.price});
+  const cats=[...new Set(PR.rows.map(r=>r.category).filter(Boolean))].sort(),sups=[...new Set(PR.rows.map(r=>r.supplier).filter(Boolean))].sort();
+  const L=PR.last;
+  return `<div class="top"><h1>Equipment Prices</h1>${can('pricebook')?'<button onclick="openPriceAdd()">+ Add price</button>':''}${can('export')?'<button onclick="exportPrices()">⬇ CSV</button>':''}<button onclick="runPriceWatch(this)">🤖 Check emails now</button></div>
+  <p class="mut small" style="margin-top:-6px">Every price a supplier quoted us — latest per model & supplier, with what it was before. The AI reads new supplier emails & quotes every 2 hours.${L&&L.at?` Last check ${fdate(L.at.slice(0,10))} ${new Date(L.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}: ${L.messages||0} emails, ${L.rows||0} new prices.`:''}</p>
+  <div class="card" style="padding:10px;display:flex;gap:8px;flex-wrap:wrap"><input id="pr_q" placeholder="Search model, brand, size, job…" value="${esc(PR.q)}" oninput="PR.q=this.value;clearTimeout(PR.t);PR.t=setTimeout(render,250)" style="max-width:280px">
+   <select onchange="PR.cat=this.value;render()" style="max-width:170px"><option value="">All types</option>${cats.map(c=>`<option ${c===PR.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
+   <select onchange="PR.sup=this.value;render()" style="max-width:200px"><option value="">All suppliers</option>${sups.map(c=>`<option ${c===PR.sup?'selected':''}>${esc(c)}</option>`).join('')}</select>
+   <label style="display:flex;gap:6px;align-items:center;margin:0;text-transform:none;font-weight:500;color:var(--txt)"><input type="checkbox" style="width:auto" ${PR.changed?'checked':''} onchange="PR.changed=this.checked;render()"> Price changed</label>
+   <span class="mut small" style="margin-left:auto;align-self:center">${rows.length} of ${PR.rows.length}</span></div>
+  <div class="card" style="padding:0;overflow-x:auto"><table><tr><th>Model</th><th>Description</th><th>Type</th><th>Supplier</th><th class="r">Price</th><th>Quoted</th><th class="r">Change</th><th>Job</th></tr>
+  ${rows.slice(0,800).map(r=>{const up=+r.change>0,ch=r.change?`<span style="color:${up?'var(--bad)':'var(--ok)'}">${up?'▲':'▼'} ${money(Math.abs(r.change))} (${r.change_pct>0?'+':''}${r.change_pct}%)</span><div class="small mut">was ${money(r.prev_price)} · ${fdate(r.prev_date)}</div>`:'<span class="mut small">—</span>';
+   return `<tr style="cursor:pointer" onclick="openPriceHist('${esc(r.model_key)}')"><td><b>${esc(r.model)}</b>${+r.price===best[r.model_key]&&PR.rows.filter(x=>x.model_key===r.model_key).length>1?' <span class="badge b-Active">best</span>':''}</td><td class="small">${esc(r.description||'')}${r.tonnage?` · ${+r.tonnage} ton`:''}<div class="mut">${esc(r.brand||'')}</div></td><td class="small">${esc(r.category||'')}</td><td class="small">${esc(r.supplier||'')}</td><td class="r"><b>${money(r.price)}</b></td><td class="small">${fdate(r.quote_date)}${r.quotes>1?`<div class="mut">${r.quotes} quotes</div>`:''}</td><td class="r small">${ch}</td><td class="small">${esc(r.job||'')}</td></tr>`}).join('')||'<tr><td colspan=8 class="empty">No prices yet.</td></tr>'}</table></div>`}
+async function openPriceHist(key){const{data}=await sb.from('equipment_prices').select('*').eq('model_key',key).order('quote_date',{ascending:false});const h=data||[];if(!h.length)return;
+  const sups=[...new Set(h.map(r=>r.supplier||'—'))];
+  $('#modal2').innerHTML=`<h2>${esc(h[0].model)}<button class="sm" onclick="closeM2()">✕</button></h2><p class="mut">${esc(h[0].description||'')} ${esc(h[0].brand||'')}</p>
+  ${sups.map(sp=>{const rs=h.filter(r=>(r.supplier||'—')===sp);return `<h3 style="margin:12px 0 6px">${esc(sp)}</h3><table><tr><th>Date</th><th class="r">Price</th><th class="r">Change</th><th>Job</th><th>Source</th>${can('pricebook')?'<th></th>':''}</tr>${rs.map((r,i)=>{const pv=rs[i+1];const d=pv?+r.price-+pv.price:null;
+   return `<tr><td>${fdate(r.quote_date)}</td><td class="r"><b>${money(r.price)}</b>${+r.qty>1?`<div class="small mut">qty ${+r.qty}</div>`:''}</td><td class="r small">${d?`<span style="color:${d>0?'var(--bad)':'var(--ok)'}">${d>0?'+':'−'}${money(Math.abs(d))} (${pv.price>0?(d/pv.price*100).toFixed(1):0}%)</span>`:'—'}</td><td class="small">${esc(r.job||'')}${r.quote_no?`<div class="mut">#${esc(r.quote_no)}</div>`:''}</td><td class="small">${r.source_link?`<a href="${esc(r.source_link)}" target="_blank" rel="noopener">${esc(r.source||'open')}</a>`:esc(r.source||'')}<div class="mut">${esc((r.source_ref||'').slice(0,60))}</div></td>${can('pricebook')?`<td><button class="sm danger" onclick="delPrice('${r.id}','${esc(key)}')">✕</button></td>`:''}</tr>`}).join('')}</table>`}).join('')}
+  <div class="mfoot"><span class="sp"></span><button onclick="closeM2()">Close</button></div>`;$('#ov2').classList.add('show')}
+async function delPrice(id,key){if(!confirm('Remove this price?'))return;const{error}=await sb.from('equipment_prices').delete().eq('id',id);if(error)return toast(error.message);PR.rows=null;await loadPrices(true);openPriceHist(key)}
+function openPriceAdd(){if(deny('pricebook'))return;$('#modal2').innerHTML=`<h2>Add a supplier price<button class="sm" onclick="closeM2()">✕</button></h2>
+  <div class="fg"><div><label>Model / part # *</label><input id="pa_model"></div><div><label>Description</label><input id="pa_desc"></div><div><label>Brand</label><input id="pa_brand"></div>
+  <div><label>Type</label><input id="pa_cat" placeholder="RTU, Split, Boiler…"></div><div><label>Tons</label><input id="pa_ton"></div><div><label>Supplier *</label><input id="pa_sup" list="pa_sups"><datalist id="pa_sups">${[...new Set((PR.rows||[]).map(r=>r.supplier).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>
+  <div><label>Unit price $ *</label><input id="pa_price"></div><div><label>Quote date</label><input type="date" id="pa_date" value="${today()}"></div><div><label>Job</label><input id="pa_job"></div></div>
+  <div class="mfoot"><span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" onclick="savePriceAdd()">Save</button></div>`;$('#ov2').classList.add('show')}
+async function savePriceAdd(){const row={model:v('pa_model'),description:v('pa_desc'),brand:v('pa_brand'),category:v('pa_cat'),tonnage:v('pa_ton'),supplier:v('pa_sup'),price:v('pa_price').replace(/[^\d.]/g,''),quote_date:v('pa_date'),job:v('pa_job'),source:'manual'};
+  if(!row.model||!row.supplier||!+row.price)return toast('Model, supplier and price are required');
+  const{data,error}=await sb.rpc('equipment_prices_upsert',{p_rows:[row],p_by:(me&&me.name)||'office'});if(error)return toast(error.message);closeM2();toast(data?'Price saved':'Already on file');PR.rows=null;loadPrices(true)}
+async function runPriceWatch(b){b.disabled=true;b.textContent='Checking…';try{const{data,error}=await sb.functions.invoke('price-watch',{body:{action:'run'}});if(error)throw error;toast(`Checked ${data.messages} emails, ${data.files} quotes — ${data.rows} new prices`);PR.rows=null;loadPrices(true)}catch(e){toast('Could not run: '+(e.message||e))}b.disabled=false;b.textContent='🤖 Check emails now'}
+function exportPrices(){if(deny('export'))return;const h=['Model','Description','Brand','Type','Tons','Supplier','Price','Quote date','Previous price','Previous date','Change','Change %','Quotes','Job'];
+  const lines=[h,...(PR.rows||[]).map(r=>[r.model,r.description,r.brand,r.category,r.tonnage,r.supplier,r.price,r.quote_date,r.prev_price,r.prev_date,r.change,r.change_pct,r.quotes,r.job])].map(a=>a.map(x=>`"${String(x??'').replace(/"/g,'""')}"`).join(','));
+  const u=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));const a=document.createElement('a');a.href=u;a.download='equipment-prices.csv';a.click()}
 function vSettings(){const c=company();
   return `<div class="top"><h1>Company Settings</h1></div><div class="card" style="max-width:800px"><div class="fg">
   <div class="span2"><label>Company name</label><input id="s_name" value="${esc(c.name)}"></div><div><label>License #</label><input id="s_license" value="${esc(c.license)}"></div>
