@@ -1315,6 +1315,39 @@ function smsSettingsCard(){const cfg=smsCfg();
 async function saveSmsSettings(){const ev={},tp={};SMS_EVENTS.forEach(([k])=>{ev[k]=el('sms_ev_'+k).checked;tp[k]=v('sms_t_'+k)});
   try{await save('settings',{id:'sms',enabled:el('sms_enabled').checked,portalUrl:v('sms_portal'),events:ev,templates:tp});toast('Text settings saved')}catch(e){}}
 
+
+/* ================= AUTOMATIC EMAIL ================= */
+const EMAIL_EVENTS=[['JOB UPDATES — from info@'],['scheduled','Appointment confirmed (when scheduled or rescheduled)'],['reminder','Day-before reminder (5 PM)'],['en_route','Technician on the way (with live tracking)'],['completed','Work completed'],
+ ['BILLING — from billing@ (to billing email)'],['invoice','New invoice with PDF (10 min after it’s created)'],['pay_reminder','Payment reminders (3 days before, due date, 7/14/30 days late — 9 AM)'],['receipt','Payment receipt'],
+ ['ESTIMATES — office from estimating@, technician from service@'],['estimate','Estimate sent'],['estimate_followup','Estimate follow-up after 3 and 7 days (10 AM)'],
+ ['OFFICE ALERTS — to info@'],['office_request','New service request from the portal'],['office_estimate','Estimate approved / declined by the customer'],['office_daily','Daily summary (7 AM)'],['office_weekly','Weekly report (Monday 7 AM)']];
+const emailCfg=()=>S.settings.find(x=>x.id==='email')||{enabled:true,events:{},templates:{},from:{}};
+let EMAIL_DEF=null,EMAIL_LOG=[];
+async function loadEmailInfo(){if(!sb)return;try{const[d,l]=await Promise.all([EMAIL_DEF?{data:EMAIL_DEF}:sb.rpc('email_defaults'),sb.from('email_queue').select('id,created_at,kind,status,error,to_addr,from_addr,subject,send_after,sent_at,customer_id').order('created_at',{ascending:false}).limit(60)]);
+  EMAIL_DEF=d.data||{};EMAIL_LOG=l.data||[];const box=$('#emailcard');if(box)box.outerHTML=emailSettingsCard()}catch(e){}}
+function emailSettingsCard(){if(!sb)return '';const c=emailCfg();if(!EMAIL_DEF){setTimeout(loadEmailInfo,0)}const D=EMAIL_DEF||{};const f=c.from||{};
+  return `<div class="card" id="emailcard" style="max-width:800px;margin-top:14px"><h3>✉️ Automatic emails</h3>
+  <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="em_enabled" style="width:auto" ${c.enabled!==false?'checked':''}> Send automatic emails</label>
+  <p class="small mut">Customer emails go out 8 AM – 7 PM only. Office alerts any time. Every email is checked again right before it sends (canceled job, paid invoice, answered estimate → it’s skipped).</p>
+  <div class="fg" style="margin-top:8px"><div><label>Job updates from</label><input id="em_from_jobs" value="${esc(f.jobs||'info@korhvac.com')}"></div><div><label>Billing from</label><input id="em_from_billing" value="${esc(f.billing||'billing@korhvac.com')}"></div><div><label>Office estimates from</label><input id="em_from_estimates" value="${esc(f.estimates||'estimating@korhvac.com')}"></div>
+   <div><label>Technician estimates from</label><input id="em_from_tech_estimates" value="${esc(f.tech_estimates||'service@korhvac.com')}"></div><div><label>Office alerts go to</label><input id="em_from_office_to" value="${esc(f.office_to||'info@korhvac.com')}"></div></div>
+  ${EMAIL_EVENTS.map(e=>e.length===1?`<div class="sec">${esc(e[0])}</div>`:(()=>{const[k,l]=e;const t={...(D[k]||{}),...((c.templates||{})[k]||{})};return `<div style="margin-top:8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600;color:var(--txt)"><input type="checkbox" id="em_ev_${k}" style="width:auto" ${(c.events||{})[k]!==false?'checked':''}> ${esc(l)}
+   <a href="#" class="small" style="margin-left:auto" onclick="const x=el('em_box_${k}');x.hidden=!x.hidden;return false">Edit wording</a></label>
+   <div id="em_box_${k}" hidden style="margin:6px 0 4px 26px"><input id="em_s_${k}" value="${esc(t.subject||'')}" placeholder="Subject"><textarea id="em_b_${k}" style="min-height:130px;margin-top:6px">${esc(t.body||'')}</textarea>
+   <button class="sm" onclick="el('em_s_${k}').value=(EMAIL_DEF['${k}']||{}).subject||'';el('em_b_${k}').value=(EMAIL_DEF['${k}']||{}).body||''">Reset to default</button></div></div>`})()).join('')}
+  <p class="small mut" style="margin-top:10px">Fill-ins: {first} {customer} {company} {phone} {type} {date} {time} {site} {job} {tech} {invoice} {amount} {balance} {due} {estimate} {title} {total} {options} {portal}</p>
+  <div class="mfoot"><span class="sp"></span><button class="pri" onclick="saveEmailSettings()">Save email settings</button></div>
+  <div class="sec">Email activity <a href="#" class="small" onclick="loadEmailInfo();return false">↻ refresh</a></div>
+  ${EMAIL_LOG.length?`<table class="small"><tr><th>When</th><th>Type</th><th>To</th><th>Status</th><th></th></tr>${EMAIL_LOG.map(q=>`<tr><td class="nowrap">${fdt(q.sent_at||q.send_after||q.created_at)}</td><td>${esc(q.kind.replace(/_/g,' '))}${q.subject?`<div class="mut">${esc(q.subject)}</div>`:''}</td><td>${esc(q.to_addr||custName(q.customer_id)||'')}${q.from_addr?`<div class="mut">from ${esc(q.from_addr)}</div>`:''}</td>
+   <td>${badge({sent:'Sent',queued:'Scheduled',sending:'Sending',skipped:'Skipped',failed:'Failed',canceled:'Canceled'}[q.status]||q.status)}${q.error?`<div class="mut">${esc(q.error)}</div>`:''}</td>
+   <td class="r nowrap">${q.status==='queued'?`<button class="sm" onclick="emailAct('send','${q.id}')">Send now</button> <button class="sm" onclick="emailAct('cancel','${q.id}')">Cancel</button>`:''}</td></tr>`).join('')}</table>`:'<p class="small mut">No emails yet.</p>'}</div>`}
+async function saveEmailSettings(){const c=emailCfg(),D=EMAIL_DEF||{};const ev={},tp={};EMAIL_EVENTS.filter(e=>e.length>1).forEach(([k])=>{ev[k]=el('em_ev_'+k).checked;const s=v('em_s_'+k),b=el('em_b_'+k).value;
+   if(s&&b&&(s!==(D[k]||{}).subject||b!==(D[k]||{}).body))tp[k]={subject:s,body:b}});
+  const fr={...(c.from||{})};['jobs','billing','estimates','tech_estimates','office_to'].forEach(k=>{const x=v('em_from_'+k).toLowerCase();if(x)fr[k]=x});
+  try{await save('settings',{id:'email',enabled:el('em_enabled').checked,events:ev,templates:tp,from:fr});toast('Email settings saved')}catch(e){}}
+async function emailAct(a,id){const{error}=await sb.rpc(a==='send'?'email_send_now':'email_cancel',{p_id:id});if(error){toast(sbErr(error));return}toast(a==='send'?'Sending…':'Canceled');setTimeout(loadEmailInfo,a==='send'?4000:300)}
+async function uploadInvPdf(i){if(!sb||!i||!i.id)return;try{const blob=await invPdfJob(i,w=>w.outputPdf('blob'));await sb.storage.from('invoice-pdfs').upload(i.id+'.pdf',blob,{upsert:true,contentType:'application/pdf'})}catch(e){console.warn('invoice pdf upload failed',e)}}
+
 /* ================= JOBS ================= */
 function vJobs(){
   const q=UI.jobQ.toLowerCase();
@@ -1371,7 +1404,7 @@ async function jobToInv(){syncJob();const j=finishJob(edit.obj);if(!j.customerId
   fillPrices(j.items);const miss=j.items.filter(i=>i.needsPrice&&!(+i.price));if(miss.length){drawJob();toast(miss.length+' part(s) still need a price — type it in, or set it in the Pricebook');return}
   const inv={id:uid(),number:nextNum('invoices','INV-',5001),customerId:j.customerId,jobId:j.id,jobNumber:j.number,site:j.site,po:j.po,items:JSON.parse(JSON.stringify(j.items)),taxRate:company().taxRate||'0',status:'Open',date:today(),due:addDays(today(),+(company().terms||30)),notes:j.description||'',payments:[]};
   j.invoiceId=inv.id;if(!['Completed','Canceled'].includes(j.status)){j.status='Completed';j.completedAt=today()}
-  try{await save('jobs',j);await save('invoices',inv);closeM();openInv(inv.id);toast('Invoice '+inv.number+' created')}catch(e){}}
+  try{await save('jobs',j);await save('invoices',inv);uploadInvPdf(inv);closeM();openInv(inv.id);toast('Invoice '+inv.number+' created')}catch(e){}}
 function notifyJob(kind){syncJob();const j=edit.obj,c=byId('customers',j.customerId)||{},co=company(),t=byId('techs',j.techId);const nm=co.name||'our team';
   const when=j.date?fdate(j.date)+(j.time?' at '+ftime(j.time).replace('a',' AM').replace('p',' PM'):''):'(date to be confirmed)';
   const msg={confirm:[`Service appointment confirmed – ${nm}`,`Hello ${c.name||''},\n\nThis confirms your ${j.type.toLowerCase()} appointment for ${when}${j.site?' at '+j.site:''}.\n\nTechnician: ${t?t.name:'to be assigned'}\nJob #: ${j.number}\n\nIf you need to reschedule, reply to this email or call ${co.phone||'our office'}.\n\nThank you,\n${nm}`],
@@ -1493,7 +1526,7 @@ function openCust(id,pre,back){
    <div><label>Type</label><select id="f_ctype">${opts(['Commercial','Residential','Healthcare / Nursing Home','Property Mgmt','Industrial','Government','School'],c.ctype)}</select></div>
    <div><label>Phone</label><input id="f_phone" value="${esc(c.phone)}"></div>
    <div><label>Email</label><input id="f_email" value="${esc(c.email)}"></div>
-   <div><label>Billing email (AP)</label><input id="f_billEmail" value="${esc(c.billEmail)}"></div>
+   <div><label>Billing email (AP)</label><input id="f_billEmail" value="${esc(c.billEmail)}"><label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt);margin-top:6px"><input type="checkbox" id="f_noEmail" style="width:auto" ${c.emailOptOutAt?'checked':''}> Don’t send automatic emails</label></div>
    <div class="span3"><label>Service address</label><input id="f_address" value="${esc(c.address)}"></div>
    <div class="span3"><label>Notes (access, gate codes, contacts on site)</label><textarea id="f_notes">${esc(c.notes)}</textarea></div>
    <div><label>Mobile for texts</label><input id="f_smsPhone" value="${esc(c.smsPhone||'')}" placeholder="(555) 555-5555"></div>
@@ -1509,7 +1542,7 @@ function openCust(id,pre,back){
   <div class="mfoot">${id?`<button class="danger" onclick="delRec('customers','${c.id}')">Delete</button><button onclick="openJob(null,{customerId:'${c.id}',site:byId('customers','${c.id}').address||''})">+ New Job</button><button onclick="closeM();openEst(null,{customerId:'${c.id}'})">+ Estimate</button>`:''}<span class="sp"></span><button onclick="${tgt==='#ov2'?'closeM2()':'closeM()'}">Cancel</button><button class="pri" onclick="saveCust()">Save</button></div>`;
   if(tgt==='#ov2'){$('#modal2').innerHTML=html;$('#ov2').classList.add('show')}else modal(html);
 }
-async function saveCust(){const c=grab({...edit.obj},['name','company','ctype','phone','email','billEmail','address','notes','smsPhone']);
+async function saveCust(){const c=grab({...edit.obj},['name','company','ctype','phone','email','billEmail','address','notes','smsPhone']);{const ne=el('f_noEmail');if(ne)c.emailOptOutAt=ne.checked?(c.emailOptOutAt||new Date().toISOString()):null}
   const oi=el('f_smsOptIn');if(oi){const was=!!c.smsOptIn;c.smsOptIn=oi.checked;if(c.smsOptIn&&!was){c.smsOptInAt=new Date().toISOString();c.smsOptInSource=v('f_smsOptInSource')}if(!c.smsOptIn&&was)c.smsOptInAt=null}
   if(!c.name&&!c.company){toast('Enter a name');return}const{back,prevEdit}=edit;
   try{await save('customers',c)}catch(e){return}toast('Customer saved');
@@ -1562,7 +1595,7 @@ async function runAgreements(){const da=dueAgreements();let nj=0,ni=0;const t=to
     await save('jobs',j);nj++;a.nextVisit=addMonths(a.nextVisit,12/(+a.visits||1));a.lastVisitJob=j.id;await save('agreements',a);}
   for(const a0 of da.bills){const a={...(byId('agreements',a0.id)||a0)};const m=BILL_MONTHS[a.billing]||12;const amt=(+a.price||0)*m/12;
     const inv={id:uid(),number:nextNum('invoices','INV-',5001),customerId:a.customerId,agreementId:a.id,items:[{desc:`${a.name} – ${a.billing.toLowerCase()} agreement billing (${fdate(a.nextBill)} – ${fdate(addDays(addMonths(a.nextBill,m),-1))})`,qty:1,price:+amt.toFixed(2),cost:''}],taxRate:'0',status:'Open',date:t,due:addDays(t,+(company().terms||30)),payments:[]};
-    await save('invoices',inv);ni++;a.nextBill=addMonths(a.nextBill,m);await save('agreements',a);}
+    await save('invoices',inv);await uploadInvPdf(inv);ni++;a.nextBill=addMonths(a.nextBill,m);await save('agreements',a);}
   toast(`Created ${nj} maintenance job(s) and ${ni} invoice(s)`);}
 
 /* ================= ESTIMATES (Good / Better / Best) ================= */
@@ -1610,6 +1643,10 @@ async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a cu
    if(e.rebate==='Yes'&&!S.rebates.some(r=>r.estimateId===e.id))await save('rebates',{id:uid(),customerId:e.customerId,estimateId:e.id,jobId:j.id,measure:e.title,status:'Pre-approval',created:today()});
    openJob(j.id);toast('Job '+j.number+' created'+(e.rebate==='Yes'?' + rebate record':''))}catch(x){}}
 function emailEst(){const e=finishEst();const c=byId('customers',e.customerId)||{},co=company();
+  if(sb){if(!e.customerId){toast('Pick a customer');return}if(!(c.email||c.billEmail)){toast('No email on file for this customer');return}
+    if(e.status==='Draft'||!byId('estimates',e.id)){e.status='Sent';e.followUp=e.followUp||addDays(today(),3);save('estimates',e).then(()=>{toast('✉️ Sending estimate to '+(c.email||c.billEmail)+' from estimating@');drawEst()}).catch(()=>{})}
+    else{save('estimates',e).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'estimate',p_id:e.id});toast(error?sbErr(error):'✉️ Estimate re-sent to '+(c.email||c.billEmail))}).catch(()=>{})}
+    return}
   const body=`Hello ${c.name||''},\n\nThank you for the opportunity. Here is our estimate ${e.number} for: ${e.title||'the work discussed'}${c.address?' at '+c.address:''}.\n\n`+
    e.options.map(o=>`${o.name.toUpperCase()}${o.desc?' – '+o.desc:''}\n${o.items.map(i=>`• ${i.desc}${+i.qty!==1?' (x'+i.qty+')':''}`).join('\n')}\nPrice: ${money(calc(o.items,0).sub)}`).join('\n\n')+
    `\n\n${e.notes?e.notes+'\n\n':''}This estimate is valid for ${e.valid||30} days. To approve, simply reply to this email with the option you'd like.\n\nThank you,\n${co.name||''}\n${co.phone||''}`;
@@ -1648,10 +1685,13 @@ function drawInv(){const i=edit.obj,isNew=!byId('invoices',i.id);
   itemsEditor('items',i.items,()=>v('f_taxRate'));}
 function syncInv(){grab(edit.obj,['customerId','status','date','due','taxRate','po','payLink','notes'])}
 function addPay(){syncInv();const a=+v('p_amt');if(!a){toast('Enter an amount');return}edit.obj.payments.push({date:v('p_date')||today(),amount:a,method:v('p_method'),ref:v('p_ref')});drawInv();toast('Payment added — click Save')}
-async function saveInv(){syncInv();const i=edit.obj;i.items=i.items.filter(x=>x.desc||+x.price);if(!i.customerId){toast('Pick a customer');return}if(invStatus(i)==='Paid'&&!i.paidDate)i.paidDate=(i.payments.slice(-1)[0]||{}).date||today();try{await save('invoices',i);toast('Invoice saved');edit.obj=JSON.parse(JSON.stringify(byId('invoices',i.id)||i));invView()}catch(e){}}
+async function saveInv(){syncInv();const i=edit.obj;i.items=i.items.filter(x=>x.desc||+x.price);if(!i.customerId){toast('Pick a customer');return}if(invStatus(i)==='Paid'&&!i.paidDate)i.paidDate=(i.payments.slice(-1)[0]||{}).date||today();try{await save('invoices',i);toast('Invoice saved');uploadInvPdf(JSON.parse(JSON.stringify(i)));edit.obj=JSON.parse(JSON.stringify(byId('invoices',i.id)||i));invView()}catch(e){}}
 function invText(i){const c=byId('customers',i.customerId)||{},co=company(),t=calc(i.items,i.taxRate);
   return `Hello ${c.name||''},\n\nPlease find invoice ${i.number} from ${co.name||'us'} below.\n\nInvoice: ${i.number}\nDate: ${fdate(i.date)}\nDue: ${fdate(i.due)}${i.po?'\nPO: '+i.po:''}${i.jobNumber?'\nJob: '+i.jobNumber:''}${i.site?'\nService address: '+i.site:''}${(()=>{const sv=jobService(i.jobId);return sv&&sv.rows.length?`\nService date: ${fdate(sv.j.date||sv.start.slice(0,10))}\nStarted: ${ftm(sv.start)} · Finished: ${sv.finish?ftm(sv.finish):'in progress'}\nTotal time on site: ${fdur(sv.hrs)} (labor billed ${sv.billed.toFixed(2)} h)`:''})()}\n\n${i.notes?i.notes+'\n\n':''}${(i.items||[]).map(x=>`• ${x.desc} — ${x.qty} x ${money(x.price)} = ${money(x.qty*x.price)}`).join('\n')}\n\nSubtotal: ${money(t.sub)}${+i.taxRate?`\nTax (${i.taxRate}%): ${money(t.tax)}`:''}\nTotal: ${money(t.total)}${invPaid(i)?`\nPaid: ${money(invPaid(i))}`:''}\nBALANCE DUE: ${money(invBal(i))}\n\n${i.payLink?'Pay online: '+i.payLink+'\n\n':''}${co.remit?'Remit to: '+co.remit+'\n\n':''}${co.invoiceFooter||'Thank you for your business!'}\n\n${co.name||''}\n${co.phone||''}`}
-function emailInv(){if($('#modal').querySelector('#f_customerId'))syncInv();const i=edit.obj,c=byId('customers',i.customerId)||{};sendEmail(c.billEmail||c.email,`Invoice ${i.number} from ${company().name||''} – ${money(invBal(i))} due ${fdate(i.due)}`,invText(i),{kind:'invoice',ref:i.number,attachments:()=>invPdfB64(i)}).then(async ok=>{if(ok){i.sentAt=today();try{await save('invoices',i)}catch(e){}}})}
+function emailInv(){if($('#modal').querySelector('#f_customerId'))syncInv();const i=edit.obj,c=byId('customers',i.customerId)||{};
+  if(sb){if(!byId('invoices',i.id)){toast('Save the invoice first');return}if(!(c.billEmail||c.email)){toast('No email on file for this customer');return}
+    toast('Preparing invoice PDF…');uploadInvPdf(i).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'invoice',p_id:i.id});toast(error?sbErr(error):'✉️ Sending invoice to '+(c.billEmail||c.email)+' from billing@')});return}
+sendEmail(c.billEmail||c.email,`Invoice ${i.number} from ${company().name||''} – ${money(invBal(i))} due ${fdate(i.due)}`,invText(i),{kind:'invoice',ref:i.number,attachments:()=>invPdfB64(i)}).then(async ok=>{if(ok){i.sentAt=today();try{await save('invoices',i)}catch(e){}}})}
 
 
 /* ---------- invoice: document view + actions ---------- */
@@ -1967,6 +2007,7 @@ function vSettings(){const c=company();
   <div class="span3"><label>Invoice footer</label><textarea id="s_invoiceFooter">${esc(c.invoiceFooter||'Thank you for your business! Please remit payment by the due date.')}</textarea></div></div>
   <div class="mfoot"><span class="sp"></span><button class="pri" onclick="saveSettings()">Save Settings</button></div></div>
   ${smsSettingsCard()}
+  ${emailSettingsCard()}
   <div class="card" style="max-width:800px;margin-top:14px"><h3>Connections</h3>
   <p class="small"><b>Email:</b> ${mcp?'Customer emails send from your Microsoft 365 / Outlook account (you approve the first one).':'Email sending isn’t available in this view — emails open as a draft to copy.'}<br>
   <b>Data:</b> ${db?'Stored in this app and shared live with everyone you share it with (Contributor access or higher can edit).':'Saved in this browser only.'}<br>
