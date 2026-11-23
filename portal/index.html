@@ -181,8 +181,9 @@ function supabaseApi(){
   const J=r=>r||[];
   return{
     demo:false,
-    async session(){const{data}=await sb.auth.getSession();if(!data.session)return null;const me=await rpc('client_me');return me&&me.customers&&me.customers.length?me:{...me,unlinked:true}},
-    async sendLink(email){const{error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.origin+location.pathname}});if(error)throw new Error(error.message.includes('Signups not allowed')?'This email isn’t set up for portal access. Please contact us.':error.message)},
+    async session(){const{data}=await sb.auth.getSession();if(!data.session)return null;await rpc('portal_autolink').catch(()=>0);const me=await rpc('client_me');return me&&me.customers&&me.customers.length?me:{...me,unlinked:true}},
+    async sendLink(email){const r=await fetch(CFG.supabaseUrl+'/functions/v1/portal-login',{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.supabaseAnonKey},body:JSON.stringify({email})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Could not send the code — please try again')},
+    async verify(email,token){const{error}=await sb.auth.verifyOtp({email,token,type:'email'});if(error)throw new Error('That code didn’t work — check it or request a new one')},
     async signOut(){await sb.auth.signOut()},
     async load(){const me=await rpc('client_me');const[jobs,invoices,estimates,equipment,agreements,requests]=await Promise.all(['client_jobs','client_invoices','client_estimates','client_equipment','client_agreements','client_requests'].map(f=>rpc(f)));
       const sms=await rpc('client_sms_status').catch(()=>({optIn:false,phone:''}));
@@ -240,13 +241,19 @@ function login(){return `<div class="login"><div class="lbox"><div style="margin
   <h2 style="margin-bottom:4px">Sign in</h2><p class="mut small" style="margin-top:0">View your service history, invoices, estimates and equipment — and request service anytime.</p>
   ${DEMO?`<div class="demo"><b>Demo mode</b> — not connected to live data yet.</div><button class="pri" style="width:100%" onclick="demoIn()">View demo account</button>`:
   `<label>Email address</label><input id="em" type="email" autocomplete="email" placeholder="you@company.com" onkeydown="if(event.key==='Enter')sendLink()">
-  <button class="pri" style="width:100%;margin-top:14px" id="sl" onclick="sendLink()">Email me a sign-in link</button>
-  <p class="mut small" id="lmsg">We’ll email you a secure link — no password needed.</p>`}
+  <button class="pri" style="width:100%;margin-top:14px" id="sl" onclick="sendLink()">Email me a sign-in code</button>
+  <div id="codebox" style="display:none"><label>6-digit code from the email</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" onkeydown="if(event.key==='Enter')verifyCode()">
+  <button class="pri" style="width:100%;margin-top:10px" id="vc" onclick="verifyCode()">Sign in</button></div>
+  <p class="mut small" id="lmsg">Use the email address we have on file for you — no password needed.</p>`}
   ${CFG.phone?`<p class="small mut">Need access? Call ${esc(CFG.phone)}</p>`:''}</div></div>`}
 function unlinked(){return `<div class="login"><div class="lbox"><h2>Almost there</h2><p>You’re signed in as <b>${esc(me.email||'')}</b>, but this email isn’t linked to a customer account yet. Please contact ${esc(CFG.company)}${CFG.phone?' at '+esc(CFG.phone):''} and we’ll connect it.</p><button onclick="signOut()">Sign out</button></div></div>`}
 async function demoIn(){me=await api.demoLogin();await refresh()}
 async function sendLink(){const em=$('#em').value.trim();if(!/^\S+@\S+\.\S+$/.test(em)){toast('Enter a valid email');return}$('#sl').disabled=true;
-  try{await api.sendLink(em);$('#lmsg').innerHTML='✅ Check your inbox for a sign-in link from <b>'+esc(CFG.company)+'</b>. You can close this page.'}catch(e){$('#lmsg').textContent=e.message;$('#sl').disabled=false}}
+  try{await api.sendLink(em);$('#codebox').style.display='';$('#sl').textContent='Send a new code';$('#sl').disabled=false;$('#sl').classList.remove('pri');
+    $('#lmsg').innerHTML='✅ If <b>'+esc(em)+'</b> is on file with '+esc(CFG.company)+', a 6-digit code is on its way (check spam too). Enter it above, or tap the button in the email.';setTimeout(()=>$('#code')&&$('#code').focus(),50)}
+  catch(e){$('#lmsg').textContent=e.message;$('#sl').disabled=false}}
+async function verifyCode(){const em=$('#em').value.trim(),c=($('#code').value||'').replace(/\D/g,'');if(c.length<6){toast('Enter the 6-digit code');return}$('#vc').disabled=true;
+  try{await api.verify(em,c);me=await api.session();if(me&&!me.unlinked)await refresh();else render()}catch(e){$('#lmsg').textContent=e.message;$('#vc').disabled=false}}
 async function signOut(){await api.signOut();me=null;D=null;location.hash='';render()}
 
 /* ---------- Overview ---------- */
@@ -325,10 +332,11 @@ function openEst(id,keep){const e=D.estimates.find(x=>x.id===id);if(!e)return;co
   const exp=e.date&&e.valid?addDays(e.date,+e.valid):'';
   modal(`<h2><span>${esc(e.title)}</span><button class="sm" onclick="closeM()">✕</button></h2>
   <div class="row small mut" style="margin-bottom:10px"><span>${esc(e.number)}</span><span>Issued ${fdate(e.date)}</span>${exp?`<span>Valid until ${fdate(exp)}</span>`:''}${multi()?`<span>${esc(locName(e.customerId))}</span>`:''}${badge(open?'Awaiting approval':e.status)}</div>
+  ${e.pdf?`<p><a class="btn" href="${esc(e.pdf)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">📄 View full proposal (PDF)</a></p>`:''}
   ${e.notes?`<p class="small">${esc(e.notes)}</p>`:''}
   ${(e.options||[]).map((o,n)=>`<div class="opt ${pick===n?'sel':''}" onclick="${open?`pick=${n};openEst('${e.id}',1)`:''}"><div class="row"><b style="font-size:17px">${esc(o.name)}</b>${!open&&e.selected===n?'<span class="badge b-Approved">Selected</span>':''}<span class="sp"></span><span class="price">${money(sub(o.items))}</span></div>
    ${o.desc?`<div class="small mut">${esc(o.desc)}</div>`:''}<ul class="small" style="margin:8px 0 0;padding-left:18px">${(o.items||[]).map(x=>`<li>${esc(x.desc)}${+x.qty!==1?' (×'+esc(x.qty)+')':''}</li>`).join('')}</ul></div>`).join('')}
-  <p class="small mut">Prices before applicable tax.</p>
+  ${e.pdf?'<p class="small mut">Price includes applicable sales tax.</p>':'<p class="small mut">Prices before applicable tax.</p>'}
   ${open?`<div class="card" style="background:#fafbfd"><label style="margin-top:0">Your name</label><input id="apn" value="${esc(D.me&&D.me.name||'')}" placeholder="Full name">
    <label style="display:flex;gap:8px;align-items:flex-start;font-weight:500;color:var(--txt)"><input type="checkbox" id="apc" style="width:auto;margin-top:3px"> I authorize ${esc(CFG.company)} to perform the work in the selected option at the price shown.</label>
    <div class="row" style="margin-top:12px"><button onclick="decide('${e.id}',false)">Decline</button><span class="sp"></span><button class="grn" onclick="decide('${e.id}',true)">✓ Approve ${pick!=null&&e.options[pick]?esc(e.options[pick].name):'selected option'}</button></div></div>`
