@@ -947,7 +947,7 @@ async function sendEmail(to,subject,text,opt={}){
 }
 function smsBox(phone,text){draftBox('Text message',text,`Text this to <b>${esc(phone||'(no phone on file)')}</b> from your phone or texting app. ${phone?`<a href="sms:${esc(phone.replace(/[^\d+]/g,''))}?&body=${encodeURIComponent(text)}">Open in Messages</a>`:''}`)}
 function draftBox(title,text,note){window._draft=text;$('#modal2').innerHTML=`<h2>${esc(title)}<button class="sm" onclick="closeM2()">✕</button></h2><p class="small">${note}</p><textarea style="min-height:220px" readonly>${esc(text)}</textarea><div class="mfoot"><span class="sp"></span><button class="pri" onclick="copyTxt(window._draft)">Copy</button><button onclick="closeM2()">Close</button></div>`;$('#ov2').classList.add('show')}
-function closeM2(){$('#ov2').classList.remove('show');$('#modal2').innerHTML=''}
+function closeM2(){$('#ov2').classList.remove('show');$('#modal2').innerHTML='';$('#modal2').style.maxWidth='820px'}
 function copyTxt(t){try{navigator.clipboard.writeText(t).then(()=>toast('Copied')).catch(()=>toast('Copy blocked — select the text and copy'))}catch(e){toast('Copy blocked — select the text and copy')}}
 function csvRow(a){return a.map(x=>{x=String(x??'');return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x}).join(',')}
 async function exportCSV(name,rows){if(deny('export'))return;const csv=rows.map(csvRow).join('\n');
@@ -1862,13 +1862,22 @@ function proFooter(co){return{a:'Contractor’s Initials ____ Purchaser’s Init
 function proPageCss(f){const q=s=>String(s).replace(/\\/g,'').replace(/"/g,'\\"');return `@page{size:letter;margin:14mm 14mm 24mm;@bottom-left{content:"${q(f.a)}";white-space:nowrap;width:95mm;font:bold 9.5pt Calibri,Carlito,Arial;vertical-align:top;padding-top:5mm}@bottom-right{content:"Page " counter(page) " of " counter(pages);font:bold 9.5pt Calibri,Carlito,Arial;vertical-align:top;padding-top:5mm}@bottom-center{content:"${q(f.b)}";font:bold 8pt Calibri,Carlito,Arial;vertical-align:top;padding-top:10mm;white-space:nowrap}}`}
 function proPrint(){proSync();syncEst();proFinish(edit.obj);const w=window.open('','_blank');if(!w)return toast('Allow pop-ups to print');const f=proFooter(company());
   w.document.write(`<!DOCTYPE html><html><head><title>Proposal ${esc(edit.obj.number)}</title><style>body{margin:0}${PRO_CSS}${proPageCss(f)}</style></head><body>${proDoc(edit.obj)}<script>setTimeout(()=>print(),400)<\/script></body></html>`);w.document.close()}
-async function proPdf(){proSync();syncEst();proFinish(edit.obj);const e=edit.obj,f=proFooter(company());toast('Preparing PDF…');
-  try{if(!window.html2pdf){try{await loadJs(new URL('html2pdf.bundle.min.js',location.href).href)}catch(_){await loadJs('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js')}}
-   const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;width:740px;background:#fff';box.innerHTML=`<style>${PRO_CSS}</style><div style="background:#fff">${proDoc(e).replace(INV_LOGO,`<img src="${INV_LOGO_PNG}" style="height:62px;width:auto;display:block">`)}</div>`;document.body.appendChild(box);
-   try{await html2pdf().set({margin:[12,13,22,13],filename:`Proposal ${e.number}${e.title?' - '+e.title.replace(/[\\/:*?"<>|]/g,''):''}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['li','.price','.ack','h5','h4']}})
-     .from(box.lastElementChild).toPdf().get('pdf').then(pdf=>{const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
-       for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,13,H-13);pdf.text(`Page ${i} of ${n}`,W-13,H-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,H-8.5,{align:'center'})}}).save()}finally{box.remove()}toast('PDF downloaded')}
-  catch(err){toast('PDF failed — use Print → Save as PDF')}}
+async function proPdfDoc(e){const f=proFooter(company());
+  if(!window.html2pdf){try{await loadJs(new URL('html2pdf.bundle.min.js',location.href).href)}catch(_){await loadJs('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js')}}
+  const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;width:740px;background:#fff';box.innerHTML=`<style>${PRO_CSS}</style><div style="background:#fff">${proDoc(e).replace(INV_LOGO,`<img src="${INV_LOGO_PNG}" style="height:62px;width:auto;display:block">`)}</div>`;document.body.appendChild(box);
+  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Proposal ${e.number}${e.title?' - '+e.title.replace(/[\\/:*?"<>|]/g,''):''}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['li','.price','.ack','h5','h4']}}).from(box.lastElementChild).toPdf();
+    await w.get('pdf').then(pdf=>{const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
+       for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,13,H-13);pdf.text(`Page ${i} of ${n}`,W-13,H-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,H-8.5,{align:'center'})}});
+    return w}finally{setTimeout(()=>box.remove(),0)}}
+async function proPdf(){proSync();syncEst();proFinish(edit.obj);toast('Preparing PDF…');
+  try{const w=await proPdfDoc(edit.obj);await w.save();toast('PDF downloaded')}catch(err){toast('PDF failed — use Print → Save as PDF')}}
+let PREV_URL=null;
+async function proPreview(){proSync();syncEst();proFinish(edit.obj);const e=edit.obj,m=$('#modal2');m.style.maxWidth='1000px';
+  m.innerHTML=`<h2>Preview — Proposal ${esc(e.number)}<span><button class="sm" onclick="proPdf()">📄 Download PDF</button> <button class="sm" onclick="proPrint()">🖨 Print</button> <button class="sm" onclick="closeM2()">✕</button></span></h2><div id="pv_box" style="height:78vh;background:#525659;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff">Building preview…</div><div class="small mut" style="margin-top:6px">This is exactly what the customer gets. Close to keep editing.</div>`;
+  $('#ov2').classList.add('show');
+  try{const w=await proPdfDoc(e);const blob=await w.outputPdf('blob');if(PREV_URL)URL.revokeObjectURL(PREV_URL);PREV_URL=URL.createObjectURL(blob);
+    const b=el('pv_box');if(b)b.innerHTML=`<iframe src="${PREV_URL}#view=FitH" style="width:100%;height:100%;border:0;border-radius:8px;background:#fff"></iframe>`}
+  catch(err){const b=el('pv_box');if(b){b.style.cssText='height:78vh;overflow:auto;background:#525659;border-radius:8px;padding:20px';b.innerHTML=`<style>${PRO_CSS}</style><div style="background:#fff;max-width:816px;margin:0 auto;padding:48px 52px;box-shadow:0 2px 10px rgba(0,0,0,.4)">${proDoc(e)}</div>`}}}
 
 function vEst(){const t=today();
   const list=S.estimates.filter(e=>UI.estSt==='All'||e.status===UI.estSt).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -1899,7 +1908,7 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
     <button class="sm ${e.selected===n?'pri':''}" onclick="syncEst();edit.obj.selected=${e.selected===n?'null':n};drawEst()">${e.selected===n?'✓ Customer choice':'Customer picked this'}</button>${e.options.length>1?`<button class="sm danger" onclick="syncEst();edit.obj.options.splice(${n},1);edit.obj.selected=null;drawEst()">Remove</button>`:''}</div>
     <div id="oi_${n}" style="margin-top:6px"></div></div>`).join('')}
   <div class="mfoot">${!isNew?`<button class="danger" onclick="delRec('estimates','${e.id}')">Delete</button>`:''}<span class="sp"></span>
-  ${e.pro?`<button onclick="proPdf()">📄 Proposal PDF</button><button onclick="proPrint()">🖨 Print</button>`:''}
+  ${e.pro?`<button class="pri" onclick="proPreview()">👁 Preview</button><button onclick="proPdf()">📄 Proposal PDF</button><button onclick="proPrint()">🖨 Print</button>`:''}
   ${!isNew?`<button onclick="emailEst()">✉️ Email to customer</button>`:''}
   ${!isNew&&!e.jobId?`<button onclick="estToJob()">Approve → Create Job</button>`:''}${e.jobId?`<button onclick="openJob('${e.jobId}')">View Job</button>`:''}
   <button onclick="closeM()">Cancel</button><button class="pri" onclick="saveEst()">Save</button></div>`);
