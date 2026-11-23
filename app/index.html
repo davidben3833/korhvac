@@ -1947,6 +1947,7 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
     ${e.techNotes?`<div style="margin-top:4px">“${esc(e.techNotes)}”</div>`:''}<div class="small mut" style="margin-top:4px">Prices were filled from the price book — review them, then email it. It goes out from service@korhvac.com. The tech never sees prices.</div></div>`:''}
   <div class="fg"><div class="span2"><label>Customer *</label><select id="f_customerId">${custOpts(e.customerId)}</select></div>
    <div><label>Status</label><select id="f_status">${opts(['Draft','Sent','Approved','Declined'],e.status)}</select></div>
+   <div><label>Proposal #</label><input id="f_number" value="${esc(e.number)}" placeholder="26-001-01"></div>
    <div class="span2"><label>Title / scope</label><input id="f_title" value="${esc(e.title)}" placeholder="Replace RTU-2 with new 10-ton unit"></div>
    <div><label>Date</label><input type="date" id="f_date" value="${esc(e.date)}"></div>
    <div><label>Follow-up date</label><input type="date" id="f_followUp" value="${esc(e.followUp)}"></div>
@@ -1966,9 +1967,9 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   ${!isNew&&!e.jobId?`<button onclick="estToJob()">Approve → Create Job</button>`:''}${e.jobId?`<button onclick="openJob('${e.jobId}')">View Job</button>`:''}
   <button onclick="closeM()">Cancel</button><button class="pri" onclick="saveEst()">Save</button></div>`);
   e.options.forEach((o,n)=>e.pro?proLines(n):itemsEditor('oi_'+n,o.items,()=>0));if(e.pro){proUnitsDraw();if(!(PR.rows||[]).length)loadPrices().then(()=>{if(edit.obj===e)e.options.forEach((o,n)=>proLines(n))}).catch(()=>{})}}
-function syncEst(){const e=edit.obj;proSync();grab(e,['customerId','status','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
+function syncEst(){const e=edit.obj;proSync();grab(e,['customerId','status','number','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
 function finishEst(){syncEst();const e=edit.obj;proFinish(e);e.options.forEach(o=>o.items=o.items.filter(i=>i.desc||+i.price));if(e.status==='Sent'&&!e.followUp)e.followUp=addDays(today(),3);if(e.status==='Sent'&&!e.sentAt)e.sentAt=today();if(['Approved','Declined'].includes(e.status)&&!e.closedAt)e.closedAt=today();return e}
-async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Proposal saved');proLearn(e).then(()=>e.pro&&save('estimates',e).catch(()=>{}))}catch(x){}}
+async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}e.number=String(e.number||'').trim();if(!e.number){toast('Enter a proposal number');return}if(S.estimates.some(x=>x.id!==e.id&&String(x.number).trim().toLowerCase()===e.number.toLowerCase())){toast('Proposal # '+e.number+' is already used');return}try{await save('estimates',e);closeM();toast('Proposal saved');proLearn(e).then(()=>e.pro&&save('estimates',e).catch(()=>{}))}catch(x){}}
 async function followedUp(id){const e=byId('estimates',id);try{await save('estimates',{...e,followUp:addDays(today(),4),followUps:(e.followUps||0)+1});toast('Next follow-up in 4 days')}catch(x){}}
 async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a customer');return}
   if(e.options.length>1&&e.selected==null){toast('Mark which option the customer picked first');return}
