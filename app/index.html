@@ -830,7 +830,17 @@ let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null
 const isAdmin=()=>!sb||(me&&(me.base||me.role)==='Admin');
 const roleBase=r=>{const x=(S.roles||[]).find(y=>y.name===r);return x?x.base:(r||'Technician')};
 const roleNames=()=>(S.roles&&S.roles.length?S.roles.map(r=>r.name):['Technician','Office','Dispatcher','Rebate','Admin']);
-const canSee=v=>{if(!sb||isAdmin())return true;const a=(me&&me.areas)||[];return a.includes('*')||a.includes(v)};
+const can=p=>{if(!sb||isAdmin())return true;const x=(me&&me.perms)||[];return x.includes('*')||x.includes(p)};
+const ADMIN_PERM={reports:'reports',payroll:'payroll',settings:'settings',users:'users'};
+const canSee=v=>{if(!sb||isAdmin())return true;if(ADMIN_PERM[v])return can(ADMIN_PERM[v])||(v==='users'&&can('roles'));const a=(me&&me.areas)||[];return a.includes('*')||a.includes(v)};
+const deny=p=>{if(can(p))return false;toast('You don’t have permission for that — ask an Admin');return true};
+const PERMS=[['💵 Money',[['estimates','Create & edit estimates'],['send_estimates','Send estimates to customers'],['invoices','Create & edit invoices'],['send_invoices','Send invoices & reminders'],['payments','Record payments'],['pricebook','Edit pricebook & prices']]],
+ ['🔧 Jobs & dispatch',[['jobs','Create & edit jobs'],['agreements','Manage service agreements']]],
+ ['👥 Customers',[['customers','Add & edit customers'],['messages','Text & email customers'],['portal_invites','Give customers portal access'],['export','Export data (CSV)']]],
+ ['🗑️ Delete',[['delete','Delete jobs, customers, estimates, invoices']]],
+ ['♻️ Rebates',[['rebate_approve','Approve & send supplier emails'],['suppliers','Edit supplier list']]],
+ ['🔐 Admin',[['reports','See reports'],['payroll','Payroll & pay rates'],['fleet_edit','Edit trucks & fleet costs'],['users','Add / disable people, reset passwords'],['roles','Create & edit roles and permissions'],['settings','Company settings (rates, email, texts, AI)']]]];
+const PERM_LABEL=Object.fromEntries(PERMS.flatMap(g=>g[1]));
 const ADMIN_VIEWS=['reports','payroll','settings','users'];
 const crew=()=>S.techs.filter(t=>!t.access||roleBase(t.access)==='Technician');
 const UI={jobQ:'',jobSt:'Open',custQ:'',invSt:'All',estSt:'All',date:today(),pbQ:'',pbCat:'',pbNeeds:false,sampleMap:false,routeTech:'',mapCenter:null,mapZoom:null,eqQ:'',rbSt:'All',from:today().slice(0,8)+'01',to:today(),tech:lsGet('tech')||'',tdate:today(),callQ:''};
@@ -889,7 +899,7 @@ async function save(col,obj){
   if(['jobs','invoices','estimates'].includes(col))autoText(col,prev,obj);
 }
 async function remove(col,id){
-  if(sb){const{error}=await sb.from(TBL[col].t).delete().eq('id',id);if(error)toast(error.message.includes('security')?'Only an Admin can delete this':'Delete failed: '+error.message);else{S[col]=S[col].filter(x=>x.id!==id);render()}}
+  if(sb){const{data,error}=await sb.from(TBL[col].t).delete().eq('id',id).select('id');if(error)toast(error.message.includes('security')?'You don’t have permission to delete this':'Delete failed: '+error.message);else if(!data||!data.length)toast('You don’t have permission to delete this — ask an Admin');else{S[col]=S[col].filter(x=>x.id!==id);render()}}
   else if(db){try{await db.collection(col).doc(id).delete()}catch(e){toast('Delete failed')}}
   else{S[col]=S[col].filter(x=>x.id!==id);lsSet(col,JSON.stringify(S[col]));render()}
 }
@@ -940,7 +950,7 @@ function draftBox(title,text,note){window._draft=text;$('#modal2').innerHTML=`<h
 function closeM2(){$('#ov2').classList.remove('show');$('#modal2').innerHTML=''}
 function copyTxt(t){try{navigator.clipboard.writeText(t).then(()=>toast('Copied')).catch(()=>toast('Copy blocked — select the text and copy'))}catch(e){toast('Copy blocked — select the text and copy')}}
 function csvRow(a){return a.map(x=>{x=String(x??'');return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x}).join(',')}
-async function exportCSV(name,rows){const csv=rows.map(csvRow).join('\n');
+async function exportCSV(name,rows){if(deny('export'))return;const csv=rows.map(csvRow).join('\n');
   if(downloads){try{await downloads.save({filename:name,data:csv});toast('Downloaded '+name);return}catch(e){if(e.code==='declined')return}}
   if(!window.claude){try{const u=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);toast('Downloaded '+name);return}catch(e){}}
   draftBox(name,csv,'Downloads aren’t available here — copy this and save it as a .csv file:')}
@@ -1069,31 +1079,41 @@ function vUsers(){
   if(!sb)return `<div class="top"><h1>Users & Access</h1></div><div class="card"><p>Logins for office staff, technicians and customers are managed here once the office system is live on the KOR HVAC database.</p><p class="small mut">Admins (David, Avi): add/remove people, change access, see payroll and settings. Office: day-to-day work. Technicians: the phone app only. Customers: the portal only.</p></div>`;
   const RANK={Admin:0,Office:1,Dispatcher:2,Rebate:3,Technician:4};const staff=[...S.techs].sort((a,b)=>(RANK[roleBase(a.access)]??5)-(RANK[roleBase(b.access)]??5)||(a.name||'').localeCompare(b.name||''));
   const pu={};(S.portalUsers||[]).forEach(r=>{(pu[r.user_id]=pu[r.user_id]||{email:r.email,name:r.name,cids:[]}).cids.push(r.customer_id)});
-  return `<div class="top"><h1>Users & Access</h1><button class="pri" onclick="openAddUser()">+ Add person</button><button onclick="openPortalInvite()">+ Give a customer portal access</button></div>
+  return `<div class="top"><h1>Users & Access</h1>${can('users')?'<button class="pri" onclick="openAddUser()">+ Add person</button>':''}${can('portal_invites')?'<button onclick="openPortalInvite()">+ Give a customer portal access</button>':''}</div>
   <div class="card" style="padding:0;overflow-x:auto"><table><tr><th>Name</th><th>Email</th><th>Access</th><th>Status</th><th>Location notice</th><th></th></tr>
   ${staff.map(t=>`<tr><td><b>${esc(t.name)}</b><div class="mut small">${esc(t.title||'')}</div></td><td>${esc(t.email||'')}${t.userId?'':' <span class="badge b-Unpaid">no login</span>'}</td><td>${badge(t.access||'Technician')}</td><td>${t.active===false?'<span class="badge b-Canceled">Disabled</span>':'<span class="badge b-Active">Active</span>'}</td>
    <td class="small">${t.access==='Technician'?(t.locationAckAt?'✓ '+fdate(t.locationAckAt):'<span style="color:var(--warn)">Not yet</span>'):'—'}</td>
-   <td class="r nowrap"><button class="sm" onclick="openUser('${t.id}')">Edit</button>${t.email?` <button class="sm" onclick="sendReset('${esc(t.email)}',false)">Reset password</button>`:''}</td></tr>`).join('')}</table></div>
-  <h3 style="margin:22px 0 10px">Roles <button class="sm" onclick="openRole()">+ New role</button></h3>
-  <div class="card" style="padding:0;overflow-x:auto"><table><tr><th>Role</th><th>Works like</th><th>Can see</th><th class="r">People</th><th></th></tr>
-  ${(S.roles||[]).map(r=>`<tr><td><b>${esc(r.name)}</b>${r.builtin?' <span class="mut small">built-in</span>':''}</td><td>${esc(r.base)}</td><td class="small">${(r.areas||[]).includes('*')?'Everything':(r.areas||[]).map(a=>esc((VIEWS.find(n=>n[0]===a)||[0,0,a==='rebate'?'Rebate portal':a])[2])).join(', ')}</td><td class="r">${S.techs.filter(t=>t.access===r.name).length}</td><td class="r">${r.builtin?'':`<button class="sm" onclick="openRole('${esc(r.name)}')">Edit</button>`}</td></tr>`).join('')}</table></div>
+   <td class="r nowrap">${can('users')&&(isAdmin()||roleBase(t.access)!=='Admin')?`<button class="sm" onclick="openUser('${t.id}')">Edit</button>`:''}${t.email?` <button class="sm" onclick="sendReset('${esc(t.email)}',false)">Reset password</button>`:''}</td></tr>`).join('')}</table></div>
+  <h3 style="margin:22px 0 10px">Roles & permissions ${can('roles')?'<button class="sm" onclick="openRole()">+ New role</button>':''}</h3>
+  <div class="card" style="padding:0;overflow-x:auto"><table><tr><th>Role</th><th>Works like</th><th>Can see</th><th>Permissions</th><th class="r">People</th><th></th></tr>
+  ${(S.roles||[]).map(r=>`<tr><td><b>${esc(r.name)}</b>${r.builtin?' <span class="mut small">built-in</span>':''}</td><td>${esc(r.base)}</td><td class="small">${(r.areas||[]).includes('*')?'Everything':(r.areas||[]).map(a=>esc((VIEWS.find(n=>n[0]===a)||[0,0,a==='rebate'?'Rebate portal':a])[2])).join(', ')}</td><td class="small">${r.name==='Admin'?'All':((r.perms||[]).length?(r.perms||[]).length+' of '+Object.keys(PERM_LABEL).length:'none')}</td><td class="r">${S.techs.filter(t=>t.access===r.name).length}</td><td class="r">${r.name==='Admin'?'<span class="mut small">everything</span>':can('roles')?`<button class="sm" onclick="openRole('${esc(r.name)}')">Edit</button>`:''}</td></tr>`).join('')}</table></div>
   <h3 style="margin:22px 0 10px">Customer portal access</h3>
   <div class="card" style="padding:0">${Object.keys(pu).length?`<table><tr><th>Email</th><th>Name</th><th>Locations</th><th></th></tr>${Object.entries(pu).map(([uid_,u])=>`<tr><td>${esc(u.email||'')}</td><td>${esc(u.name||'')}</td><td class="small">${u.cids.map(c=>esc(custName(c))).join('<br>')}</td><td class="r nowrap">${u.email?`<button class="sm" onclick="sendReset('${esc(u.email)}',true)">Send sign-in link</button> `:''}<button class="sm danger" onclick="removePortal('${uid_}')">Remove access</button></td></tr>`).join('')}</table>`:'<div class="empty">No customers have portal access yet.</div>'}</div>
   <p class="small mut">Admin: everything. Office: calls, dispatch, jobs, customers, estimates, invoices. Dispatcher: calls, dispatch board, map, jobs, customers, techs, fleet — no money. Rebate: the rebate portal only (korhvac.com/rebate). Technicians: the Tech app only (their own jobs, no prices). Customers: the customer portal only (their own locations). Make your own roles above.</p>`}
 const AREA_OPTS=()=>[...VIEWS.filter(n=>!ADMIN_VIEWS.includes(n[0])).map(n=>[n[0],n[2]]),['rebate','Rebate portal']];
-function openRole(name){const r=name?(S.roles||[]).find(x=>x.name===name):{name:'',base:'Office',areas:['dashboard','jobs','customers']};
-  $('#modal2').innerHTML=`<h2>${name?'Edit role':'New role'}<button class="sm" onclick="closeM2()">✕</button></h2>
+function permGrid(sel,cls,tri){return PERMS.map(([g,items])=>`<div style="margin-top:10px"><b class="small">${g}</b><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px 14px;margin-top:4px">${items.map(([k,l])=>tri
+  ?`<label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt)"><select class="${cls}" data-p="${k}" style="width:auto;padding:3px 6px">${[['','Role default'],['grant','✅ Allow'],['deny','⛔ Block']].map(([v,t])=>`<option value="${v}" ${sel[k]===v?'selected':''}>${t}</option>`).join('')}</select> ${esc(l)}${tri.base.includes(k)?' <span class="mut small">(role: yes)</span>':''}</label>`
+  :`<label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt)"><input type="checkbox" class="${cls}" value="${k}" style="width:auto" ${sel.includes(k)?'checked':''}> ${esc(l)}</label>`).join('')}</div></div>`).join('')}
+function openRole(name){if(deny('roles'))return;const r=name?(S.roles||[]).find(x=>x.name===name):{name:'',base:'Office',areas:['dashboard','jobs','customers'],perms:['jobs','customers']};
+  const isB=!!r.builtin;
+  $('#modal2').innerHTML=`<h2>${name?'Edit role: '+esc(name):'New role'}<button class="sm" onclick="closeM2()">✕</button></h2>
   <div class="fg"><div><label>Role name *</label><input id="ro_name" value="${esc(r.name)}" ${name?'disabled':''} placeholder="Estimator, Service Manager…"></div>
-   <div><label>Works like</label><select id="ro_base">${opts(['Office','Dispatcher','Rebate','Technician'],r.base)}</select><div class="small mut">Decides which app they sign into and what data they can reach.</div></div></div>
-  <label style="margin-top:12px">Can see these areas</label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 14px">${AREA_OPTS().map(([k,l])=>`<label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt)"><input type="checkbox" class="ro_area" value="${k}" style="width:auto" ${(r.areas||[]).includes(k)?'checked':''}> ${esc(l)}</label>`).join('')}</div>
-  <p class="small mut">Payroll, Reports, Settings and Users & Access are always Admin-only. Technicians never see prices.</p>
-  <div class="mfoot">${name?`<button class="danger" onclick="delRole('${esc(name)}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" onclick="saveRole(${name?`'${esc(name)}'`:'null'})">Save</button></div>`;$('#ov2').classList.add('show')}
+   <div><label>Works like</label><select id="ro_base" ${isB?'disabled':''}>${opts(['Office','Dispatcher','Rebate','Technician'],r.base)}</select><div class="small mut">Decides which app they sign into.</div></div></div>
+  ${r.base==='Technician'?'<p class="small mut">Technicians use the phone app only and never see prices.</p>':`
+  <div class="row" style="margin-top:14px;align-items:center"><b>Screens they can open</b><span class="sp"></span><a href="#" class="small" onclick="event.preventDefault();document.querySelectorAll('.ro_area').forEach(c=>c.checked=true)">all</a> · <a href="#" class="small" onclick="event.preventDefault();document.querySelectorAll('.ro_area').forEach(c=>c.checked=false)">none</a></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 14px;margin-top:6px">${AREA_OPTS().map(([k,l])=>`<label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt)"><input type="checkbox" class="ro_area" value="${k}" style="width:auto" ${(r.areas||[]).includes(k)?'checked':''}> ${esc(l)}</label>`).join('')}</div>
+  <div class="row" style="margin-top:16px;align-items:center"><b>What they can do</b><span class="sp"></span><a href="#" class="small" onclick="event.preventDefault();document.querySelectorAll('.ro_perm').forEach(c=>c.checked=true)">all</a> · <a href="#" class="small" onclick="event.preventDefault();document.querySelectorAll('.ro_perm').forEach(c=>c.checked=false)">none</a></div>
+  ${permGrid(r.perms||[],'ro_perm')}
+  <p class="small mut" style="margin-top:10px">Only Admins can create or change Admin accounts. You can also allow or block single permissions for one person in their profile.</p>`}
+  <div class="mfoot">${name&&!isB?`<button class="danger" onclick="delRole('${esc(name)}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" onclick="saveRole(${name?`'${esc(name)}'`:'null'})">Save</button></div>`;$('#ov2').classList.add('show')}
 async function saveRole(name){const n=name||v('ro_name');if(!n){toast('Enter a role name');return}if(!name&&roleNames().some(x=>x.toLowerCase()===n.toLowerCase())){toast('That role already exists');return}
-  const row={name:n,base:v('ro_base'),areas:[...document.querySelectorAll('.ro_area:checked')].map(x=>x.value)};
+  const old=name?(S.roles||[]).find(x=>x.name===name):null;
+  const row={name:n,base:old&&old.builtin?old.base:v('ro_base'),areas:[...document.querySelectorAll('.ro_area:checked')].map(x=>x.value),perms:[...document.querySelectorAll('.ro_perm:checked')].map(x=>x.value)};
+  if(old&&old.builtin)row.builtin=true;
   const{error}=await sb.from('app_roles').upsert(row);if(error){toast(sbErr(error));return}const{data}=await sb.from('app_roles').select('*').order('builtin',{ascending:false});S.roles=data||[];closeM2();render();toast('Role saved')}
 async function delRole(name){if(S.techs.some(t=>t.access===name)){toast('Move the people in this role to another role first');return}if(!confirm('Delete role '+name+'?'))return;
   const{error}=await sb.from('app_roles').delete().eq('name',name);if(error){toast(sbErr(error));return}S.roles=(S.roles||[]).filter(r=>r.name!==name);closeM2();render();toast('Role deleted')}
-function openAddUser(){$('#modal2').innerHTML=`<h2>Add a person<button class="sm" onclick="closeM2()">✕</button></h2>
+function openAddUser(){if(deny('users'))return;$('#modal2').innerHTML=`<h2>Add a person<button class="sm" onclick="closeM2()">✕</button></h2>
   <div class="fg"><div><label>Full name *</label><input id="nu_name"></div><div><label>Email *</label><input id="nu_email" type="email"></div><div><label>Access</label><select id="nu_access">${opts(roleNames(),'Technician')}</select></div>
   <div><label>Mobile</label><input id="nu_phone"></div><div><label>Job title</label><input id="nu_title" placeholder="Service Tech, Dispatcher…"></div><div><label>Board color</label><input type="color" id="nu_color" value="${['#2f6fde','#1f9d55','#8e44ad','#d35400','#16a085','#c0392b'][S.techs.length%6]}" style="height:38px"></div>
   <div class="span3"><label>How do they get their password?</label>
@@ -1106,14 +1126,17 @@ async function addUser(){const name=v('nu_name'),email=v('nu_email'),how=(docume
   el('nu_btn').disabled=true;try{await callAdmin('create_staff',{name,email,access:v('nu_access'),phone:v('nu_phone'),title:v('nu_title'),color:v('nu_color'),password:how==='pw'?pw:null,redirectTo:location.origin+location.pathname});
     closeM2();toast(how==='pw'?name+' added — give them their temporary password':'Invite emailed to '+email)}catch(e){toast(e.message);el('nu_btn').disabled=false}}
 function openUser(id){const t=byId('techs',id);if(!t)return;$('#modal2').innerHTML=`<h2>${esc(t.name)}<button class="sm" onclick="closeM2()">✕</button></h2>
-  <div class="fg"><div><label>Full name</label><input id="eu_name" value="${esc(t.name)}"></div><div><label>Access</label><select id="eu_access" ${me&&me.id===id?'disabled':''}>${opts(roleNames(),t.access||'Technician')}</select></div><div><label>Status</label><select id="eu_active" ${me&&me.id===id?'disabled':''}>${opts(['Active','Disabled'],t.active===false?'Disabled':'Active')}</select></div>
+  <div class="fg"><div><label>Full name</label><input id="eu_name" value="${esc(t.name)}"></div><div><label>Access</label><select id="eu_access" ${me&&me.id===id?'disabled':''}>${opts(roleNames().filter(r=>isAdmin()||roleBase(r)!=='Admin'),t.access||'Technician')}</select></div><div><label>Status</label><select id="eu_active" ${me&&me.id===id?'disabled':''}>${opts(['Active','Disabled'],t.active===false?'Disabled':'Active')}</select></div>
   <div><label>Mobile</label><input id="eu_phone" value="${esc(t.phone||'')}"></div><div><label>Job title</label><input id="eu_title" value="${esc(t.title||'')}"></div><div><label>Board color</label><input type="color" id="eu_color" value="${esc(t.color||'#2f6fde')}" style="height:38px"></div></div>
   ${me&&me.id===id?'<p class="small mut">You can’t change your own access or disable yourself.</p>':'<p class="small mut">Disabled people can’t sign in anywhere, but their history stays.</p>'}
+  ${roleBase(t.access)!=='Admin'&&roleBase(t.access)!=='Technician'&&can('roles')&&!(me&&me.id===id)?`<details style="margin-top:10px"><summary><b>Personal permissions</b> <span class="small mut">— allow or block single things just for ${esc(t.name.split(' ')[0])}</span></summary>${(()=>{const pp=t.perms||{};const sel={};(pp.grant||[]).forEach(k=>sel[k]='grant');(pp.deny||[]).forEach(k=>sel[k]='deny');const rb=((S.roles||[]).find(r=>r.name===t.access)||{}).perms||[];return permGrid(sel,'eu_perm',{base:rb})})()}</details>`:''}
   <div class="mfoot"><span class="sp"></span><button onclick="closeM2()">Cancel</button><button class="pri" onclick="saveUser('${id}')">Save</button></div>`;$('#ov2').classList.add('show')}
-async function saveUser(id){const t=byId('techs',id);const active=v('eu_active')!=='Disabled';const n={...t,name:v('eu_name'),access:v('eu_access'),phone:v('eu_phone'),title:v('eu_title'),color:v('eu_color'),active};
+async function saveUser(id){if(deny('users'))return;const t=byId('techs',id);const active=v('eu_active')!=='Disabled';const n={...t,name:v('eu_name'),access:v('eu_access'),phone:v('eu_phone'),title:v('eu_title'),color:v('eu_color'),active};
+  if(!isAdmin()&&roleBase(n.access)==='Admin'){toast('Only an Admin can make someone an Admin');return}
+  const ps=[...document.querySelectorAll('.eu_perm')];if(ps.length)n.perms={grant:ps.filter(x=>x.value==='grant').map(x=>x.dataset.p),deny:ps.filter(x=>x.value==='deny').map(x=>x.dataset.p)};
   try{if(t.active!==false&&!active||t.active===false&&active){await callAdmin('set_active',{techId:id,active})}await save('techs',n);closeM2();toast('Saved')}catch(e){toast(e.message||'Could not save')}}
 async function sendReset(email,portal){const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:portal&&KOR.portalUrl?KOR.portalUrl:location.origin+location.pathname});toast(error?error.message:'Email sent to '+email)}
-function openPortalInvite(){$('#modal2').innerHTML=`<h2>Give a customer portal access<button class="sm" onclick="closeM2()">✕</button></h2>
+function openPortalInvite(){if(deny('portal_invites'))return;$('#modal2').innerHTML=`<h2>Give a customer portal access<button class="sm" onclick="closeM2()">✕</button></h2>
   <div class="fg"><div><label>Contact name</label><input id="pi_name"></div><div class="span2"><label>Email *</label><input id="pi_email" type="email"></div></div>
   <label style="margin-top:10px">Which locations can they see? *</label><input id="pi_q" placeholder="Search customers…" oninput="document.querySelectorAll('.pi_row').forEach(r=>r.hidden=!r.textContent.toLowerCase().includes(this.value.toLowerCase()))">
   <div style="max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px;padding:6px">${[...S.customers].sort((a,b)=>(a.company||a.name||'').localeCompare(b.company||b.name||'')).map(c=>`<label class="pi_row" style="display:flex;gap:8px;font-weight:400;color:var(--txt);padding:4px"><input type="checkbox" class="pi_c" value="${c.id}" style="width:auto"> ${esc(c.company||c.name)} <span class="mut small">${esc(c.address||'')}</span></label>`).join('')||'<div class="mut small">Add customers first</div>'}</div>
@@ -1325,7 +1348,7 @@ function smsThread(cid,compose=''){const c=byId('customers',cid)||{};const ms=S.
   <div class="small mut">Texts go out through Twilio once it’s connected at go-live; until then they wait in the queue.</div>`}
 async function sendManual(cid){const inp=el('sms_body_'+cid);const b=inp&&inp.value.trim();if(!b){toast('Type a message');return}
   if(await queueText(cid,'manual',b,'')){S.sms.forEach(m=>{if(m.customerId===cid&&m.direction==='in'&&!m.readAt)m.readAt=new Date().toISOString()});toast('Text queued');const box=inp.closest('#modal2')?'#modal2':null;if(box)openThread(cid);else if(edit&&edit.col==='customers')openCust(cid)}}
-function openThread(cid,compose=''){const c=byId('customers',cid)||{};
+function openThread(cid,compose=''){if(deny('messages'))return;const c=byId('customers',cid)||{};
   S.sms.filter(m=>m.customerId===cid&&m.direction==='in'&&!m.readAt).forEach(m=>save('sms',{...m,readAt:new Date().toISOString()}).catch(()=>{}));
   $('#modal2').innerHTML=`<h2>💬 ${esc(c.company||c.name||'Customer')} <span class="small mut">${esc(c.smsPhone||c.phone||'')}</span><button class="sm" onclick="closeM2()">✕</button></h2>${smsThread(cid,compose)}<div class="mfoot"><span class="sp"></span><button onclick="closeM2();openCust('${cid}')">Open customer</button><button class="pri" onclick="closeM2()">Done</button></div>`;
   $('#ov2').classList.add('show');const th=document.querySelector('#modal2 .thr');if(th)th.scrollTop=th.scrollHeight;setTimeout(()=>{const b=document.querySelector('#modal2 [id^=sms_body_]');if(b)b.focus()},50)}
@@ -1343,7 +1366,7 @@ function smsSettingsCard(){const cfg=smsCfg();
   ${SMS_EVENTS.map(([k,l])=>`<div style="margin-top:12px"><label style="display:flex;gap:8px;align-items:center;font-weight:600;color:var(--txt)"><input type="checkbox" id="sms_ev_${k}" style="width:auto" ${cfg.events[k]?'checked':''}> ${l}</label><textarea id="sms_t_${k}" style="min-height:52px;margin-top:4px">${esc(cfg.templates[k])}</textarea></div>`).join('')}
   <p class="small mut">Fill-ins: {company} {first} {customer} {type} {date} {time} {job} {tech} {site} {link} {portal} {phone} {invoice} {amount} {estimate}. Keep “Reply STOP to opt out” in the first text a customer receives.</p>
   <div class="mfoot"><button onclick="['scheduled','reminder','en_route','completed','invoice','estimate'].forEach(k=>el('sms_t_'+k).value=SMS_DEFAULTS[k])">Reset wording</button><span class="sp"></span><button class="pri" onclick="saveSmsSettings()">Save text settings</button></div></div>`}
-async function saveSmsSettings(){const ev={},tp={};SMS_EVENTS.forEach(([k])=>{ev[k]=el('sms_ev_'+k).checked;tp[k]=v('sms_t_'+k)});
+async function saveSmsSettings(){if(deny('settings'))return;const ev={},tp={};SMS_EVENTS.forEach(([k])=>{ev[k]=el('sms_ev_'+k).checked;tp[k]=v('sms_t_'+k)});
   try{await save('settings',{id:'sms',enabled:el('sms_enabled').checked,portalUrl:v('sms_portal'),events:ev,templates:tp});toast('Text settings saved')}catch(e){}}
 
 
@@ -1360,14 +1383,20 @@ async function loadEmailInfo(){if(!sb)return;try{const[d,l]=await Promise.all([E
 let AI_INFO=null;
 const AI_P={anthropic:['Claude (Anthropic)','ANTHROPIC_API_KEY'],openai:['OpenAI (GPT)','OPENAI_API_KEY'],gemini:['Google Gemini','GEMINI_API_KEY']};
 async function loadAiInfo(){try{const{data}=await sb.functions.invoke('ai-assist',{body:{action:'status'}});AI_INFO=data||{};const b=$('#aicard');if(b)b.outerHTML=aiSettingsCard()}catch(e){AI_INFO={error:true}}}
-function aiSettingsCard(){if(!sb||!isAdmin())return '';if(!AI_INFO){setTimeout(loadAiInfo,0);return '<div class="card" id="aicard"><h3>🤖 AI assistant</h3><p class="mut small">Loading…</p></div>'}
-  const I=AI_INFO,k=I.keys||{};
-  return `<div class="card" id="aicard"><h3>🤖 AI assistant</h3><p class="mut small">Used for reading unit photos (rebate survey + tech app), drafting supplier pricing emails, reading supplier quotes and the tech troubleshooting chat. Pick the AI company here; its key goes in Supabase → Edge Functions → Secrets.</p>
-  <div class="grid2"><div><label>AI company</label><select id="ai_p" onchange="$('#ai_m').placeholder=(AI_INFO.defaults||{})[this.value]||''">${Object.entries(AI_P).map(([v,[n]])=>`<option value="${v}" ${v===I.provider?'selected':''}>${n}${k[v]?'':' — key not added'}</option>`).join('')}</select></div>
-  <div><label>Model (optional)</label><input id="ai_m" value="${esc(I.model&&I.model!==(I.defaults||{})[I.provider]?I.model:'')}" placeholder="${esc((I.defaults||{})[I.provider]||'')}"></div></div>
-  <div class="small" style="margin-top:8px">${Object.entries(AI_P).map(([v,[n,sec]])=>`${k[v]?'✅':'⚪'} ${n}: <code>${sec}</code>`).join('<br>')}</div>
-  <div style="margin-top:10px"><button class="pri" onclick="saveAi()">Save</button></div></div>`}
-async function saveAi(){const p=$('#ai_p').value,m=$('#ai_m').value.trim();const{error}=await sb.rpc('set_ai_settings',{p_provider:p,p_model:m});if(error)return toast(error.message);AI_INFO=null;toast('AI settings saved');loadAiInfo()}
+const AI_TASKS=[['photos','📷 Reading unit photos (survey + tech)'],['rebate','✉️ Supplier pricing emails'],['quotes','📄 Reading supplier quotes'],['chat','🛠️ Tech troubleshooting chat']];
+function aiSettingsCard(){if(!sb||!can('settings'))return '';if(!AI_INFO){setTimeout(loadAiInfo,0);return '<div class="card" id="aicard" style="max-width:800px;margin-top:14px"><h3>🤖 AI assistant</h3><p class="mut small">Loading…</p></div>'}
+  const I=AI_INFO,k=I.keys||{},R=I.routes||{},D=I.defaults||{};
+  const sel=(id,val,withDef)=>`<select id="${id}">${withDef?`<option value="">Same as main</option>`:''}${Object.entries(AI_P).map(([v,[n]])=>`<option value="${v}" ${v===val?'selected':''}>${n}${k[v]?'':' (no key)'}</option>`).join('')}</select>`;
+  return `<div class="card" id="aicard" style="max-width:800px;margin-top:14px"><h3>🤖 AI assistant</h3><p class="mut small">Connect one, two or all three. Each key goes in Supabase → Edge Functions → Secrets.</p>
+  <div class="small">${Object.entries(AI_P).map(([v,[n,sec]])=>`${k[v]?'✅ connected':'⚪ not connected'} — <b>${n}</b> <code>${sec}</code>`).join('<br>')}</div>
+  <div class="fg" style="margin-top:10px"><div><label>Main AI</label>${sel('ai_p',I.provider,false)}</div><div><label>Main model (optional)</label><input id="ai_m" value="${esc(I.model||'')}" placeholder="${esc(D[I.provider]||'')}"></div><div></div></div>
+  <label style="margin-top:10px">Use a different AI for a job (optional)</label>
+  <table class="small"><tr><th>Job</th><th>AI</th><th>Model (optional)</th></tr>${AI_TASKS.map(([t,l])=>`<tr><td>${l}</td><td>${sel('ai_r_'+t,(R[t]||{}).provider,true)}</td><td><input id="ai_rm_${t}" value="${esc((R[t]||{}).model||'')}" placeholder="default"></td></tr>`).join('')}</table>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:500;color:var(--txt);text-transform:none"><input type="checkbox" id="ai_fb" style="width:auto" ${I.fallback!==false?'checked':''}> Backup: if the chosen AI fails or is down, automatically try the other connected AIs</label>
+  <p class="small mut">Tip: open a unit in the Rebate Portal and tap <b>⚖️ Compare AIs</b> to see how each one reads the same photos.</p>
+  <div style="margin-top:10px"><button class="pri" onclick="saveAi()">Save AI settings</button></div></div>`}
+async function saveAi(){if(deny('settings'))return;const routes={};AI_TASKS.forEach(([t])=>{const p=v('ai_r_'+t);if(p)routes[t]={provider:p,model:v('ai_rm_'+t)}});
+  const{error}=await sb.rpc('set_ai_settings',{p_provider:v('ai_p'),p_model:v('ai_m'),p_routes:routes,p_fallback:$('#ai_fb').checked});if(error)return toast(error.message);AI_INFO=null;toast('AI settings saved');loadAiInfo()}
 function emailSettingsCard(){if(!sb)return '';const c=emailCfg();if(!EMAIL_DEF){setTimeout(loadEmailInfo,0)}const D=EMAIL_DEF||{};const f=c.from||{};
   return `<div class="card" id="emailcard" style="max-width:800px;margin-top:14px"><h3>✉️ Automatic emails</h3>
   <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="em_enabled" style="width:auto" ${c.enabled!==false?'checked':''}> Send automatic emails</label>
@@ -1384,7 +1413,7 @@ function emailSettingsCard(){if(!sb)return '';const c=emailCfg();if(!EMAIL_DEF){
   ${EMAIL_LOG.length?`<table class="small"><tr><th>When</th><th>Type</th><th>To</th><th>Status</th><th></th></tr>${EMAIL_LOG.map(q=>`<tr><td class="nowrap">${fdt(q.sent_at||q.send_after||q.created_at)}</td><td>${esc(q.kind.replace(/_/g,' '))}${q.subject?`<div class="mut">${esc(q.subject)}</div>`:''}</td><td>${esc(q.to_addr||custName(q.customer_id)||'')}${q.from_addr?`<div class="mut">from ${esc(q.from_addr)}</div>`:''}</td>
    <td>${badge({sent:'Sent',queued:'Scheduled',sending:'Sending',skipped:'Skipped',failed:'Failed',canceled:'Canceled'}[q.status]||q.status)}${q.error?`<div class="mut">${esc(q.error)}</div>`:''}</td>
    <td class="r nowrap">${q.status==='queued'?`<button class="sm" onclick="emailAct('send','${q.id}')">Send now</button> <button class="sm" onclick="emailAct('cancel','${q.id}')">Cancel</button>`:''}</td></tr>`).join('')}</table>`:'<p class="small mut">No emails yet.</p>'}</div>`}
-async function saveEmailSettings(){const c=emailCfg(),D=EMAIL_DEF||{};const ev={},tp={};EMAIL_EVENTS.filter(e=>e.length>1).forEach(([k])=>{ev[k]=el('em_ev_'+k).checked;const s=v('em_s_'+k),b=el('em_b_'+k).value;
+async function saveEmailSettings(){if(deny('settings'))return;const c=emailCfg(),D=EMAIL_DEF||{};const ev={},tp={};EMAIL_EVENTS.filter(e=>e.length>1).forEach(([k])=>{ev[k]=el('em_ev_'+k).checked;const s=v('em_s_'+k),b=el('em_b_'+k).value;
    if(s&&b&&(s!==(D[k]||{}).subject||b!==(D[k]||{}).body))tp[k]={subject:s,body:b}});
   const fr={...(c.from||{})};['jobs','billing','estimates','tech_estimates','tech','office_to'].forEach(k=>{const x=v('em_from_'+k).toLowerCase();if(x)fr[k]=x});
   try{await save('settings',{id:'email',enabled:el('em_enabled').checked,events:ev,templates:tp,from:fr});toast('Email settings saved')}catch(e){}}
@@ -1442,7 +1471,7 @@ function drawJob(){
 }
 function syncJob(){if(!$('#ov').classList.contains('show')||!document.getElementById('f_duration'))return;grab(edit.obj,['customerId','site','equipmentId','type','priority','status','techId','date','time','duration','description','po','notes'])}
 function finishJob(j){j.items=(j.items||[]).filter(i=>i.desc||+i.price);if(j.date&&j.status==='Unscheduled')j.status='Scheduled';if(j.status==='Completed'&&!j.completedAt)j.completedAt=today();return j}
-async function saveJob(){syncJob();const j=finishJob(edit.obj);{const cur=byId('jobs',j.id);if(cur){j.trips=cur.trips||[];j.timeLog=cur.timeLog||j.timeLog}}if(!j.customerId){toast('Pick a customer');return}const rq=j.fromRequest;delete j.fromRequest;try{await save('jobs',j);closeM();toast('Job '+j.number+' saved');if(rq){const r=byId('requests',rq);if(r)await save('requests',{...r,status:'Scheduled',jobId:j.id})}}catch(e){}}
+async function saveJob(){if(deny('jobs'))return;syncJob();const j=finishJob(edit.obj);{const cur=byId('jobs',j.id);if(cur){j.trips=cur.trips||[];j.timeLog=cur.timeLog||j.timeLog}}if(!j.customerId){toast('Pick a customer');return}const rq=j.fromRequest;delete j.fromRequest;try{await save('jobs',j);closeM();toast('Job '+j.number+' saved');if(rq){const r=byId('requests',rq);if(r)await save('requests',{...r,status:'Scheduled',jobId:j.id})}}catch(e){}}
 async function jobToInv(){syncJob();const j=finishJob(edit.obj);if(!j.customerId){toast('Pick a customer');return}applyLabor(j);
   fillPrices(j.items);const miss=j.items.filter(i=>i.needsPrice&&!(+i.price));if(miss.length){drawJob();toast(miss.length+' part(s) still need a price — type it in, or set it in the Pricebook');return}
   const inv={id:uid(),number:nextNum('invoices','INV-',5001),customerId:j.customerId,jobId:j.id,jobNumber:j.number,site:j.site,po:j.po,items:JSON.parse(JSON.stringify(j.items)),taxRate:company().taxRate||'0',status:'Open',date:today(),due:addDays(today(),+(company().terms||30)),notes:j.description||'',payments:[]};
@@ -1585,7 +1614,7 @@ function openCust(id,pre,back){
   <div class="mfoot">${id?`<button class="danger" onclick="delRec('customers','${c.id}')">Delete</button><button onclick="openJob(null,{customerId:'${c.id}',site:byId('customers','${c.id}').address||''})">+ New Job</button><button onclick="closeM();openEst(null,{customerId:'${c.id}'})">+ Estimate</button>`:''}<span class="sp"></span><button onclick="${tgt==='#ov2'?'closeM2()':'closeM()'}">Cancel</button><button class="pri" onclick="saveCust()">Save</button></div>`;
   if(tgt==='#ov2'){$('#modal2').innerHTML=html;$('#ov2').classList.add('show')}else modal(html);
 }
-async function saveCust(){const c=grab({...edit.obj},['name','company','ctype','phone','email','billEmail','address','notes','smsPhone']);{const ne=el('f_noEmail');if(ne)c.emailOptOutAt=ne.checked?(c.emailOptOutAt||new Date().toISOString()):null}
+async function saveCust(){if(deny('customers'))return;const c=grab({...edit.obj},['name','company','ctype','phone','email','billEmail','address','notes','smsPhone']);{const ne=el('f_noEmail');if(ne)c.emailOptOutAt=ne.checked?(c.emailOptOutAt||new Date().toISOString()):null}
   const oi=el('f_smsOptIn');if(oi){const was=!!c.smsOptIn;c.smsOptIn=oi.checked;if(c.smsOptIn&&!was){c.smsOptInAt=new Date().toISOString();c.smsOptInSource=v('f_smsOptInSource')}if(!c.smsOptIn&&was)c.smsOptInAt=null}
   if(!c.name&&!c.company){toast('Enter a name');return}const{back,prevEdit}=edit;
   try{await save('customers',c)}catch(e){return}toast('Customer saved');
@@ -1630,7 +1659,7 @@ function openAgr(id,pre){const a=id?JSON.parse(JSON.stringify(byId('agreements',
   <div><label>Next visit</label><input type="date" id="f_nextVisit" value="${esc(a.nextVisit)}"></div><div><label>Next bill date</label><input type="date" id="f_nextBill" value="${esc(a.nextBill)}"></div><div></div>
   <div class="span3"><label>Scope of each visit (goes on the PM job)</label><textarea id="f_scope">${esc(a.scope||'Inspect and clean coils, replace filters, check belts, check refrigerant pressures, test safeties and controls, inspect electrical connections.')}</textarea></div></div>
   <div class="mfoot">${id?`<button class="danger" onclick="delRec('agreements','${a.id}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM()">Cancel</button><button class="pri" onclick="saveAgr()">Save</button></div>`)}
-async function saveAgr(){const a=grab({...edit.obj},['customerId','status','name','price','visits','billing','discount','start','end','techId','nextVisit','nextBill','scope']);if(!a.customerId){toast('Pick a customer');return}if(!a.name)a.name=a.visits+'x/yr Maintenance';try{await save('agreements',a);closeM();toast('Agreement saved')}catch(e){}}
+async function saveAgr(){if(deny('agreements'))return;const a=grab({...edit.obj},['customerId','status','name','price','visits','billing','discount','start','end','techId','nextVisit','nextBill','scope']);if(!a.customerId){toast('Pick a customer');return}if(!a.name)a.name=a.visits+'x/yr Maintenance';try{await save('agreements',a);closeM();toast('Agreement saved')}catch(e){}}
 async function runAgreements(){const da=dueAgreements();let nj=0,ni=0;const t=today();
   for(const a0 of da.visits){const a={...a0};const c=byId('customers',a.customerId)||{};const per=a.billing==='Per Visit'?(+a.price||0)/(+a.visits||1):0;
     const j={id:uid(),number:nextNum('jobs','J-',1001),customerId:a.customerId,site:c.address||'',type:'Maintenance',priority:'Normal',status:a.nextVisit?'Scheduled':'Unscheduled',date:a.nextVisit<t?'':a.nextVisit,time:'08:00',duration:'3',techId:a.techId||'',description:`${a.name} (${a.number})\n${a.scope||''}`,items:per?[{desc:a.name+' – maintenance visit',qty:1,price:+per.toFixed(2),cost:''}]:[],agreementId:a.id,created:t};
@@ -1677,7 +1706,7 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   e.options.forEach((o,n)=>itemsEditor('oi_'+n,o.items,()=>0));}
 function syncEst(){const e=edit.obj;grab(e,['customerId','status','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
 function finishEst(){syncEst();const e=edit.obj;e.options.forEach(o=>o.items=o.items.filter(i=>i.desc||+i.price));if(e.status==='Sent'&&!e.followUp)e.followUp=addDays(today(),3);if(e.status==='Sent'&&!e.sentAt)e.sentAt=today();if(['Approved','Declined'].includes(e.status)&&!e.closedAt)e.closedAt=today();return e}
-async function saveEst(){const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Estimate saved')}catch(x){}}
+async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Estimate saved')}catch(x){}}
 async function followedUp(id){const e=byId('estimates',id);try{await save('estimates',{...e,followUp:addDays(today(),4),followUps:(e.followUps||0)+1});toast('Next follow-up in 4 days')}catch(x){}}
 async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a customer');return}
   if(e.options.length>1&&e.selected==null){toast('Mark which option the customer picked first');return}
@@ -1687,7 +1716,7 @@ async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a cu
   try{await save('estimates',e);await save('jobs',j);
    if(e.rebate==='Yes'&&!S.rebates.some(r=>r.estimateId===e.id))await save('rebates',{id:uid(),customerId:e.customerId,estimateId:e.id,jobId:j.id,measure:e.title,status:'Pre-approval',created:today()});
    openJob(j.id);toast('Job '+j.number+' created'+(e.rebate==='Yes'?' + rebate record':''))}catch(x){}}
-function emailEst(){const e=finishEst();const c=byId('customers',e.customerId)||{},co=company();
+function emailEst(){if(deny('send_estimates'))return;const e=finishEst();const c=byId('customers',e.customerId)||{},co=company();
   if(sb){if(!e.customerId){toast('Pick a customer');return}if(!(c.email||c.billEmail)){toast('No email on file for this customer');return}
     if(e.status==='Draft'||!byId('estimates',e.id)){e.status='Sent';e.followUp=e.followUp||addDays(today(),3);save('estimates',e).then(()=>{toast('✉️ Sending estimate to '+(c.email||c.billEmail)+' from estimating@');drawEst()}).catch(()=>{})}
     else{save('estimates',e).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'estimate',p_id:e.id});toast(error?sbErr(error):'✉️ Estimate re-sent to '+(c.email||c.billEmail))}).catch(()=>{})}
@@ -1729,11 +1758,11 @@ function drawInv(){const i=edit.obj,isNew=!byId('invoices',i.id);
   ${!isNew?`<button onclick="syncInv();invView()">← Back to invoice</button>`:''}<button onclick="previewInv()">Preview</button><button onclick="pdfInv()">⬇ PDF</button><button onclick="emailInv()">✉️ Email invoice</button><button onclick="closeM()">Cancel</button><button class="pri" onclick="saveInv()">Save</button></div>`);
   itemsEditor('items',i.items,()=>v('f_taxRate'));}
 function syncInv(){grab(edit.obj,['customerId','status','date','due','taxRate','po','payLink','notes'])}
-function addPay(){syncInv();const a=+v('p_amt');if(!a){toast('Enter an amount');return}edit.obj.payments.push({date:v('p_date')||today(),amount:a,method:v('p_method'),ref:v('p_ref')});drawInv();toast('Payment added — click Save')}
-async function saveInv(){syncInv();const i=edit.obj;i.items=i.items.filter(x=>x.desc||+x.price);if(!i.customerId){toast('Pick a customer');return}if(invStatus(i)==='Paid'&&!i.paidDate)i.paidDate=(i.payments.slice(-1)[0]||{}).date||today();try{await save('invoices',i);toast('Invoice saved');uploadInvPdf(JSON.parse(JSON.stringify(i)));edit.obj=JSON.parse(JSON.stringify(byId('invoices',i.id)||i));invView()}catch(e){}}
+function addPay(){if(deny('payments'))return;syncInv();const a=+v('p_amt');if(!a){toast('Enter an amount');return}edit.obj.payments.push({date:v('p_date')||today(),amount:a,method:v('p_method'),ref:v('p_ref')});drawInv();toast('Payment added — click Save')}
+async function saveInv(){if(deny('invoices'))return;syncInv();const i=edit.obj;i.items=i.items.filter(x=>x.desc||+x.price);if(!i.customerId){toast('Pick a customer');return}if(invStatus(i)==='Paid'&&!i.paidDate)i.paidDate=(i.payments.slice(-1)[0]||{}).date||today();try{await save('invoices',i);toast('Invoice saved');uploadInvPdf(JSON.parse(JSON.stringify(i)));edit.obj=JSON.parse(JSON.stringify(byId('invoices',i.id)||i));invView()}catch(e){}}
 function invText(i){const c=byId('customers',i.customerId)||{},co=company(),t=calc(i.items,i.taxRate);
   return `Hello ${c.name||''},\n\nPlease find invoice ${i.number} from ${co.name||'us'} below.\n\nInvoice: ${i.number}\nDate: ${fdate(i.date)}\nDue: ${fdate(i.due)}${i.po?'\nPO: '+i.po:''}${i.jobNumber?'\nJob: '+i.jobNumber:''}${i.site?'\nService address: '+i.site:''}${(()=>{const sv=jobService(i.jobId);return sv&&sv.rows.length?`\nService date: ${fdate(sv.j.date||sv.start.slice(0,10))}\nStarted: ${ftm(sv.start)} · Finished: ${sv.finish?ftm(sv.finish):'in progress'}\nTotal time on site: ${fdur(sv.hrs)} (labor billed ${sv.billed.toFixed(2)} h)`:''})()}\n\n${i.notes?i.notes+'\n\n':''}${(i.items||[]).map(x=>`• ${x.desc} — ${x.qty} x ${money(x.price)} = ${money(x.qty*x.price)}`).join('\n')}\n\nSubtotal: ${money(t.sub)}${+i.taxRate?`\nTax (${i.taxRate}%): ${money(t.tax)}`:''}\nTotal: ${money(t.total)}${invPaid(i)?`\nPaid: ${money(invPaid(i))}`:''}\nBALANCE DUE: ${money(invBal(i))}\n\n${i.payLink?'Pay online: '+i.payLink+'\n\n':''}${co.remit?'Remit to: '+co.remit+'\n\n':''}${co.invoiceFooter||'Thank you for your business!'}\n\n${co.name||''}\n${co.phone||''}`}
-function emailInv(){if($('#modal').querySelector('#f_customerId'))syncInv();const i=edit.obj,c=byId('customers',i.customerId)||{};
+function emailInv(){if(deny('send_invoices'))return;if($('#modal').querySelector('#f_customerId'))syncInv();const i=edit.obj,c=byId('customers',i.customerId)||{};
   if(sb){if(!byId('invoices',i.id)){toast('Save the invoice first');return}if(!(c.billEmail||c.email)){toast('No email on file for this customer');return}
     toast('Preparing invoice PDF…');uploadInvPdf(i).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'invoice',p_id:i.id});toast(error?sbErr(error):'✉️ Sending invoice to '+(c.billEmail||c.email)+' from billing@')});return}
 sendEmail(c.billEmail||c.email,`Invoice ${i.number} from ${company().name||''} – ${money(invBal(i))} due ${fdate(i.due)}`,invText(i),{kind:'invoice',ref:i.number,attachments:()=>invPdfB64(i)}).then(async ok=>{if(ok){i.sentAt=today();try{await save('invoices',i)}catch(e){}}})}
@@ -1960,10 +1989,10 @@ function vPB(){const np=S.pricebook.filter(p=>p.needsPrice&&!(+p.price));const l
   ${ad?'<div class="mut small" style="margin:-4px 0 8px">Tip: type a new cost or price right in the table — it saves when you press Enter or click away.</div>':''}
   <div class="filters"><input id="pq" placeholder="Search items…" value="${esc(UI.pbQ)}" oninput="UI.pbQ=this.value;render()"><select onchange="UI.pbCat=this.value;render()"><option value="">All categories</option>${cats.map(c=>`<option ${c===UI.pbCat?'selected':''}>${esc(c)}</option>`).join('')}</select><span class="mut small">${list.length} shown</span></div>
   <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Item</th><th>Category</th><th>SKU</th><th class="r">Cost</th><th class="r">Price</th><th class="r">Margin</th></tr>${list.map(p=>`<tr class="click" onclick="openPB('${p.id}')"><td><b>${esc(p.name)}</b>${p.addedBy?`<div class="mut small">added by ${esc(p.addedBy)}${p.addedAt?' · '+fdate(p.addedAt):''}</div>`:''}</td><td>${esc(p.category)}</td><td>${esc(p.sku)}</td>${ad?`<td class="r" onclick="event.stopPropagation()"><input class="pbin" value="${+p.cost||''}" placeholder="—" onkeydown="if(event.key==='Enter')this.blur()" onchange="pbInline('${p.id}','cost',this)"></td><td class="r" onclick="event.stopPropagation()"><input class="pbin" value="${+p.price||''}" placeholder="${p.needsPrice?'Needs price':'—'}" style="${p.needsPrice&&!(+p.price)?'border-color:#c0392b':''}" onkeydown="if(event.key==='Enter')this.blur()" onchange="pbInline('${p.id}','price',this)"></td>`:`<td class="r">${p.cost?money(p.cost):'—'}</td><td class="r">${p.needsPrice&&!(+p.price)?'<span class="badge b-Overdue">Needs price</span>':money(p.price)}</td>`}<td class="r">${+p.cost&&+p.price?pct(1-p.cost/p.price):'—'}</td></tr>`).join('')}</table>`:'<div class="empty">No items match.</div>'}</div>`}
-async function pbInline(id,f,inp){const p=byId('pricebook',id);if(!p)return;const n=inp.value.replace(/[$,\s]/g,'');if(n!==''&&!isFinite(+n)){toast('Enter a number');inp.value=+p[f]||'';return}
+async function pbInline(id,f,inp){if(deny('pricebook'))return;const p=byId('pricebook',id);if(!p)return;const n=inp.value.replace(/[$,\s]/g,'');if(n!==''&&!isFinite(+n)){toast('Enter a number');inp.value=+p[f]||'';return}
   const o={...p,[f]:n===''?'':Math.round(+n*100)/100};if(f==='price'&&+o.price)o.needsPrice=false;
   try{await save('pricebook',o);toast((f==='price'?'Price':'Cost')+' saved — '+p.name)}catch(e){inp.value=+p[f]||''}}
-async function pbBulk(objs){if(!objs.length)return 0;
+async function pbBulk(objs){if(deny('pricebook'))return 0;if(!objs.length)return 0;
   if(sb){let n=0;for(let i=0;i<objs.length;i+=200){const rows=objs.slice(i,i+200).map(o=>({id:o.id,...toRow('pricebook',o,new Set(['name','category','sku','cost','price','needsPrice']))}));const{data,error}=await sb.from('pricebook').upsert(rows,{onConflict:'id'}).select();if(error){toast(sbErr(error));break}(data||[]).forEach(r=>{const o=fromRow('pricebook',r);const a=S.pricebook,k=a.findIndex(x=>x.id===o.id);if(k>=0)a[k]=o;else a.push(o)});n+=(data||[]).length}render();return n}
   let n=0;for(const o of objs){try{await save('pricebook',o);n++}catch(e){break}}return n}
 const pbRound=(x,how)=>how==='none'?Math.round(x*100)/100:how==='1'?Math.round(x):how==='5'?Math.max(5,Math.round(x/5)*5):(x<100?Math.round(x):Math.round(x/5)*5);
@@ -2010,7 +2039,7 @@ function openPB(id){const p=id?{...byId('pricebook',id)}:{id:uid(),category:'Lab
   <div class="fg"><div class="span2"><label>Name *</label><input id="f_name" value="${esc(p.name)}" placeholder="Service call – first hour"></div><div><label>Category</label><select id="f_category">${opts([...new Set([...PB_CATS,...S.pricebook.map(x=>x.category).filter(Boolean)])],p.category)}</select></div>
   <div><label>SKU / part #</label><input id="f_sku" value="${esc(p.sku)}"></div><div><label>Cost</label><input id="f_cost" value="${esc(p.cost)}"></div><div><label>Sell price *</label><input id="f_price" value="${esc(p.price)}"></div></div>
   <div class="mfoot">${id?`<button class="danger" onclick="delRec('pricebook','${p.id}')">Delete</button>`:''}<span class="sp"></span><button onclick="closeM()">${isAdmin()?'Cancel':'Close'}</button>${isAdmin()?`<button class="pri" onclick="savePB()">Save</button>`:''}</div>`)}
-async function savePB(){const p=grab({...edit.obj},['name','category','sku','cost','price']);if(!p.name){toast('Enter a name');return}if(+p.price)p.needsPrice=false;
+async function savePB(){if(deny('pricebook'))return;const p=grab({...edit.obj},['name','category','sku','cost','price']);if(!p.name){toast('Enter a name');return}if(+p.price)p.needsPrice=false;
   try{await save('pricebook',p);closeM();toast('Item saved')}catch(e){return}
   if(+p.price){let n=0;for(const j of S.jobs.filter(j=>!j.invoiceId&&(j.items||[]).some(i=>i.pricebookId===p.id&&!(+i.price)))){const c=JSON.parse(JSON.stringify(j));c.items.forEach(i=>{if(i.pricebookId===p.id&&!(+i.price)){i.price=+p.price;i.cost=+p.cost||'';delete i.needsPrice}});try{await save('jobs',c);n++}catch(e){}}if(n)toast('Price applied to '+n+' open job(s)')}}
 function fillPrices(items){(items||[]).forEach(i=>{if(!(+i.price)&&i.pricebookId){const p=byId('pricebook',i.pricebookId);if(p&&+p.price){i.price=+p.price;i.cost=+p.cost||'';delete i.needsPrice}}})}
@@ -2031,7 +2060,7 @@ async function tpSave(id,items){const j=byId('jobs',id);try{await save('jobs',{.
 function tpQty(id,n,d){const j=byId('jobs',id);const items=JSON.parse(JSON.stringify(j.items||[]));items[n].qty=Math.max(0,(+items[n].qty||0)+d);tpSave(id,items.filter(i=>+i.qty>0))}
 function tpAdd(id){const pid=v('tp_sel');if(!pid){toast('Select a part');return}const p=byId('pricebook',pid),j=byId('jobs',id);const items=JSON.parse(JSON.stringify(j.items||[]));const ex=items.find(i=>i.pricebookId===pid);const q=+v('tp_qty')||1;
   if(ex)ex.qty=(+ex.qty||0)+q;else items.push({desc:p.name,qty:q,price:+p.price||0,cost:+p.cost||'',pricebookId:pid,...(!(+p.price)?{needsPrice:true}:{}),addedBy:techName(UI.tech)});tpSave(id,items);toast('Part added')}
-async function tpNew(id){const name=v('tp_name');if(!name){toast('Enter the part name');return}
+async function tpNew(id){if(deny('pricebook'))return;const name=v('tp_name');if(!name){toast('Enter the part name');return}
   const dup=S.pricebook.find(p=>(p.name||'').trim().toLowerCase()===name.toLowerCase());
   const p=dup||{id:uid(),name,sku:v('tp_sku'),category:v('tp_cat'),price:'',cost:'',needsPrice:true,addedBy:techName(UI.tech),addedAt:new Date().toISOString()};
   if(!dup){try{await save('pricebook',p)}catch(e){return}}
@@ -2059,7 +2088,7 @@ function vSettings(){const c=company();
   <b>Data:</b> ${db?'Stored in this app and shared live with everyone you share it with (Contributor access or higher can edit).':'Saved in this browser only.'}<br>
   <b>QuickBooks:</b> Export CSVs from Customers and Invoices, then import in QuickBooks Online (Settings → Import Data).<br>
   <b>Card payments:</b> paste your Stripe / QuickBooks Payments / Square payment link above — it goes on every invoice email. Record payments on each invoice.</p></div>`}
-async function saveSettings(){const c=grab({id:'company'},['name','license','address','phone','email','taxRate','terms','laborCost','laborRate','laborMinHrs','laborRoundMin','gasPrice','dieselPrice','mileRate','payLink','remit','invoiceFooter'],'s_');try{await save('settings',c);toast('Settings saved')}catch(e){}}
+async function saveSettings(){if(deny('settings'))return;const c=grab({id:'company'},['name','license','address','phone','email','taxRate','terms','laborCost','laborRate','laborMinHrs','laborRoundMin','gasPrice','dieselPrice','mileRate','payLink','remit','invoiceFooter'],'s_');try{await save('settings',c);toast('Settings saved')}catch(e){}}
 
 
 /* ================= FLEET, MILEAGE & TOLLS ================= */
@@ -2203,7 +2232,7 @@ async function vdocOpen(id){const f=(edit.obj.docs||[]).find(d=>d.id===id);if(!f
 async function vdocDel(id){const cur=JSON.parse(JSON.stringify(byId('vehicles',edit.obj.id)||edit.obj));const f=(cur.docs||[]).find(d=>d.id===id);if(!f||!confirm(`Delete ${f.type} — ${f.name}?`))return;
   if(sb&&f.path){const{error}=await sb.storage.from('vehicle-docs').remove([f.path]);if(error){toast(sbErr(error));return}}
   cur.docs=cur.docs.filter(d=>d.id!==id);try{await save('vehicles',cur);edit.obj.docs=cur.docs;el('vdocs').innerHTML=vdocsHtml(cur);toast('Deleted')}catch(e){}}
-async function saveVeh(keep){const x=grab({...edit.obj},['name','year','color','make','model','plate','fuel','mpg','techId','vin','notes','regDate','regExp','inspExp','ezpassTag','ezpassExp','insCompany','insPolicy','insStart','insExp','oilDate','oilOdo','odometer','oilEveryMiles','oilEveryMonths','driverName','driverId','driverLicExp']);
+async function saveVeh(keep){if(deny('fleet_edit'))return;const x=grab({...edit.obj},['name','year','color','make','model','plate','fuel','mpg','techId','vin','notes','regDate','regExp','inspExp','ezpassTag','ezpassExp','insCompany','insPolicy','insStart','insExp','oilDate','oilOdo','odometer','oilEveryMiles','oilEveryMonths','driverName','driverId','driverLicExp']);
   ['oilOdo','odometer','oilEveryMiles','oilEveryMonths'].forEach(k=>{x[k]=x[k]===''||x[k]==null?null:+String(x[k]).replace(/[^0-9.]/g,'')});if(!x.oilEveryMiles)x.oilEveryMiles=3000;if(!x.oilEveryMonths)x.oilEveryMonths=3;
   {const pv=byId('vehicles',x.id);if(!pv||pv.oilDate!==x.oilDate||pv.oilOdo!==x.oilOdo)x.oilAlert=null}{const cur=byId('vehicles',x.id);if(cur)x.docs=cur.docs||[]}x.active=v('f_active')==='Active';
   if(!x.make&&!x.name){toast('Enter a truck name or make');return false}x.year=x.year?parseInt(x.year)||null:null;x.mpg=x.mpg?+x.mpg:(mpgGuess(x.make,x.model)||15);x.techId=x.techId||null;
@@ -2217,7 +2246,7 @@ $('#ov').addEventListener('mousedown',e=>{if(e.target.id==='ov')closeM()});
 $('#ov2').addEventListener('mousedown',e=>{if(e.target.id==='ov2')closeM2()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#ov2').classList.contains('show'))closeM2();else closeM()}});
 let pendingDel=null;
-function delRec(col,id){if(pendingDel===col+id){remove(col,id);closeM();toast('Deleted');pendingDel=null}else{pendingDel=col+id;toast('Click Delete again to confirm');setTimeout(()=>pendingDel=null,3000)}}
+function delRec(col,id){if(['jobs','customers','estimates','invoices'].includes(col)&&deny('delete'))return;if(pendingDel===col+id){remove(col,id);closeM();toast('Deleted');pendingDel=null}else{pendingDel=col+id;toast('Click Delete again to confirm');setTimeout(()=>pendingDel=null,3000)}}
 
 route();init();
 </script>

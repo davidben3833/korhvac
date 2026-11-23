@@ -65,6 +65,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const money=n=>n==null?'':'$'+Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
 const when=d=>d?new Date(d).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
 let ME=null, V={page:'projects',pid:null,tab:'survey'}, D={projects:[],suppliers:[],customers:[]}, P=null, chan=null;
+const canP=p=>ME&&(ME.base==='Admin'||(ME.perms||[]).includes('*')||(ME.perms||[]).includes(p));
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3200)}
 async function q(p){const{data,error}=await p;if(error)throw new Error(error.message);return data}
 function modal(html){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="mb">${html}</div>`;m.addEventListener('mousedown',e=>{if(e.target===m)m.remove()});document.body.appendChild(m);return m}
@@ -200,7 +201,7 @@ function editUnit(u,openCam){
   const F=(k,l,t='text')=>`<div><label>${l}</label><input id="u_${k}" type="${t}" value="${esc(u[k]??'')}"></div>`;
   const S=(k,l,opts)=>`<div><label>${l}</label><select id="u_${k}"><option value=""></option>${opts.map(o=>`<option ${o===u[k]?'selected':''}>${o}</option>`).join('')}</select></div>`;
   const m=modal(`<h3>📁 ${isNew?'New unit':esc(u.tag||u.equipment_type||'Unit')}</h3>
-  <div class="row"><button class="sm pri" id="cam1">📷 Take photo</button><button class="sm" id="gal">🖼️ Add photos</button><button class="sm" id="doc">📄 Add file</button><span class="sp"></span><button class="sm" id="air">✨ Fill with AI</button>
+  <div class="row"><button class="sm pri" id="cam1">📷 Take photo</button><button class="sm" id="gal">🖼️ Add photos</button><button class="sm" id="doc">📄 Add file</button><span class="sp"></span><button class="sm" id="air">✨ Fill with AI</button><button class="sm" id="cmp">⚖️ Compare AIs</button>
   <input type="file" id="pc" accept="image/*" capture="environment" hidden><input type="file" id="pg" accept="image/*" multiple hidden><input type="file" id="pd" multiple hidden></div>
   <div class="small mut" id="pcount" style="margin-top:6px"></div><div class="thumbs" id="th"></div><div id="docs" class="small" style="margin-top:6px"></div>
   <div id="aibox"></div>
@@ -242,6 +243,21 @@ function editUnit(u,openCam){
       for(const k of ['equipment_type','make','model','serial','capacity','tonnage','fuel','refrigerant','voltage','mfg_year','efficiency','orientation','mounting','difficulty','install_notes']){const el=m.querySelector('#u_'+k);if(el&&ai[k]!=null&&ai[k]!==''&&!el.value)el.value=ai[k]}
       showAi();dirty=true;toast('Filled from photos — check and save')}catch(err){toast(err.message)}
     e.target.disabled=false;e.target.textContent='✨ Fill with AI'};
+  m.querySelector('#cmp').onclick=async e=>{
+    if(!photos.length)return toast('Add photos first');
+    e.target.disabled=true;e.target.textContent='Asking all AIs…';
+    try{const r=await fn('ai-assist',{action:'compare',paths:photos.slice(0,12).map(p=>p.path),unit_id:isNew?null:uid});
+      const N={anthropic:'Claude',openai:'OpenAI',gemini:'Gemini'},K=[['equipment_type','Type'],['make','Make'],['model','Model'],['serial','Serial'],['capacity','Capacity'],['tonnage','Tons'],['fuel','Fuel'],['voltage','Voltage'],['mfg_year','Year'],['orientation','Orientation'],['mounting','Mounted'],['difficulty','Difficulty'],['install_notes','Install notes'],['confidence','Confidence']];
+      const ps=Object.keys(N),R=r.results||{};
+      const cm=modal(`<h3>⚖️ Same photos, three AIs</h3><div style="overflow:auto"><table><tr><th></th>${ps.map(p=>`<th>${N[p]}<div class="small mut" style="text-transform:none">${R[p]?.error?esc(R[p].error):esc(R[p]?.model||'')+' · '+((R[p]?.ms||0)/1000).toFixed(1)+'s'}</div></th>`).join('')}</tr>
+        ${K.map(([k,l])=>{const vals=ps.map(p=>R[p]?.unit?.[k]??'');const same=vals.filter(x=>x!=='').every(x=>String(x).toLowerCase()===String(vals.find(y=>y!=='')).toLowerCase());
+          return `<tr><td class="small mut">${l}</td>${vals.map(x=>`<td class="small" style="${!same&&x!==''?'background:#fff4dd':''}">${esc(x)}</td>`).join('')}</tr>`}).join('')}
+        <tr><td></td>${ps.map(p=>`<td>${R[p]?.unit?`<button class="sm" data-use="${p}">Use this</button>`:''}</td>`).join('')}</tr></table></div>
+        <div class="small mut">Yellow = the AIs disagree — check the nameplate photo. Nothing is saved until you pick one and Save the unit.</div><div class="row" style="margin-top:12px"><button id="cc">Close</button></div>`);
+      cm.querySelector('#cc').onclick=()=>cm.remove();
+      cm.querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>{ai=R[b.dataset.use].unit;for(const [k] of K){const el=m.querySelector('#u_'+k);if(el&&ai[k]!=null&&ai[k]!=='')el.value=ai[k]}showAi();dirty=true;cm.remove();toast(N[b.dataset.use]+' values filled — check and save')});
+    }catch(err){toast(err.message)}
+    e.target.disabled=false;e.target.textContent='⚖️ Compare AIs'};
   const close=()=>{m.remove();refreshUnits()};
   m.querySelector('#cx').onclick=async()=>{if(dirty&&confirm('Save changes to this unit?'))return m.querySelector('#sv').click();
     if(isNew&&photos.length+docs.length&&!confirm('Discard this unit and its photos?'))return;
@@ -266,7 +282,7 @@ function pricingTab(){
    <div class="small">Units: ${(r.unit_ids||[]).map(unitName).filter(Boolean).map(esc).join(', ')||'—'}</div>
    ${r.reply_snippet?`<div class="small" style="margin-top:6px;border-left:3px solid #ddd;padding-left:8px"><b>${esc(r.reply_from||'')}</b> ${when(r.replied_at)}<br>${esc(r.reply_snippet)}</div>`:''}
    ${r.error?`<div class="err">${esc(r.error)}</div>`:''}
-   <div class="row" style="margin-top:8px">${['Draft','Failed'].includes(r.status)?`<button class="sm" data-open="${r.id}">Review / edit</button><button class="sm grn" data-send="${r.id}">Approve & send</button><button class="sm red" data-del="${r.id}">Discard</button>`:`<button class="sm" data-open="${r.id}">View email</button>`}
+   <div class="row" style="margin-top:8px">${['Draft','Failed'].includes(r.status)?`<button class="sm" data-open="${r.id}">Review / edit</button>${canP('rebate_approve')?`<button class="sm grn" data-send="${r.id}">Approve & send</button>`:'<span class="small mut">Waiting for approval</span>'}<button class="sm red" data-del="${r.id}">Discard</button>`:`<button class="sm" data-open="${r.id}">View email</button>`}
    ${['Sent','Replied'].includes(r.status)?`<button class="sm" data-mark="${r.id}">Mark quoted</button>`:''}${!['Declined','Draft'].includes(r.status)?`<button class="sm" data-dec="${r.id}">Declined</button>`:''}</div></div>`).join('')||'<div class="card mut">No pricing requests yet. Add units in Survey, then let the AI pick suppliers and draft the emails.</div>'}`;
   $('#ai').onclick=async e=>{if(!units.length)return toast('Add units first');e.target.disabled=true;e.target.textContent='Drafting…';try{const r=await fn('ai-assist',{action:'rebate_plan',rebate_id:p.id});toast(`${r.drafted} draft(s) ready for approval`);await projectView()}catch(err){toast(err.message);e.target.disabled=false}};
   $('#man').onclick=()=>editReq({rebate_id:p.id,status:'Draft',unit_ids:units.map(u=>u.id),subject:`Pricing needed for job ${p.site||p.title}`,body:''});
@@ -277,7 +293,7 @@ function pricingTab(){
   document.querySelectorAll('[data-mark]').forEach(b=>b.onclick=async()=>{const t=prompt('Quote total (optional)');await q(sb.from('supplier_requests').update({status:'Quoted',quote_total:t?Number(t.replace(/[^\d.]/g,''))||null:null}).eq('id',b.dataset.mark));projectView()});
   document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=async()=>{await q(sb.from('supplier_requests').update({status:'Declined'}).eq('id',b.dataset.dec));projectView()});
 }
-async function approve(r,btn){
+async function approve(r,btn){if(!canP('rebate_approve'))return toast('You don’t have permission to send supplier emails — ask an Admin');
   if(!confirm(`Send this pricing request to ${r.to_addr} from the project owner's email (cc rebates@)?`))return;
   if(btn){btn.disabled=true;btn.textContent='Sending…'}
   try{await fn('rebate-mail',{action:'send',id:r.id});toast('Sent');}catch(e){toast(e.message)}
@@ -293,7 +309,7 @@ function editReq(r){
   <label>Subject</label><input id="sj" value="${esc(r.subject||'')}" ${ro?'disabled':''}>
   <label>Message</label><textarea id="bd" style="min-height:260px" ${ro?'disabled':''}>${esc(r.body||'')}</textarea>
   <div class="small mut">Nameplate photos of the selected units are attached automatically. Reference [KOR-${esc(r.token||'xxxxxx')}] is added to the subject so replies are matched.</div>
-  <div class="row" style="margin-top:14px">${ro?'':'<button class="pri" id="sv">Save draft</button><button class="grn" id="sd">Approve & send</button>'}<button id="cx">Close</button></div>`);
+  <div class="row" style="margin-top:14px">${ro?'':'<button class="pri" id="sv">Save draft</button>'+(canP('rebate_approve')?'<button class="grn" id="sd">Approve & send</button>':'')}<button id="cx">Close</button></div>`);
   const sel=m.querySelector('#s');sel.onchange=()=>{const s=D.suppliers.find(x=>x.id===sel.value);if(s)m.querySelector('#to').value=s.email||''};
   m.querySelector('#cx').onclick=()=>m.remove();
   if(ro)return;
@@ -301,7 +317,7 @@ function editReq(r){
     if(!o.supplier_id||!o.to_addr||!o.subject||!o.body.trim())throw new Error('Supplier, To, subject and message are required');
     if(r.id){await q(sb.from('supplier_requests').update(o).eq('id',r.id));return{...r,...o}}const n=await q(sb.from('supplier_requests').insert({...o,rebate_id:P.p.id}).select().single());return n};
   m.querySelector('#sv').onclick=async()=>{try{await save();m.remove();projectView()}catch(e){toast(e.message)}};
-  m.querySelector('#sd').onclick=async()=>{try{const n=await save();m.remove();approve(n)}catch(e){toast(e.message)}};
+  if(m.querySelector('#sd'))m.querySelector('#sd').onclick=async()=>{try{const n=await save();m.remove();approve(n)}catch(e){toast(e.message)}};
 }
 
 /* files */
@@ -324,12 +340,12 @@ function activityTab(){
 
 /* ───────── suppliers ───────── */
 function suppliersView(){
-  shell(`<div class="row" style="margin-bottom:12px"><h2 style="margin:0">Suppliers</h2><span class="sp"></span><button class="pri" id="ns">+ Add supplier</button></div>
+  shell(`<div class="row" style="margin-bottom:12px"><h2 style="margin:0">Suppliers</h2><span class="sp"></span>${canP('suppliers')?'<button class="pri" id="ns">+ Add supplier</button>':''}</div>
   <div class="mut small" style="margin-bottom:10px">The AI picks suppliers from this list by equipment type, brand and region, and learns from who replies and quotes.</div>
   <div class="card" style="overflow:auto"><table><tr><th>Company</th><th>Contact</th><th>Equipment</th><th>Brands</th><th>Regions</th><th>Record</th></tr>
   ${D.suppliers.map(s=>`<tr class="click" data-s="${s.id}" style="${s.active?'':'opacity:.5'}"><td><b>${esc(s.company)}</b></td><td class="small">${esc(s.contact_name||'')}<br>${esc(s.email||'')}</td><td class="small">${esc((s.categories||[]).join(', '))}</td><td class="small">${esc((s.brands||[]).join(', '))}</td><td class="small">${esc((s.regions||[]).join(', '))}</td>
   <td class="small">${s.stats?.sent?`${s.stats.sent} sent · ${s.stats.quoted||0} quoted${s.stats.avgReplyHrs!=null?' · ~'+s.stats.avgReplyHrs+'h reply':''}`:'<span class="mut">new</span>'}</td></tr>`).join('')}</table></div>`);
-  $('#ns').onclick=()=>editSupplier({active:true});
+  if($('#ns'))$('#ns').onclick=()=>editSupplier({active:true});
   document.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>editSupplier(D.suppliers.find(s=>s.id===r.dataset.s)));
 }
 function editSupplier(s){
@@ -342,9 +358,9 @@ function editSupplier(s){
   <label>Notes (the AI reads these)</label><textarea id="nt">${esc(s.notes||'')}</textarea>
   ${s.learned?.quoted?`<div class="ai">Learned: quoted ${esc(Object.entries(s.learned.quoted).map(([k,v])=>k+' ×'+v).join(', '))}</div>`:''}
   <label style="text-transform:none"><input type="checkbox" id="ac" style="width:auto" ${s.active!==false?'checked':''}> Active</label>
-  <div class="row" style="margin-top:14px"><button class="pri" id="sv">Save</button><button id="cx">Close</button></div>`);
+  <div class="row" style="margin-top:14px">${canP('suppliers')?'<button class="pri" id="sv">Save</button>':''}<button id="cx">Close</button></div>`);
   m.querySelector('#cx').onclick=()=>m.remove();
-  m.querySelector('#sv').onclick=async()=>{const o={company:m.querySelector('#c').value.trim(),contact_name:m.querySelector('#n').value.trim()||null,email:m.querySelector('#e').value.trim()||null,phone:m.querySelector('#p').value.trim()||null,categories:split(m.querySelector('#cat').value),brands:split(m.querySelector('#br').value),regions:split(m.querySelector('#rg').value),notes:m.querySelector('#nt').value.trim()||null,active:m.querySelector('#ac').checked,updated_at:new Date().toISOString()};
+  if(m.querySelector('#sv'))m.querySelector('#sv').onclick=async()=>{const o={company:m.querySelector('#c').value.trim(),contact_name:m.querySelector('#n').value.trim()||null,email:m.querySelector('#e').value.trim()||null,phone:m.querySelector('#p').value.trim()||null,categories:split(m.querySelector('#cat').value),brands:split(m.querySelector('#br').value),regions:split(m.querySelector('#rg').value),notes:m.querySelector('#nt').value.trim()||null,active:m.querySelector('#ac').checked,updated_at:new Date().toISOString()};
     if(!o.company)return toast('Company is required');
     try{if(s.id)await q(sb.from('suppliers').update(o).eq('id',s.id));else await q(sb.from('suppliers').insert({...o,source:'manual'}));m.remove();await loadAll();suppliersView()}catch(e){toast(e.message)}};
 }
