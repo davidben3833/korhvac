@@ -949,9 +949,9 @@ function exportQBPayments(){exportCSV('quickbooks-payments.csv',[['Customer','In
 
 /* ================= LIVE DATABASE (Supabase) ================= */
 const TBL={
- customers:{t:'customers',f:{name:'name',company:'company',ctype:'ctype',phone:'phone',email:'email',billEmail:'bill_email',address:'address',notes:'notes',smsPhone:'sms_phone',smsOptIn:'sms_opt_in',smsOptInAt:'sms_opt_in_at',smsOptInSource:'sms_opt_in_source',smsOptOutAt:'sms_opt_out_at',updated:'updated_at'}},
+ customers:{t:'customers',f:{name:'name',company:'company',ctype:'ctype',phone:'phone',email:'email',billEmail:'bill_email',address:'address',notes:'notes',smsPhone:'sms_phone',smsOptIn:'sms_opt_in',smsOptInAt:'sms_opt_in_at',smsOptInSource:'sms_opt_in_source',smsOptOutAt:'sms_opt_out_at',emailOptOutAt:'email_opt_out_at',updated:'updated_at'}},
  techs:{t:'techs',f:{name:'name',phone:'phone',email:'email',title:'title',access:'role',color:'color',payRate:'pay_rate',costRate:'cost_rate',commission:'commission',active:'active',skills:'skills',userId:'user_id',locationAckAt:'location_ack_at',locationAckName:'location_ack_name'},ro:['userId','locationAckAt','locationAckName']},
- jobs:{t:'jobs',f:{number:'number',customerId:'customer_id',techId:'tech_id',equipmentId:'equipment_id',invoiceId:'invoice_id',estimateId:'estimate_id',agreementId:'agreement_id',site:'site',type:'type',priority:'priority',status:'status',date:'date',time:'time',duration:'duration',description:'description',notes:'notes',po:'po',items:'items',timeLog:'time_log',photos:'photos',signature:'signature',signedBy:'signed_by',signedAt:'signed_at',completedAt:'completed_at',updated:'updated_at'}},
+ jobs:{t:'jobs',f:{number:'number',customerId:'customer_id',techId:'tech_id',equipmentId:'equipment_id',invoiceId:'invoice_id',estimateId:'estimate_id',agreementId:'agreement_id',site:'site',type:'type',priority:'priority',status:'status',date:'date',time:'time',duration:'duration',description:'description',notes:'notes',po:'po',items:'items',timeLog:'time_log',photos:'photos',signature:'signature',signedBy:'signed_by',signedAt:'signed_at',completedAt:'completed_at',trips:'trips',enRouteAt:'en_route_at',arrivedAt:'arrived_at',updated:'updated_at'},ro:['enRouteAt','arrivedAt']},
  estimates:{t:'estimates',f:{number:'number',customerId:'customer_id',title:'title',date:'date',valid:'valid_days',status:'status',options:'options',selected:'selected',notes:'notes',followUp:'follow_up',closedAt:'closed_at',sentAt:'sent_at',jobId:'job_id',approvedBy:'approved_by',approvedAt:'approved_at'}},
  invoices:{t:'invoices',f:{number:'number',customerId:'customer_id',jobId:'job_id',agreementId:'agreement_id',date:'date',due:'due',items:'items',taxRate:'tax_rate',status:'status',payments:'payments',payLink:'pay_link',po:'po',notes:'notes',paidDate:'paid_date',sentAt:'sent_at'}},
  pricebook:{t:'pricebook',f:{name:'name',category:'category',sku:'sku',cost:'cost',price:'price',needsPrice:'needs_price',addedBy:'added_by',addedAt:'added_at'}},
@@ -960,6 +960,7 @@ const TBL={
  calls:{t:'calls',f:{at:'at',customerId:'customer_id',name:'name',reason:'reason',outcome:'outcome',source:'source',jobId:'job_id',updated:'updated_at'}},
  rebates:{t:'rebates',f:{customerId:'customer_id',estimateId:'estimate_id',jobId:'job_id',program:'program',company:'company',appNo:'app_no',measure:'measure',amount:'amount',status:'status',submitted:'submitted',expected:'expected',paidDate:'paid_date',payee:'payee',notes:'notes',created:'created',updated:'updated_at'}},
  sms:{t:'sms_messages',noExtra:true,f:{customerId:'customer_id',jobId:'job_id',direction:'direction',kind:'kind',toPhone:'to_phone',fromPhone:'from_phone',body:'body',status:'status',error:'error',readAt:'read_at',createdAt:'created_at',sentAt:'sent_at'},order:['created_at',false],limit:3000},
+ vehicles:{t:'vehicles',f:{name:'name',make:'make',model:'model',year:'year',color:'color',plate:'plate',vin:'vin',fuel:'fuel',mpg:'mpg',techId:'tech_id',active:'active',notes:'notes',regDate:'reg_date',regExp:'reg_exp',inspExp:'insp_exp',ezpassTag:'ezpass_tag',ezpassExp:'ezpass_exp',insCompany:'ins_company',insPolicy:'ins_policy',insStart:'ins_start',insExp:'ins_exp',docs:'docs',odometer:'odometer',oilDate:'oil_date',oilOdo:'oil_odo',oilEveryMiles:'oil_every_miles',oilEveryMonths:'oil_every_months',oilAlert:'oil_alert',driverName:'driver_name',driverId:'driver_id',driverLicExp:'driver_lic_exp',updated:'updated_at'}},
  requests:{t:'service_requests',f:{customerId:'customer_id',equipmentId:'equipment_id',description:'description',urgency:'urgency',preferredDate:'preferred_date',contactName:'contact_name',contactPhone:'contact_phone',status:'status',jobId:'job_id',createdAt:'created_at'},order:['created_at',false],limit:500},
 };
 const inv=m=>m._inv||(m._inv=Object.fromEntries(Object.entries(m.f).map(([a,b])=>[b,a])));
@@ -983,13 +984,14 @@ async function sbSave(col,obj,prev){
   if(data){const o=fromRow(col,data);const a=S[col],i=a.findIndex(x=>x.id===o.id);if(i>=0)a[i]=o;else a.push(o);schedRender()}
 }
 async function sbSaveSettings(o){
-  const patch=o.id==='sms'?{sms_enabled:!!o.enabled,sms_events:o.events,sms_templates:o.templates,portal_url:o.portalUrl}
+  const patch=o.id==='email'?{email_enabled:!!o.enabled,email_events:o.events,email_templates:o.templates,email_from:o.from}
+    :o.id==='sms'?{sms_enabled:!!o.enabled,sms_events:o.events,sms_templates:o.templates,portal_url:o.portalUrl}
     :{office:Object.fromEntries(Object.entries(o).filter(([k])=>k!=='id'&&k!=='updated')),company_name:o.name||'KOR HVAC',company_phone:o.phone||null};
   const{data,error}=await sb.from('company_settings').update(patch).eq('id',1).select().maybeSingle();
   if(error){toast(sbErr(error));throw error}
   if(!data){toast('Only an Admin can change settings');throw new Error('denied')}
   setSettings(data);schedRender()}
-function setSettings(r){S.settings=[{...(r.office||{}),id:'company',name:r.company_name||(r.office||{}).name,phone:r.company_phone||(r.office||{}).phone},{id:'sms',enabled:r.sms_enabled,events:r.sms_events,templates:r.sms_templates,portalUrl:r.portal_url}]}
+function setSettings(r){S.settings=[{...(r.office||{}),id:'company',name:r.company_name||(r.office||{}).name,phone:r.company_phone||(r.office||{}).phone},{id:'sms',enabled:r.sms_enabled,events:r.sms_events,templates:r.sms_templates,portalUrl:r.portal_url},{id:'email',enabled:r.email_enabled,events:r.email_events||{},templates:r.email_templates||{},from:r.email_from||{}}]}
 async function sbLoadAll(){
   const jobs=Object.entries(TBL).map(async([col,m])=>{let q=sb.from(m.t).select('*').limit(m.limit||10000);if(m.order)q=q.order(m.order[0],{ascending:m.order[1]});const{data,error}=await q;if(error)throw new Error(m.t+': '+error.message);S[col]=(data||[]).map(r=>fromRow(col,r))});
   jobs.push((async()=>{const{data}=await sb.from('company_settings').select('*').eq('id',1).maybeSingle();if(data)setSettings(data)})());
