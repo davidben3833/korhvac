@@ -824,7 +824,7 @@ const JOB_TYPES=['Service Call','Repair','Maintenance','Install','Emergency','Es
 const PRIOS=['Normal','High','Emergency','Low'];
 const EQ_TYPES=['Rooftop Unit (RTU)','Split System','Heat Pump','Furnace','Boiler','Chiller','Air Handler','Mini-Split','PTAC','Cooling Tower','Exhaust Fan','Make-Up Air','Water Heater','Controls/BMS','Other'];
 const REBATE_ST=['Pre-approval','Approved','Installed','Submitted','Paid','Denied'];
-const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Estimates'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
+const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Proposals'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
 const VIEWS=NAV.filter(n=>n.length>1);
 let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null;
 const isAdmin=()=>!sb||(me&&(me.base||me.role)==='Admin');
@@ -1192,14 +1192,14 @@ function vDash(){
    <div class="card kpi"><div class="l">Open Jobs</div><div class="v">${open.length}</div><div class="s">${unsched.length} need scheduling</div></div>
    <div class="card kpi"><div class="l">Receivables</div><div class="v">${money(arAmt)}</div><div class="s" style="color:${overdue.length?'var(--bad)':''}">${ar.length} open · ${overdue.length} overdue</div></div>
    <div class="card kpi"><div class="l">Collected (Month)</div><div class="v">${money(coll)}</div><div class="s">payments received</div></div>
-   <div class="card kpi"><div class="l">Open Estimates</div><div class="v">${money(pendAmt)}</div><div class="s">${pend.length} pending · ${fu.length} follow-ups</div></div>
+   <div class="card kpi"><div class="l">Open Proposals</div><div class="v">${money(pendAmt)}</div><div class="s">${pend.length} pending · ${fu.length} follow-ups</div></div>
    <div class="card kpi"><div class="l">Rebates Pending</div><div class="v">${money(rb.reduce((a,r)=>a+(+r.amount||0),0))}</div><div class="s">${rb.length} in process</div></div>
   </div>
   <div class="grid2">
    <div class="card"><h3>Today's Schedule <a href="#dispatch" class="btn sm" onclick="UI.date=today()">Dispatch →</a></h3>${todays.length?`<table>${todays.map(j=>`<tr class="click" onclick="openJob('${j.id}')"><td class="nowrap">${ftime(j.time)||'—'}</td><td><b>${esc(custName(j.customerId))}</b><div class="mut small">${esc(j.type)} · ${esc(techName(j.techId))}</div></td><td class="r">${badge(j.status)}</td></tr>`).join('')}</table>`:'<div class="empty">Nothing scheduled today</div>'}</div>
    <div class="card"><h3>Technicians Right Now</h3>${live.length?`<table>${live.map(({tc,cur})=>`<tr><td><b>${esc(tc.name)}</b></td><td>${cur?`${badge(cur.status)} <span class="small">${esc(custName(cur.customerId))}</span>`:'<span class="mut small">Available</span>'}</td></tr>`).join('')}</table>`:'<div class="empty">Add technicians in the Technicians tab</div>'}</div>
    <div class="card"><h3>Needs Scheduling</h3>${unsched.length?`<table>${unsched.slice(0,8).map(j=>`<tr class="click" onclick="openJob('${j.id}')"><td><b>${esc(j.number)}</b> <span class="p-${esc(j.priority)}">${j.priority!=='Normal'?esc(j.priority):''}</span><div class="mut small">${esc(custName(j.customerId))} · ${esc(j.type)}</div></td><td class="r">${badge(j.status)}</td></tr>`).join('')}</table>`:'<div class="empty">All jobs scheduled 🎉</div>'}</div>
-   <div class="card"><h3>Estimate Follow-Ups Due</h3>${fu.length?`<table>${fu.map(e=>`<tr><td class="click" onclick="openEst('${e.id}')"><b>${esc(e.number)}</b> ${money(estValue(e))}<div class="mut small">${esc(custName(e.customerId))} · ${esc(e.title||'')}</div></td><td class="r"><button class="sm" onclick="followedUp('${e.id}')">Done</button></td></tr>`).join('')}</table>`:'<div class="empty">No follow-ups due</div>'}</div>
+   <div class="card"><h3>Proposal Follow-Ups Due</h3>${fu.length?`<table>${fu.map(e=>`<tr><td class="click" onclick="openEst('${e.id}')"><b>${esc(e.number)}</b> ${money(estValue(e))}<div class="mut small">${esc(custName(e.customerId))} · ${esc(e.title||'')}</div></td><td class="r"><button class="sm" onclick="followedUp('${e.id}')">Done</button></td></tr>`).join('')}</table>`:'<div class="empty">No follow-ups due</div>'}</div>
    <div class="card"><h3>Overdue Invoices</h3>${overdue.length?`<table>${overdue.map(i=>`<tr class="click" onclick="openInv('${i.id}')"><td><b>${esc(i.number)}</b><div class="mut small">${esc(custName(i.customerId))} · due ${fdate(i.due)}</div></td><td class="r"><b>${money(invBal(i))}</b></td></tr>`).join('')}</table>`:'<div class="empty">No overdue invoices</div>'}</div>
    <div class="card"><h3>Warranties Expiring (60 days)</h3>${warr.length?`<table>${warr.map(e=>`<tr class="click" onclick="openEq('${e.id}')"><td><b>${esc(custName(e.customerId))}</b><div class="mut small">${esc(e.type)} ${esc(e.make||'')} · S/N ${esc(e.serial||'—')}</div></td><td class="r nowrap">${fdate(e.warrantyExp)}</td></tr>`).join('')}</table>`:'<div class="empty">None expiring soon</div>'}</div>
   </div>`;
@@ -1314,7 +1314,7 @@ function initMap(){const el=document.getElementById('map');if(!el)return;if(!win
 
 
 /* ================= TEXT MESSAGES (Twilio) ================= */
-const SMS_EVENTS=[['scheduled','Job scheduled / rescheduled'],['reminder','Day-before reminder'],['en_route','Tech on the way (with live tracking link)'],['completed','Job completed'],['invoice','Invoice sent'],['estimate','Estimate sent']];
+const SMS_EVENTS=[['scheduled','Job scheduled / rescheduled'],['reminder','Day-before reminder'],['en_route','Tech on the way (with live tracking link)'],['completed','Job completed'],['invoice','Invoice sent'],['estimate','Proposal sent']];
 const SMS_DEFAULTS={scheduled:'{company}: Hi {first}, your {type} is scheduled for {date} at {time} (job {job}). Reply to this text with questions. Reply STOP to opt out.',
  reminder:'{company}: Reminder — your {type} is tomorrow, {date} at {time}. Need to reschedule? Call {phone}.',
  en_route:'{company}: {tech} is on the way to {site}. Track your technician live: {link}',
@@ -1373,9 +1373,9 @@ async function saveSmsSettings(){if(deny('settings'))return;const ev={},tp={};SM
 /* ================= AUTOMATIC EMAIL ================= */
 const EMAIL_EVENTS=[['JOB UPDATES — from info@'],['scheduled','Appointment confirmed (when scheduled or rescheduled)'],['reminder','Day-before reminder (5 PM)'],['en_route','Technician on the way (with live tracking)'],['completed','Work completed'],
  ['BILLING — from billing@ (to billing email)'],['invoice','New invoice with PDF (10 min after it’s created)'],['pay_reminder','Payment reminders (3 days before, due date, 7/14/30 days late — 9 AM)'],['receipt','Payment receipt'],
- ['ESTIMATES — office from estimating@, technician from service@'],['estimate','Estimate sent'],['estimate_followup','Estimate follow-up after 3 and 7 days (10 AM)'],
+ ['ESTIMATES — office from estimating@, technician from service@'],['estimate','Proposal sent'],['estimate_followup','Proposal follow-up after 3 and 7 days (10 AM)'],
  ['TECHNICIANS — from service@ (to the tech’s email, any hour)'],['tech_assigned','New job assigned'],['tech_changed','Job date / time / address changed'],['tech_removed','Job removed or canceled'],['tech_daily','Today’s jobs (6 AM)'],
- ['OFFICE ALERTS — to info@'],['office_request','New service request from the portal'],['office_estimate','Estimate approved / declined by the customer'],['office_daily','Daily summary (7 AM)'],['office_weekly','Weekly report (Monday 7 AM)']];
+ ['OFFICE ALERTS — to info@'],['office_request','New service request from the portal'],['office_estimate','Proposal approved / declined by the customer'],['office_daily','Daily summary (7 AM)'],['office_weekly','Weekly report (Monday 7 AM)']];
 const emailCfg=()=>S.settings.find(x=>x.id==='email')||{enabled:true,events:{},templates:{},from:{}};
 let EMAIL_DEF=null,EMAIL_LOG=[];
 async function loadEmailInfo(){if(!sb)return;try{const[d,l]=await Promise.all([EMAIL_DEF?{data:EMAIL_DEF}:sb.rpc('email_defaults'),sb.from('email_queue').select('id,created_at,kind,status,error,to_addr,from_addr,subject,send_after,sent_at,customer_id').order('created_at',{ascending:false}).limit(60)]);
@@ -1611,7 +1611,7 @@ function openCust(id,pre,back){
   <div class="sec">Agreements (${ags.length}) <button class="sm" onclick="closeM();openAgr(null,{customerId:'${id}'})">+ Add</button></div>${ags.length?`<table class="small">${ags.map(a=>`<tr class="click" onclick="closeM();openAgr('${a.id}')"><td><b>${esc(a.name)}</b></td><td>${badge(a.status)}</td><td>${money(a.price)}/yr</td><td>Next visit ${fdate(a.nextVisit)}</td></tr>`).join('')}</table>`:'<div class="mut small">No agreements</div>'}
   <div class="sec">Job History (${jobs.length})</div>${jobs.length?`<table class="small">${jobs.slice(0,12).map(j=>`<tr class="click" onclick="openJob('${j.id}')"><td><b>${esc(j.number)}</b></td><td>${fdate(j.date)}</td><td>${esc(j.type)}</td><td>${esc(techName(j.techId))}</td><td>${badge(j.status)}</td></tr>`).join('')}</table>`:'<div class="mut small">No jobs yet</div>'}
   <div class="sec">Invoices (${invs.length})</div>${invs.length?`<table class="small">${invs.map(i=>`<tr class="click" onclick="openInv('${i.id}')"><td><b>${esc(i.number)}</b></td><td>${fdate(i.date)}</td><td>${badge(invStatus(i))}</td><td class="r">${money(invTotal(i))}</td><td class="r">bal ${money(invBal(i))}</td></tr>`).join('')}</table>`:'<div class="mut small">No invoices yet</div>'}`:''}
-  <div class="mfoot">${id?`<button class="danger" onclick="delRec('customers','${c.id}')">Delete</button><button onclick="openJob(null,{customerId:'${c.id}',site:byId('customers','${c.id}').address||''})">+ New Job</button><button onclick="closeM();openEst(null,{customerId:'${c.id}'})">+ Estimate</button>`:''}<span class="sp"></span><button onclick="${tgt==='#ov2'?'closeM2()':'closeM()'}">Cancel</button><button class="pri" onclick="saveCust()">Save</button></div>`;
+  <div class="mfoot">${id?`<button class="danger" onclick="delRec('customers','${c.id}')">Delete</button><button onclick="openJob(null,{customerId:'${c.id}',site:byId('customers','${c.id}').address||''})">+ New Job</button><button onclick="closeM();openEst(null,{customerId:'${c.id}'})">+ Proposal</button>`:''}<span class="sp"></span><button onclick="${tgt==='#ov2'?'closeM2()':'closeM()'}">Cancel</button><button class="pri" onclick="saveCust()">Save</button></div>`;
   if(tgt==='#ov2'){$('#modal2').innerHTML=html;$('#ov2').classList.add('show')}else modal(html);
 }
 async function saveCust(){if(deny('customers'))return;const c=grab({...edit.obj},['name','company','ctype','phone','email','billEmail','address','notes','smsPhone']);{const ne=el('f_noEmail');if(ne)c.emailOptOutAt=ne.checked?(c.emailOptOutAt||new Date().toISOString()):null}
@@ -1709,8 +1709,13 @@ function proCalc(e,o){const p={...PRO_DEF,...(e.pro||{})};let equip=0,cost=0,lab
   const tax=equip*(+p.tax||0)/100,raw=equip+tax+labor+other,r=+p.roundTo||0,calcd=r?Math.ceil(raw/r)*r:Math.round(raw*100)/100;
   const price=o.final!==''&&o.final!=null&&!isNaN(+o.final)&&+o.final>0?+o.final:calcd;
   return{equip,tax,labor,other,raw,calcd,price,cost,profit:price-tax-cost,margin:price-tax>0?(price-tax-cost)/(price-tax)*100:0}}
+function proNum(){const yy=String(new Date().getFullYear()).slice(2),re=new RegExp('^'+yy+'-(\\d+)-\\d+$');let m=0;S.estimates.forEach(x=>{const r=re.exec(x.number||'');if(r)m=Math.max(m,+r[1])});return `${yy}-${String(m+1).padStart(3,'0')}-01`}
+function proRevise(){proSync();syncEst();const e=edit.obj,base=/^(\d{2}-\d+)-(\d+)$/.exec(e.number||'');let num;
+  if(base){let r=0;S.estimates.forEach(x=>{const m=new RegExp('^'+base[1]+'-(\\d+)$').exec(x.number||'');if(m)r=Math.max(r,+m[1])});num=`${base[1]}-${String(r+1).padStart(2,'0')}`}else num=proNum();
+  const n=JSON.parse(JSON.stringify(e));Object.assign(n,{id:uid(),number:num,status:'Draft',date:today(),sentAt:null,closedAt:null,approvedBy:null,approvedAt:null,jobId:null,selected:null,revOf:e.id});
+  (n.pro&&n.pro.units||[]).forEach(u=>{delete u._new});edit.obj=n;drawEst();toast('Revision '+num+' — edit and save')}
 function proSync(){const e=edit.obj;if(!e.pro)return;['markup','tax','roundTo'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value===''?PRO_DEF[k]:+x.value});
-  ['scope','exclusions','site','drawings','dated','pay','jobdesc'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value});
+  ['scope','exclusions','site','drawings','dated','pay','jobdesc'].forEach(k=>{const x=el('pp_'+k);if(x)e.pro[k]=x.value});{const x=el('pp_terms');if(x)e.pro.terms=x.value.trim()===PRO_TERMS_STD.trim()?'':x.value}
   e.options.forEach((o,n)=>{const f=el('pf_'+n);if(f)o.final=f.value.replace(/[^\d.]/g,'')})}
 function proLines(n){const e=edit.obj,o=e.options[n],p={...PRO_DEF,...e.pro};o.lines=o.lines||[];
   const box=el('oi_'+n);if(!box)return;const c=proCalc(e,o);
@@ -1750,13 +1755,14 @@ function pickPriceList(n){const q=(v('pp_q')||'').toLowerCase().split(/\s+/).fil
 function addPriceLine(n,id){const r=(PR.rows||[]).find(x=>x.id===id);if(!r)return;const o=edit.obj.options[n];o.lines=o.lines||[];
   o.lines.push({desc:[r.brand,r.tonnage?(+r.tonnage)+' Ton':'',r.model,r.description||r.category].filter(Boolean).join(' '),model:r.model,qty:1,cost:+r.price,kind:'equip',src:`${r.supplier} quote ${fdate(r.quote_date)}`});
   closeM2();proLines(n);toast('Added — price '+money(r.price))}
-async function proAI(btn){proSync();const e=edit.obj;const c=byId('customers',e.customerId)||{};
+async function proAI(btn,mode){proSync();const e=edit.obj;const c=byId('customers',e.customerId)||{};
   const items=e.options.flatMap(o=>(o.lines||[]).map(l=>({option:o.name,item:l.desc,qty:+l.qty||1,type:l.kind})));
   if(!items.length&&!e.title&&!e.pro.jobdesc&&!(e.pro.units||[]).length)return toast('Describe the job (or add items) so the assistant knows what to build');
   btn.disabled=true;const t0=btn.textContent;btn.textContent='✨ Working…';
   try{try{await loadPrices()}catch(_){}
-    const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'proposal',describe:e.pro.jobdesc||'',title:e.title,site:e.pro.site||c.address||'',customer:c.company||c.name||'',ctype:c.ctype||'',units:items,surveyed:(e.pro.units||[]).map(u=>{const{photos,_new,id,equipmentId,...r}=u;return r}),scope:e.pro.scope,exclusions:e.pro.exclusions}});
+    const{data,error}=await sb.functions.invoke('ai-assist',{body:{action:'proposal',mode:mode||'job',terms:(e.pro.terms||'').trim()||PRO_TERMS_STD,pay:PRO_PAY[e.pro.pay||'deposit'],rebate:!!e.rebate,describe:e.pro.jobdesc||'',title:e.title,site:e.pro.site||c.address||'',customer:c.company||c.name||'',ctype:c.ctype||'',units:items,surveyed:(e.pro.units||[]).map(u=>{const{photos,_new,id,equipmentId,...r}=u;return r}),scope:e.pro.scope,exclusions:e.pro.exclusions}});
     if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch(_){}throw new Error(m)}
+    if(data.terms&&data.terms.trim())e.pro.terms=data.terms;if(mode==='terms'){drawEst();toast('Terms fitted to this job — review them');btn.disabled=false;btn.textContent=t0;return}
     if(data.scope&&data.scope.length)e.pro.scope=data.scope.join('\n');if(data.exclusions&&data.exclusions.length)e.pro.exclusions=data.exclusions.join('\n');if(!e.title&&data.title)e.title=data.title;
     const adds=(data.add_lines||[]).filter(a=>a&&a.desc),o=e.options[0];o.lines=o.lines||[];let n=0;
     adds.forEach(a=>{if(o.lines.some(l=>(l.desc||'').toLowerCase()===a.desc.toLowerCase()))return;const m=a.model&&(PR.rows||[]).find(r=>(r.model||'').toUpperCase()===String(a.model).toUpperCase());
@@ -1814,7 +1820,10 @@ function proSection(){const e=edit.obj,p={...PRO_DEF,...e.pro},c=byId('customers
   <div class="sec">Scope of work — “We will:” <span class="mut small" style="font-weight:400">one bullet per line</span></div>
   <div style="display:flex;gap:6px;margin-bottom:6px"><button class="sm" onclick="proScopeFromItems()">+ “Furnish and Install” lines from equipment items</button></div>
   <textarea id="pp_scope" style="min-height:180px">${esc(e.pro.scope||'')}</textarea>
-  <div class="fg"><div class="span3"><label>Exclusions (one per line)</label><textarea id="pp_exclusions" style="min-height:130px">${esc(e.pro.exclusions??PRO_EXCL.join('\n'))}</textarea></div></div>`}
+  <div class="fg"><div class="span3"><label>Exclusions (one per line)</label><textarea id="pp_exclusions" style="min-height:130px">${esc(e.pro.exclusions??PRO_EXCL.join('\n'))}</textarea></div></div>
+  <div class="sec">Terms & conditions <span class="mut small" style="font-weight:400">— “# ” starts a section, “- ” a bullet; {price}, {company} and {payment} fill in automatically</span></div>
+  <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap"><button class="sm pri" onclick="proAI(this,'terms')">✨ AI: fit terms to this job</button><button class="sm" onclick="proSync();edit.obj.pro.terms='';drawEst()">Reset to standard terms</button></div>
+  <textarea id="pp_terms" style="min-height:220px;font-size:12px">${esc((e.pro.terms||'').trim()||PRO_TERMS_STD)}</textarea>`}
 function proFinish(e){if(!e.pro)return;(e.pro.units||[]).forEach(u=>{delete u._new});e.options.forEach(o=>{const c=proCalc(e,o);o.items=[{desc:(o.name&&e.options.length>1?o.name+' — ':'')+(e.title||'HVAC work')+' (per proposal)',qty:1,price:c.price,cost:c.cost}]})}
 const PRO_CSS=`.pdoc{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:#000;font-size:11pt;line-height:1.35}
 .pdoc .lh{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #000;padding-bottom:2px}.pdoc .lh svg,.pdoc .lh img{height:62px!important;width:auto!important}
@@ -1827,20 +1836,41 @@ const PRO_CSS=`.pdoc{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;col
 .pdoc .tch{text-align:center;font-weight:700;font-size:11pt;margin:14px 0 8px}.pdoc .ack{border-top:2px solid #aaa;margin-top:6px;padding:16px 0 0 48px;break-inside:avoid;page-break-inside:avoid}
 .pdoc .sig{display:grid;grid-template-columns:250px 250px;gap:0 64px;margin-top:16px}.pdoc .sig .h{font-weight:700;margin-bottom:22px}.pdoc .sig .v{border-bottom:1px solid #000;min-height:18px;font-size:10pt}.pdoc .sig .c{font-size:7.5pt;color:#666;margin:2px 0 20px}
 .pdoc .ft{display:none}`;
-function proTerms(e,co,price){const L=co.legalName||co.name||'KOR HVAC LLC',p=e.pro||{},pay=p.pay||'deposit';
-  const payTxt=pay==='requisition'?`<ul><li>Requisitions: Payments are due based on monthly requisitions for work completed and equipment/materials delivered to the site, payable within 30 days of submission.</li></ul>`
-   :pay==='completion'?`<ul><li>Payment in full is due upon completion of the work.</li></ul>`
-   :`<ul><li>Deposit: A 30% deposit is required upon issuance of the Purchase Order.</li><li>Final Payment: The remaining balance is due within 30 days after completion of installation and final system testing${e.rebate?', and is not contingent upon the utility rebate program or any rebate disbursement':''}.</li></ul>`;
-  return `<div class="tch">Terms and Conditions</div><div class="tc"><p>${esc(L)} (the "Contractor") is pleased to submit the following proposal for HVAC installation and related services. This proposal, upon acceptance, is governed by the terms and conditions set forth below.</p>
-<h5>1. Scope of Work</h5><p>The Contractor shall furnish all labor, equipment, and materials expressly described in the Scope of Work above. Any item not expressly included is excluded unless agreed upon by both parties in writing.</p><p>All materials shall meet applicable specifications, and all work shall be performed in a professional manner consistent with industry standards and applicable codes.</p>
-<h5>2. Warranty</h5><p>The Contractor warrants its installation workmanship for a period of one (1) year from the date of substantial completion. Equipment is warranted solely by the respective manufacturer in accordance with its published terms for the make and model provided.</p>
-<h5>3. Permits and Approvals</h5><p>Unless otherwise stated in writing, the Purchaser shall be responsible for obtaining and paying for all permits, inspections, and approvals required for the work. The Contractor shall not be liable for any delay or cost arising from the permitting or approval process.</p>
-<h5>4. Payment Terms</h5><p>The total quoted price for the specified scope of work is ${price}, payable as follows:</p>${payTxt}<p>Any amount not received by its due date shall accrue interest at the rate of 1.5% per month (18% per annum) until paid in full. The Contractor reserves the right to suspend work until all outstanding amounts are satisfied.</p>
-<h5>5. Changes and Delays</h5><p>Any change to the plans, specifications, or Scope of Work shall be authorized in advance through a written Change Order setting forth any adjustment to the price and schedule. The Purchaser shall bear responsibility for delays resulting from such changes.</p><p>Additional labor or materials required due to concealed or unforeseen conditions shall be billed separately at the Contractor’s prevailing rates.</p>
-<h5>6. Limitation of Liability</h5><p>The Contractor’s total liability under this agreement shall not exceed the contract price. The Contractor shall not be liable for incidental, consequential, or indirect damages, nor for loss or damage occurring after installation has been completed.</p>
-<h5>7. Force Majeure</h5><p>The Contractor shall not be liable for any delay or failure to perform caused by events beyond its reasonable control, including but not limited to acts of God, labor or material shortages, weather, or non-payment by the Purchaser.</p>
-<h5>8. Entire Agreement</h5><p>This proposal, upon acceptance, constitutes the entire agreement between the parties and supersedes all prior discussions, representations, or understandings, whether oral or written.</p><p>In the event of a conflict between the Purchaser’s plans and specifications and the Contractor’s Scope of Work, the Contractor’s Scope of Work shall govern. Materials furnished by the Contractor shall be of equal or comparable quality to those specified.</p>
-<h5>9. Cancellation</h5><p>The Purchaser may cancel this agreement within three (3) business days of acceptance. In the event of cancellation, the Purchaser shall reimburse the Contractor for all materials ordered and work performed prior to receipt of written notice of cancellation.</p></div>`}
+const PRO_TERMS_STD=`{company} (the "Contractor") is pleased to submit the following proposal for HVAC installation and related services. This proposal, upon acceptance, is governed by the terms and conditions set forth below.
+# 1. Scope of Work
+The Contractor shall furnish all labor, equipment, and materials expressly described in the Scope of Work above. Any item not expressly included is excluded unless agreed upon by both parties in writing.
+All materials shall meet applicable specifications, and all work shall be performed in a professional manner consistent with industry standards and applicable codes.
+# 2. Warranty
+The Contractor warrants its installation workmanship for a period of one (1) year from the date of substantial completion. Equipment is warranted solely by the respective manufacturer in accordance with its published terms for the make and model provided.
+# 3. Permits and Approvals
+Unless otherwise stated in writing, the Purchaser shall be responsible for obtaining and paying for all permits, inspections, and approvals required for the work. The Contractor shall not be liable for any delay or cost arising from the permitting or approval process.
+# 4. Payment Terms
+The total quoted price for the specified scope of work is {price}, payable as follows:
+{payment}
+Any amount not received by its due date shall accrue interest at the rate of 1.5% per month (18% per annum) until paid in full. The Contractor reserves the right to suspend work until all outstanding amounts are satisfied.
+# 5. Changes and Delays
+Any change to the plans, specifications, or Scope of Work shall be authorized in advance through a written Change Order setting forth any adjustment to the price and schedule. The Purchaser shall bear responsibility for delays resulting from such changes.
+Additional labor or materials required due to concealed or unforeseen conditions shall be billed separately at the Contractor’s prevailing rates.
+# 6. Limitation of Liability
+The Contractor’s total liability under this agreement shall not exceed the contract price. The Contractor shall not be liable for incidental, consequential, or indirect damages, nor for loss or damage occurring after installation has been completed.
+# 7. Force Majeure
+The Contractor shall not be liable for any delay or failure to perform caused by events beyond its reasonable control, including but not limited to acts of God, labor or material shortages, weather, or non-payment by the Purchaser.
+# 8. Entire Agreement
+This proposal, upon acceptance, constitutes the entire agreement between the parties and supersedes all prior discussions, representations, or understandings, whether oral or written.
+In the event of a conflict between the Purchaser’s plans and specifications and the Contractor’s Scope of Work, the Contractor’s Scope of Work shall govern. Materials furnished by the Contractor shall be of equal or comparable quality to those specified.
+# 9. Cancellation
+The Purchaser may cancel this agreement within three (3) business days of acceptance. In the event of cancellation, the Purchaser shall reimburse the Contractor for all materials ordered and work performed prior to receipt of written notice of cancellation.`;
+function proPayTxt(e){const pay=(e.pro||{}).pay||'deposit';
+  return pay==='requisition'?['Requisitions: Payments are due based on monthly requisitions for work completed and equipment/materials delivered to the site, payable within 30 days of submission.']
+   :pay==='completion'?['Payment in full is due upon completion of the work.']
+   :['Deposit: A 30% deposit is required upon issuance of the Purchase Order.',`Final Payment: The remaining balance is due within 30 days after completion of installation and final system testing${e.rebate?', and is not contingent upon the utility rebate program or any rebate disbursement':''}.`]}
+function proTerms(e,co,price){const L=co.legalName||co.name||'KOR HVAC LLC',txt=((e.pro||{}).terms||'').trim()||PRO_TERMS_STD;let out='',ul=false;
+  const close=()=>{if(ul){out+='</ul>';ul=false}};
+  txt.split('\n').map(x=>x.trim()).filter(Boolean).forEach(l=>{
+    if(l==='{payment}'){close();out+='<ul>'+proPayTxt(e).map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>';return}
+    l=esc(l).replace(/\{company\}/g,esc(L)).replace(/\{price\}/g,price);
+    if(l.startsWith('# ')){close();out+=`<h5>${l.slice(2)}</h5>`}else if(/^[-•] /.test(l)){if(!ul){out+='<ul>';ul=true}out+=`<li>${l.slice(2)}</li>`}else{close();out+=`<p>${l}</p>`}});
+  close();return `<div class="tch">Terms and Conditions</div><div class="tc">${out}</div>`}
 function proDoc(e){const c=byId('customers',e.customerId)||{},co=company(),p={...PRO_DEF,...e.pro},L=co.legalName||co.name||'KOR HVAC LLC';
   const est=(e.createdByName)||(me&&me.name)||'';const site=p.site??c.address??'';const sp=s=>esc(s||'').replace(/\n/g,'<br>');
   const two=a=>{a=String(a||'').trim();if(!a)return[];if(a.includes('\n'))return a.split('\n').map(s=>s.trim()).filter(Boolean);const i=a.indexOf(',');return i<0?[a]:[a.slice(0,i).trim(),a.slice(i+1).trim()]};const addr=two(c.address),saddr=two(site);
@@ -1881,16 +1911,16 @@ async function proPreview(){proSync();syncEst();proFinish(edit.obj);const e=edit
 
 function vEst(){const t=today();
   const list=S.estimates.filter(e=>UI.estSt==='All'||e.status===UI.estSt).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return `<div class="top"><h1>Estimates</h1><button class="pri" onclick="openEst()">+ New Estimate</button></div>
+  return `<div class="top"><h1>Proposals</h1><button class="pri" onclick="openEst()">+ New Proposal</button></div>
   <div class="filters"><select onchange="UI.estSt=this.value;render()">${opts(['All','Draft','Sent','Approved','Declined'],UI.estSt)}</select></div>
-  <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Estimate #</th><th>Customer</th><th>Title</th><th>Options</th><th>Date</th><th>Follow-up</th><th>Status</th><th class="r">Value</th></tr>
+  <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Proposal #</th><th>Customer</th><th>Title</th><th>Options</th><th>Date</th><th>Follow-up</th><th>Status</th><th class="r">Value</th></tr>
   ${list.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b>${e.byTech?` <span class="badge" title="Requested by ${esc(e.techName||'tech')}">🛠️ Tech</span>`:''}</td><td>${esc(custName(e.customerId))}</td><td>${esc(e.title)}</td><td>${(e.options||[]).length}</td><td>${fdate(e.date)}</td><td>${e.status==='Sent'&&e.followUp?(e.followUp<=t?`<b style="color:var(--bad)">${fdate(e.followUp)}</b>`:fdate(e.followUp)):'—'}</td><td>${badge(e.status)}</td><td class="r">${money(estValue(e))}</td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
 function openEst(id,pre){
-  let e=id?JSON.parse(JSON.stringify(byId('estimates',id))):{id:uid(),number:nextNum('estimates','EST-',2001),status:'Draft',date:today(),options:[{name:'Option 1',desc:'',items:[],lines:[]}],selected:null,pro:(pre&&pre.byTech)?null:{...PRO_DEF,scope:'',exclusions:PRO_EXCL.join('\n'),pay:'deposit'},...(pre||{})};
+  let e=id?JSON.parse(JSON.stringify(byId('estimates',id))):{id:uid(),number:proNum(),status:'Draft',date:today(),options:[{name:'Option 1',desc:'',items:[],lines:[]}],selected:null,pro:(pre&&pre.byTech)?null:{...PRO_DEF,scope:'',exclusions:PRO_EXCL.join('\n'),pay:'deposit'},...(pre||{})};
   if(!e.options){e.options=[{name:'Option 1',desc:'',items:e.items||[]}]}
   edit={col:'estimates',obj:e};drawEst();}
 function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
-  modal(`<h2>${isNew?'New Estimate':'Estimate '+esc(e.number)} ${!isNew?badge(e.status):''}<button class="sm" onclick="closeM()">✕</button></h2>
+  modal(`<h2>${isNew?'New Proposal':'Proposal '+esc(e.number)} ${!isNew?badge(e.status):''}<button class="sm" onclick="closeM()">✕</button></h2>
   ${e.byTech?`<div class="treq pending" style="margin-bottom:10px">🛠️ <b>Requested by ${esc(e.techName||'technician')}</b> from job <a href="#" onclick="${e.jobId&&byId('jobs',e.jobId)?`openJob('${e.jobId}')`:''};return false">#${esc(e.jobNumber||'')}</a> · Urgency: <b>${esc(e.urgency||'Normal')}</b>${e.techHours?` · ${esc(e.techHours)} hrs labor`:''}
     ${e.techNotes?`<div style="margin-top:4px">“${esc(e.techNotes)}”</div>`:''}<div class="small mut" style="margin-top:4px">Prices were filled from the price book — review them, then email it. It goes out from service@korhvac.com. The tech never sees prices.</div></div>`:''}
   <div class="fg"><div class="span2"><label>Customer *</label><select id="f_customerId">${custOpts(e.customerId)}</select></div>
@@ -1908,6 +1938,7 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
     <button class="sm ${e.selected===n?'pri':''}" onclick="syncEst();edit.obj.selected=${e.selected===n?'null':n};drawEst()">${e.selected===n?'✓ Customer choice':'Customer picked this'}</button>${e.options.length>1?`<button class="sm danger" onclick="syncEst();edit.obj.options.splice(${n},1);edit.obj.selected=null;drawEst()">Remove</button>`:''}</div>
     <div id="oi_${n}" style="margin-top:6px"></div></div>`).join('')}
   <div class="mfoot">${!isNew?`<button class="danger" onclick="delRec('estimates','${e.id}')">Delete</button>`:''}<span class="sp"></span>
+  ${!isNew?`<button onclick="proRevise()">＋ New revision</button>`:''}
   ${e.pro?`<button class="pri" onclick="proPreview()">👁 Preview</button><button onclick="proPdf()">📄 Proposal PDF</button><button onclick="proPrint()">🖨 Print</button>`:''}
   ${!isNew?`<button onclick="emailEst()">✉️ Email to customer</button>`:''}
   ${!isNew&&!e.jobId?`<button onclick="estToJob()">Approve → Create Job</button>`:''}${e.jobId?`<button onclick="openJob('${e.jobId}')">View Job</button>`:''}
@@ -1915,7 +1946,7 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   e.options.forEach((o,n)=>e.pro?proLines(n):itemsEditor('oi_'+n,o.items,()=>0));if(e.pro)proUnitsDraw();}
 function syncEst(){const e=edit.obj;proSync();grab(e,['customerId','status','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
 function finishEst(){syncEst();const e=edit.obj;proFinish(e);e.options.forEach(o=>o.items=o.items.filter(i=>i.desc||+i.price));if(e.status==='Sent'&&!e.followUp)e.followUp=addDays(today(),3);if(e.status==='Sent'&&!e.sentAt)e.sentAt=today();if(['Approved','Declined'].includes(e.status)&&!e.closedAt)e.closedAt=today();return e}
-async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Estimate saved')}catch(x){}}
+async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}try{await save('estimates',e);closeM();toast('Proposal saved')}catch(x){}}
 async function followedUp(id){const e=byId('estimates',id);try{await save('estimates',{...e,followUp:addDays(today(),4),followUps:(e.followUps||0)+1});toast('Next follow-up in 4 days')}catch(x){}}
 async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a customer');return}
   if(e.options.length>1&&e.selected==null){toast('Mark which option the customer picked first');return}
@@ -1928,12 +1959,12 @@ async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a cu
 function emailEst(){if(deny('send_estimates'))return;const e=finishEst();const c=byId('customers',e.customerId)||{},co=company();
   if(sb){if(!e.customerId){toast('Pick a customer');return}if(!(c.email||c.billEmail)){toast('No email on file for this customer');return}
     if(e.status==='Draft'||!byId('estimates',e.id)){e.status='Sent';e.followUp=e.followUp||addDays(today(),3);save('estimates',e).then(()=>{toast('✉️ Sending estimate to '+(c.email||c.billEmail)+' from estimating@');drawEst()}).catch(()=>{})}
-    else{save('estimates',e).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'estimate',p_id:e.id});toast(error?sbErr(error):'✉️ Estimate re-sent to '+(c.email||c.billEmail))}).catch(()=>{})}
+    else{save('estimates',e).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'estimate',p_id:e.id});toast(error?sbErr(error):'✉️ Proposal re-sent to '+(c.email||c.billEmail))}).catch(()=>{})}
     return}
   const body=`Hello ${c.name||''},\n\nThank you for the opportunity. Here is our estimate ${e.number} for: ${e.title||'the work discussed'}${c.address?' at '+c.address:''}.\n\n`+
    e.options.map(o=>`${o.name.toUpperCase()}${o.desc?' – '+o.desc:''}\n${o.items.map(i=>`• ${i.desc}${+i.qty!==1?' (x'+i.qty+')':''}`).join('\n')}\nPrice: ${money(calc(o.items,0).sub)}`).join('\n\n')+
    `\n\n${e.notes?e.notes+'\n\n':''}This estimate is valid for ${e.valid||30} days. To approve, simply reply to this email with the option you'd like.\n\nThank you,\n${co.name||''}\n${co.phone||''}`;
-  sendEmail(c.email,`Estimate ${e.number} – ${co.name||''}`,body).then(async ok=>{if(ok&&e.status==='Draft'){e.status='Sent';e.sentAt=today();e.followUp=e.followUp||addDays(today(),3);try{await save('estimates',e);drawEst()}catch(x){}}})}
+  sendEmail(c.email,`Proposal ${e.number} – ${co.name||''}`,body).then(async ok=>{if(ok&&e.status==='Draft'){e.status='Sent';e.sentAt=today();e.followUp=e.followUp||addDays(today(),3);try{await save('estimates',e);drawEst()}catch(x){}}})}
 
 /* ================= INVOICES & PAYMENTS ================= */
 function vInv(){
@@ -2078,7 +2109,7 @@ function vReports(){const f=UI.from,t=UI.to;
    <div class="card kpi"><div class="l">Collected</div><div class="v">${money(coll)}</div></div>
    <div class="card kpi"><div class="l">Jobs completed</div><div class="v">${jobsDone.length}</div><div class="s">${callbacks} callbacks</div></div>
    <div class="card kpi"><div class="l">Average ticket</div><div class="v">${money(avg)}</div></div>
-   <div class="card kpi"><div class="l">Estimate close rate</div><div class="v">${pct(close)}</div><div class="s">${won.length} of ${ests.length} · ${money(won.reduce((a,e)=>a+estValue(e),0))} won</div></div>
+   <div class="card kpi"><div class="l">Proposal close rate</div><div class="v">${pct(close)}</div><div class="s">${won.length} of ${ests.length} · ${money(won.reduce((a,e)=>a+estValue(e),0))} won</div></div>
    <div class="card kpi"><div class="l">Gross margin (jobs)</div><div class="v">${gr?pct(gm/gr):'—'}</div><div class="s">${money(gm)}</div></div>
    <div class="card kpi"><div class="l">Call booking rate</div><div class="v">${pct(calls.length?booked/calls.length:NaN)}</div><div class="s">${booked} of ${calls.length} calls</div></div></div>
   <div class="grid2"><div class="card"><h3>Revenue by Technician</h3>${bars(byTech)}</div><div class="card"><h3>Revenue by Job Type</h3>${bars(byType)}</div>

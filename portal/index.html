@@ -151,7 +151,7 @@ function demoApi(){
                 {name:'Best',desc:'High efficiency + variable speed + 5-yr parts & labor',items:[{desc:'10-ton RTU, variable speed',qty:1,price:21400},{desc:'Installation, crane & startup',qty:1,price:5200},{desc:'5-year parts & labor warranty',qty:1,price:1900}]}]}],
     agreements:[{id:'a1',number:'AG-301',customerId:'c1',name:'Quarterly PM – 2 RTUs + boiler',status:'Active',visits:4,billing:'Quarterly',start:addDays(t,-200),end:addDays(t,165),nextVisit:addDays(t,5)}],
     requests:[],
-    notifs:[{id:'n1',kind:'estimate',title:'New estimate ready',body:'Replace RTU-1 — review it in your portal.',link:'estimate:x1',read_at:null,created_at:new Date(Date.now()-3*864e5).toISOString()},
+    notifs:[{id:'n1',kind:'estimate',title:'New proposal ready',body:'Replace RTU-1 — review it in your portal.',link:'estimate:x1',read_at:null,created_at:new Date(Date.now()-3*864e5).toISOString()},
             {id:'n2',kind:'job',title:'Service completed',body:'Job #J-1041 is complete. Thank you!',link:'job:j1',read_at:new Date().toISOString(),created_at:new Date(Date.now()-6*864e5).toISOString()}],
     sms:{optIn:false,phone:''}
   });
@@ -198,7 +198,7 @@ function supabaseApi(){
 
 /* ===================== STATE / ROUTING ===================== */
 let D=null,me=null,loc='all',N=[],bellOpen=false,bellSub=null;
-const TABS=[['home','Overview'],['history','Service History'],['invoices','Invoices'],['estimates','Estimates'],['equipment','Equipment'],['request','Request Service']];
+const TABS=[['home','Overview'],['history','Service History'],['invoices','Invoices'],['estimates','Proposals'],['equipment','Equipment'],['request','Request Service']];
 const tab=()=>{const h=location.hash.slice(1);return TABS.some(t=>t[0]===h)?h:'home'};
 window.addEventListener('hashchange',()=>render());
 const inLoc=x=>loc==='all'||x.customerId===loc;
@@ -260,10 +260,10 @@ function vHome(){
   <div class="grid">
    <div class="card kpi ${bal?'due':''}"><div class="l">Balance due</div><div class="v">${money(bal)}</div><div class="s" style="${over.length?'color:var(--bad)':''}">${over.length?over.length+' overdue invoice'+(over.length>1?'s':''):'All caught up'}</div>${bal?`<a class="btn pri sm" href="#invoices" style="margin-top:10px">View & pay</a>`:''}</div>
    <div class="card kpi"><div class="l">Next visit</div><div class="v" style="font-size:20px">${up[0]?fdate(up[0].date):'None scheduled'}</div><div class="s">${up[0]?esc(up[0].type)+(up[0].time?' · '+ftime(up[0].time):'')+(multi()?'<br>'+esc(locName(up[0].customerId)):''):'<a href="#request">Request service</a>'}</div></div>
-   <div class="card kpi"><div class="l">Estimates awaiting you</div><div class="v">${est.length}</div><div class="s">${est.length?'<a href="#estimates">Review & approve</a>':'Nothing pending'}</div></div>
+   <div class="card kpi"><div class="l">Proposals awaiting you</div><div class="v">${est.length}</div><div class="s">${est.length?'<a href="#estimates">Review & approve</a>':'Nothing pending'}</div></div>
    <div class="card kpi"><div class="l">Maintenance plan</div><div class="v" style="font-size:20px">${ag.length?'Active':'—'}</div><div class="s">${ag.length?esc(ag[0].name)+'<br>Renews '+fdate(ag[0].end):'Ask us about a maintenance plan'}</div></div>
   </div>
-  ${est.length?`<div class="card" style="border-color:#cfcfcf"><h2>📝 Estimate ready for your review</h2>${est.map(e=>`<div class="row"><div><b>${esc(e.title)}</b><div class="mut small">${esc(e.number)} · ${fdate(e.date)}${multi()?' · '+esc(locName(e.customerId)):''}</div></div><span class="sp"></span><button class="pri sm" onclick="openEst('${e.id}')">Review</button></div>`).join('<hr style="border:none;border-top:1px solid var(--line)">')}</div>`:''}
+  ${est.length?`<div class="card" style="border-color:#cfcfcf"><h2>📝 Proposal ready for your review</h2>${est.map(e=>`<div class="row"><div><b>${esc(e.title)}</b><div class="mut small">${esc(e.number)} · ${fdate(e.date)}${multi()?' · '+esc(locName(e.customerId)):''}</div></div><span class="sp"></span><button class="pri sm" onclick="openEst('${e.id}')">Review</button></div>`).join('<hr style="border:none;border-top:1px solid var(--line)">')}</div>`:''}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
    <div class="card"><h2>Most recent service</h2>${last?`<b>${esc(last.type)}</b> · ${fdate(last.date)}<p class="small" style="margin:8px 0">${esc(last.notes||last.description||'')}</p><a href="#history" class="small">See full history →</a>`:'<div class="empty">No completed service yet</div>'}</div>
    ${smsCard()}
@@ -318,8 +318,8 @@ function printInv(id){const i=D.invoices.find(x=>x.id===id);const w=window.open(
 
 /* ---------- Estimates ---------- */
 function vEstimates(){const es=D.estimates.filter(inLoc).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return `<h1>Estimates</h1><p class="sub">Review proposals and approve the option that’s right for you.</p>
-  <div class="card" style="padding:0;overflow-x:auto">${es.length?`<table><tr><th>Estimate</th><th>Scope</th><th class="hide-m">Date</th><th>Status</th><th></th></tr>${es.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b></td><td>${esc(e.title)}${multi()?`<div class="mut small">${esc(locName(e.customerId))}</div>`:''}</td><td class="hide-m nowrap">${fdate(e.date)}</td><td>${badge(e.status==='Sent'?'Awaiting approval':e.status)}</td><td class="r"><button class="sm ${e.status==='Sent'?'pri':''}">${e.status==='Sent'?'Review':'View'}</button></td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
+  return `<h1>Proposals</h1><p class="sub">Review proposals and approve the option that’s right for you.</p>
+  <div class="card" style="padding:0;overflow-x:auto">${es.length?`<table><tr><th>Proposal</th><th>Scope</th><th class="hide-m">Date</th><th>Status</th><th></th></tr>${es.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b></td><td>${esc(e.title)}${multi()?`<div class="mut small">${esc(locName(e.customerId))}</div>`:''}</td><td class="hide-m nowrap">${fdate(e.date)}</td><td>${badge(e.status==='Sent'?'Awaiting approval':e.status)}</td><td class="r"><button class="sm ${e.status==='Sent'?'pri':''}">${e.status==='Sent'?'Review':'View'}</button></td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
 let pick=null;
 function openEst(id,keep){const e=D.estimates.find(x=>x.id===id);if(!e)return;const open=e.status==='Sent';if(!keep)pick=null;pick=open?(e.options.length===1?0:pick):e.selected;
   const exp=e.date&&e.valid?addDays(e.date,+e.valid):'';
@@ -335,7 +335,7 @@ function openEst(id,keep){const e=D.estimates.find(x=>x.id===id);if(!e)return;co
   :e.approvedBy?`<p class="small">${e.status} by <b>${esc(e.approvedBy)}</b> on ${fdate(e.approvedAt)}.</p>`:''}`)}
 async function decide(id,approve){const e=D.estimates.find(x=>x.id===id);const name=$('#apn').value.trim();
   if(approve&&pick==null){toast('Choose an option first');return}if(!name){toast('Please enter your name');return}if(approve&&!$('#apc').checked){toast('Please check the authorization box');return}
-  try{await api.decide(id,approve?pick:null,approve,name);closeM();await refresh();toast(approve?'Approved — thank you! We’ll contact you to schedule.':'Estimate declined. Thank you for letting us know.')}catch(err){toast(err.message||'Something went wrong')}}
+  try{await api.decide(id,approve?pick:null,approve,name);closeM();await refresh();toast(approve?'Approved — thank you! We’ll contact you to schedule.':'Proposal declined. Thank you for letting us know.')}catch(err){toast(err.message||'Something went wrong')}}
 
 /* ---------- Equipment ---------- */
 function vEquipment(){const eq=D.equipment.filter(inLoc);const t=today();
