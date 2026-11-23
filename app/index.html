@@ -2070,17 +2070,18 @@ async function tpNew(id){if(deny('pricebook'))return;const name=v('tp_name');if(
 /* ================= SETTINGS ================= */
 /* ================= EQUIPMENT PRICES (from supplier quotes; AI keeps it updated) ================= */
 const PR={rows:null,loading:false,q:'',cat:'',sup:'',changed:false,last:null};
-async function loadPrices(force){if(!sb||PR.loading)return;if(PR.rows&&!force)return;PR.loading=true;
+async function loadPrices(force){if(!sb||PR.loading)return;if(PR.rows&&!force&&Date.now()-(PR.at||0)<60000)return;PR.loading=true;PR.at=Date.now();
   try{const[a,b]=await Promise.all([sb.from('equipment_price_latest').select('*').order('quote_date',{ascending:false}).limit(5000),sb.from('company_settings').select('price_watch_last').limit(1).maybeSingle()]);
     PR.rows=a.data||[];PR.last=b.data&&b.data.price_watch_last}catch(e){PR.rows=[]}PR.loading=false;if(view==='prices')render()}
 function vPrices(){if(!sb)return '<div class="top"><h1>Equipment Prices</h1></div><div class="card">Available once the office system is live.</div>';
   if(!PR.rows){setTimeout(loadPrices,0);return '<div class="top"><h1>Equipment Prices</h1></div><div class="card mut">Loading…</div>'}
+  if(Date.now()-(PR.at||0)>60000)setTimeout(()=>loadPrices(),0);
   const q=PR.q.toLowerCase();
   const rows=PR.rows.filter(r=>(!PR.cat||r.category===PR.cat)&&(!PR.sup||r.supplier===PR.sup)&&(!PR.changed||r.change)&&(!q||[r.model,r.description,r.brand,r.supplier,r.job,r.tonnage&&r.tonnage+' ton'].join(' ').toLowerCase().includes(q)));
   const best={};PR.rows.forEach(r=>{if(!best[r.model_key]||+r.price<+best[r.model_key])best[r.model_key]=+r.price});
   const cats=[...new Set(PR.rows.map(r=>r.category).filter(Boolean))].sort(),sups=[...new Set(PR.rows.map(r=>r.supplier).filter(Boolean))].sort();
   const L=PR.last;
-  return `<div class="top"><h1>Equipment Prices</h1>${can('pricebook')?'<button onclick="openPriceAdd()">+ Add price</button>':''}${can('export')?'<button onclick="exportPrices()">⬇ CSV</button>':''}<button onclick="runPriceWatch(this)">🤖 Check emails now</button></div>
+  return `<div class="top"><h1>Equipment Prices</h1>${can('pricebook')?'<button onclick="openPriceAdd()">+ Add price</button>':''}${can('export')?'<button onclick="exportPrices()">⬇ CSV</button>':''}<button onclick="PR.at=0;loadPrices(true)">🔄 Refresh</button><button onclick="runPriceWatch(this)">🤖 Check emails now</button></div>
   <p class="mut small" style="margin-top:-6px">Every price a supplier quoted us — latest per model & supplier, with what it was before. The AI reads new supplier emails & quotes every 2 hours.${L&&L.at?` Last check ${fdate(L.at.slice(0,10))} ${new Date(L.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}: ${L.messages||0} emails, ${L.rows||0} new prices.`:''}</p>
   <div class="card" style="padding:10px;display:flex;gap:8px;flex-wrap:wrap"><input id="pr_q" placeholder="Search model, brand, size, job…" value="${esc(PR.q)}" oninput="PR.q=this.value;clearTimeout(PR.t);PR.t=setTimeout(render,250)" style="max-width:280px">
    <select onchange="PR.cat=this.value;render()" style="max-width:170px"><option value="">All types</option>${cats.map(c=>`<option ${c===PR.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
