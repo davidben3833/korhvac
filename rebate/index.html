@@ -179,58 +179,79 @@ function drawProject(){
   ({survey:surveyTab,pricing:pricingTab,files:filesTab,activity:activityTab})[tab]();
 }
 
-/* survey */
+/* survey — every unit is its own folder: rebate-files/<project>/units/<unit id>/ (photos + docs) */
+const unitDir=(uid)=>`units/${uid}`;
 function surveyTab(){
-  const{p,units}=P;
-  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="snap">📷 Snap nameplate (AI fills it)</button><button id="add">+ Add unit manually</button><span class="sp"></span><span class="mut small">${units.reduce((a,u)=>a+(u.qty||1),0)} units</span></div>
-  <input type="file" id="cam" accept="image/*" capture="environment" multiple hidden>
+  const{units}=P;
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="add">📷 New unit</button><span class="mut small">Take all the photos you need — nameplate, the unit, how it's installed, access. The AI reads them all.</span><span class="sp"></span><span class="mut small">${units.reduce((a,u)=>a+(u.qty||1),0)} units</span></div>
   <div class="units">${units.map(u=>`<div class="unit" data-u="${u.id}"><div class="row" style="align-items:flex-start"><img data-th="${esc((u.photos||[])[0]?.path||'')}" alt=""><div style="flex:1;min-width:0">
-   <b>${esc(u.tag||u.equipment_type||'Unit')}</b> ${u.qty>1?`<span class="b">×${u.qty}</span>`:''}<div class="small">${esc([u.make,u.model].filter(Boolean).join(' '))||'<span class="mut">no model yet</span>'}</div>
-   <div class="small mut">${esc([u.equipment_type,u.tonnage&&(u.tonnage+' ton'),u.capacity,u.fuel,u.mfg_year].filter(Boolean).join(' · '))}</div>
-   <div class="small mut">${esc(u.location||'')}</div>${u.ai_status==='reading'?'<div class="small" style="color:#5b2fb0">AI reading…</div>':''}</div></div></div>`).join('')||'<div class="mut">No units yet. Walk the site and snap each nameplate — the AI fills in make, model, serial, size and year.</div>'}</div>`;
+   <b>📁 ${esc(u.tag||u.equipment_type||'Unit')}</b> ${u.qty>1?`<span class="b">×${u.qty}</span>`:''}<div class="small">${esc([u.make,u.model].filter(Boolean).join(' '))||'<span class="mut">no model yet</span>'}</div>
+   <div class="small mut">${esc([u.equipment_type,u.tonnage&&(u.tonnage+' ton'),u.orientation,u.mounting,u.mfg_year].filter(Boolean).join(' · '))}</div>
+   <div class="small mut">📷 ${(u.photos||[]).length}${(u.docs||[]).length?` · 📄 ${(u.docs||[]).length}`:''}${u.location?' · '+esc(u.location):''}${u.difficulty?` · <b style="color:${u.difficulty==='Hard'?'var(--bad)':u.difficulty==='Moderate'?'var(--warn)':'var(--ok)'}">${esc(u.difficulty)}</b>`:''}</div>
+   ${u.ai_status==='reading'?'<div class="small" style="color:#5b2fb0">AI reading…</div>':''}</div></div></div>`).join('')||'<div class="mut">No units yet. Tap “New unit” for each unit on site.</div>'}</div>`;
   document.querySelectorAll('img[data-th]').forEach(async i=>{if(i.dataset.th)i.src=await thumb(i.dataset.th)});
   document.querySelectorAll('[data-u]').forEach(c=>c.onclick=()=>editUnit(units.find(u=>u.id===c.dataset.u)));
-  $('#add').onclick=()=>editUnit({});
-  $('#snap').onclick=()=>$('#cam').click();
-  $('#cam').onchange=async e=>{
-    const files=[...e.target.files];if(!files.length)return;
-    toast(`Uploading ${files.length} photo(s)…`);
-    for(const f of files){
-      try{const up=await upload(p.id,f,'units');
-        const u=await q(sb.from('rebate_units').insert({rebate_id:p.id,photos:[{path:up.path}],ai_status:'reading',tag:`Unit ${P.units.length+1}`}).select().single());
-        P.units.push(u);surveyTab();
-        fn('ai-assist',{action:'nameplate',paths:[up.path],unit_id:u.id}).then(()=>refreshUnits()).catch(err=>{toast('AI: '+err.message);sb.from('rebate_units').update({ai_status:'failed'}).eq('id',u.id).then(refreshUnits)});
-      }catch(err){toast(err.message)}
-    }
-    await event(p.id,`Added ${files.length} unit photo(s)`);
-  };
+  $('#add').onclick=()=>editUnit({},true);
 }
 async function refreshUnits(){P.units=await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at'));if(V.tab==='survey'&&!document.querySelector('.modal'))surveyTab()}
-function editUnit(u){
+function aiRead(uid,paths){return fn('ai-assist',{action:'nameplate',paths,unit_id:uid})}
+function editUnit(u,openCam){
+  const isNew=!u.id, uid=u.id||crypto.randomUUID();
   const F=(k,l,t='text')=>`<div><label>${l}</label><input id="u_${k}" type="${t}" value="${esc(u[k]??'')}"></div>`;
-  const m=modal(`<h3>${u.id?'Unit':'New unit'}</h3>
-  <div class="thumbs" id="th"></div><div class="row" style="margin-top:8px"><button class="sm" id="ph">📷 Add photo</button>${u.id?'<button class="sm" id="air">✨ Read nameplate with AI</button>':''}<input type="file" id="pf" accept="image/*" capture="environment" multiple hidden></div>
-  ${u.ai?`<div class="ai" style="margin-top:8px">AI read (${esc(u.ai.confidence||'')} confidence)${u.ai.notes?': '+esc(u.ai.notes):''}</div>`:''}
-  <div class="g3">${F('tag','Tag / name')}${F('location','Location')}<div><label>Type</label><select id="u_equipment_type"><option value=""></option>${TYPES.map(t=>`<option ${t===u.equipment_type?'selected':''}>${t}</option>`).join('')}</select></div>
+  const S=(k,l,opts)=>`<div><label>${l}</label><select id="u_${k}"><option value=""></option>${opts.map(o=>`<option ${o===u[k]?'selected':''}>${o}</option>`).join('')}</select></div>`;
+  const m=modal(`<h3>📁 ${isNew?'New unit':esc(u.tag||u.equipment_type||'Unit')}</h3>
+  <div class="row"><button class="sm pri" id="cam1">📷 Take photo</button><button class="sm" id="gal">🖼️ Add photos</button><button class="sm" id="doc">📄 Add file</button><span class="sp"></span><button class="sm" id="air">✨ Fill with AI</button>
+  <input type="file" id="pc" accept="image/*" capture="environment" hidden><input type="file" id="pg" accept="image/*" multiple hidden><input type="file" id="pd" multiple hidden></div>
+  <div class="small mut" id="pcount" style="margin-top:6px"></div><div class="thumbs" id="th"></div><div id="docs" class="small" style="margin-top:6px"></div>
+  <div id="aibox"></div>
+  <div class="g3">${F('tag','Tag / name')}${F('location','Location')}${S('equipment_type','Type',TYPES)}
   ${F('make','Make')}${F('model','Model')}${F('serial','Serial')}${F('capacity','Capacity')}${F('tonnage','Tons','number')}${F('fuel','Fuel')}
-  ${F('refrigerant','Refrigerant')}${F('voltage','Voltage')}${F('mfg_year','Year','number')}${F('efficiency','Efficiency')}${F('condition','Condition')}${F('qty','Qty','number')}</div>
+  ${F('refrigerant','Refrigerant')}${F('voltage','Voltage')}${F('mfg_year','Year','number')}${F('efficiency','Efficiency')}
+  ${S('orientation','Orientation',['Vertical','Horizontal','Upflow','Downflow'])}${S('mounting','Mounted',['Rooftop','Ceiling','Wall','Floor','Pad','Closet','Attic','Mechanical room','Through-wall','Other'])}
+  ${S('difficulty','Install difficulty',['Easy','Moderate','Hard'])}${F('condition','Condition')}${F('qty','Qty','number')}</div>
+  <label>Install / access notes</label><textarea id="u_install_notes" placeholder="Crane, lift, tight space, curb adapter, long line set…">${esc(u.install_notes||'')}</textarea>
   <label>Notes</label><textarea id="u_notes">${esc(u.notes||'')}</textarea>
-  <div class="row" style="margin-top:14px"><button class="pri" id="sv">Save</button><button id="cx">Close</button><span class="sp"></span>${u.id?'<button class="red" id="dl">Delete</button>':''}</div>`);
-  let photos=[...(u.photos||[])];
-  const drawTh=()=>{const t=m.querySelector('#th');t.innerHTML=photos.map((p,i)=>`<img data-i="${i}">`).join('');photos.forEach(async(p,i)=>{const im=t.querySelector(`[data-i="${i}"]`);im.src=await thumb(p.path);im.onclick=()=>window.open(im.src)})};drawTh();
-  const val=()=>{const o={};['tag','location','equipment_type','make','model','serial','capacity','fuel','refrigerant','voltage','efficiency','condition','notes'].forEach(k=>o[k]=m.querySelector('#u_'+k).value.trim()||null);['tonnage','mfg_year','qty'].forEach(k=>{const v=m.querySelector('#u_'+k).value;o[k]=v===''?null:Number(v)});o.qty=o.qty||1;o.photos=photos;return o};
-  m.querySelector('#cx').onclick=()=>{m.remove();refreshUnits()};
-  m.querySelector('#ph').onclick=()=>m.querySelector('#pf').click();
-  m.querySelector('#pf').onchange=async e=>{for(const f of e.target.files){try{const up=await upload(P.p.id,f,'units');photos.push({path:up.path})}catch(err){toast(err.message)}}drawTh()};
-  if(u.id)m.querySelector('#air').onclick=async e=>{
-    if(!photos.length)return toast('Add a nameplate photo first');
-    e.target.disabled=true;e.target.textContent='Reading…';
-    try{await q(sb.from('rebate_units').update({photos}).eq('id',u.id));const r=await fn('ai-assist',{action:'nameplate',paths:photos.slice(-3).map(p=>p.path)});
-      const a=r.unit||{};for(const k of ['equipment_type','make','model','serial','capacity','tonnage','fuel','refrigerant','voltage','mfg_year','efficiency']){const el=m.querySelector('#u_'+k);if(el&&a[k]!=null&&a[k]!=='')el.value=a[k]}
-      u.ai=a;toast('Filled from nameplate — check and save')}catch(err){toast(err.message)}
-    e.target.disabled=false;e.target.textContent='✨ Read nameplate with AI'};
-  m.querySelector('#sv').onclick=async()=>{const o=val();try{if(u.id)await q(sb.from('rebate_units').update({...o,ai:u.ai??null,updated_at:new Date().toISOString()}).eq('id',u.id));else await q(sb.from('rebate_units').insert({...o,rebate_id:P.p.id}));m.remove();refreshUnits()}catch(e){toast(e.message)}};
-  if(u.id)m.querySelector('#dl').onclick=async()=>{if(!confirm('Delete this unit?'))return;await q(sb.from('rebate_units').delete().eq('id',u.id));m.remove();refreshUnits()};
+  <div class="row" style="margin-top:14px"><button class="pri" id="sv">Save</button><button id="cx">Close</button><span class="sp"></span>${isNew?'':'<button class="red" id="dl">Delete unit</button>'}</div>`);
+  let photos=[...(u.photos||[])], docs=[...(u.docs||[])], ai=u.ai||null, dirty=false;
+  const showAi=()=>{m.querySelector('#aibox').innerHTML=ai?`<div class="ai" style="margin-top:8px">AI (${esc(ai.confidence||'')} confidence)${ai.install_notes?' — '+esc(ai.install_notes):''}${ai.notes?'<br>'+esc(ai.notes):''}</div>`:''};showAi();
+  const drawTh=()=>{const t=m.querySelector('#th');m.querySelector('#pcount').textContent=photos.length?`${photos.length} photo${photos.length>1?'s':''} in this unit's folder`:'No photos yet';
+    t.innerHTML=photos.map((p,i)=>`<span style="position:relative"><img data-i="${i}"><b data-rm="${i}" style="position:absolute;top:2px;right:4px;color:#fff;text-shadow:0 0 3px #000;cursor:pointer">✕</b></span>`).join('');
+    photos.forEach(async(p,i)=>{const im=t.querySelector(`[data-i="${i}"]`);im.src=await thumb(p.path);im.onclick=()=>window.open(im.src)});
+    t.querySelectorAll('[data-rm]').forEach(x=>x.onclick=async()=>{if(!confirm('Remove this photo?'))return;const[p]=photos.splice(+x.dataset.rm,1);dirty=true;sb.storage.from('rebate-files').remove([p.path]);drawTh()});
+    m.querySelector('#docs').innerHTML=docs.map((d,i)=>`<div>📄 <a href="#" data-d="${i}">${esc(d.name)}</a> <a href="#" data-dx="${i}" class="red">✕</a></div>`).join('');
+    m.querySelectorAll('[data-d]').forEach(a=>a.onclick=async e=>{e.preventDefault();const url=await signed(docs[+a.dataset.d].path);if(url)window.open(url)});
+    m.querySelectorAll('[data-dx]').forEach(a=>a.onclick=e=>{e.preventDefault();const[d]=docs.splice(+a.dataset.dx,1);dirty=true;sb.storage.from('rebate-files').remove([d.path]);drawTh()});
+  };drawTh();
+  const addFiles=async(files,asDoc)=>{for(const f of files){try{
+      if(!asDoc&&f.type.startsWith('image/')){const up=await upload(P.p.id,f,unitDir(uid));photos.push({path:up.path,at:new Date().toISOString()})}
+      else{const path=`${P.p.id}/${unitDir(uid)}/${Date.now()}-${f.name.replace(/[^\w.\- ]+/g,'_')}`;const{error}=await sb.storage.from('rebate-files').upload(path,f,{contentType:f.type});if(error)throw error;docs.push({path,name:f.name,mime:f.type})}
+      dirty=true;drawTh()}catch(err){toast(err.message)}}};
+  m.querySelector('#cam1').onclick=()=>m.querySelector('#pc').click();
+  m.querySelector('#gal').onclick=()=>m.querySelector('#pg').click();
+  m.querySelector('#doc').onclick=()=>m.querySelector('#pd').click();
+  m.querySelector('#pc').onchange=async e=>{await addFiles([...e.target.files]);e.target.value='';};
+  m.querySelector('#pg').onchange=async e=>{await addFiles([...e.target.files]);e.target.value='';};
+  m.querySelector('#pd').onchange=async e=>{await addFiles([...e.target.files],true);e.target.value='';};
+  if(openCam)setTimeout(()=>m.querySelector('#pc').click(),100);
+  const FIELDS=['tag','location','equipment_type','make','model','serial','capacity','fuel','refrigerant','voltage','efficiency','orientation','mounting','difficulty','condition','install_notes','notes'];
+  const val=()=>{const o={};FIELDS.forEach(k=>o[k]=m.querySelector('#u_'+k).value.trim()||null);['tonnage','mfg_year','qty'].forEach(k=>{const v=m.querySelector('#u_'+k).value;o[k]=v===''?null:Number(v)});o.qty=o.qty||1;o.photos=photos;o.docs=docs;o.ai=ai;return o};
+  m.querySelector('#air').onclick=async e=>{
+    if(!photos.length)return toast('Add photos first');
+    e.target.disabled=true;e.target.textContent=`Reading ${Math.min(photos.length,12)} photos…`;
+    try{const r=await fn('ai-assist',{action:'nameplate',paths:photos.slice(0,12).map(p=>p.path)});ai=r.unit||{};
+      for(const k of ['equipment_type','make','model','serial','capacity','tonnage','fuel','refrigerant','voltage','mfg_year','efficiency','orientation','mounting','difficulty','install_notes']){const el=m.querySelector('#u_'+k);if(el&&ai[k]!=null&&ai[k]!==''&&!el.value)el.value=ai[k]}
+      showAi();dirty=true;toast('Filled from photos — check and save')}catch(err){toast(err.message)}
+    e.target.disabled=false;e.target.textContent='✨ Fill with AI'};
+  const close=()=>{m.remove();refreshUnits()};
+  m.querySelector('#cx').onclick=async()=>{if(dirty&&confirm('Save changes to this unit?'))return m.querySelector('#sv').click();
+    if(isNew&&photos.length+docs.length&&!confirm('Discard this unit and its photos?'))return;
+    if(isNew&&photos.length+docs.length)sb.storage.from('rebate-files').remove([...photos,...docs].map(p=>p.path));close()};
+  m.querySelector('#sv').onclick=async()=>{const o=val();if(!o.tag)o.tag=`Unit ${P.units.length+(isNew?1:0)}`;
+    try{if(isNew){await q(sb.from('rebate_units').insert({...o,id:uid,rebate_id:P.p.id,ai_status:!o.ai&&photos.length?'reading':null}));await event(P.p.id,`Unit "${o.tag}" added (${photos.length} photos)`)}
+      else await q(sb.from('rebate_units').update({...o,updated_at:new Date().toISOString()}).eq('id',uid));
+      if(!o.ai&&photos.length)aiRead(uid,photos.slice(0,12).map(p=>p.path)).then(refreshUnits).catch(err=>{toast('AI: '+err.message);sb.from('rebate_units').update({ai_status:'failed'}).eq('id',uid).then(refreshUnits)});
+      close()}catch(e){toast(e.message)}};
+  if(!isNew)m.querySelector('#dl').onclick=async()=>{if(!confirm('Delete this unit and its folder (all photos and files)?'))return;await sb.storage.from('rebate-files').remove([...photos,...docs].map(p=>p.path));await q(sb.from('rebate_units').delete().eq('id',uid));close()};
 }
 
 /* pricing */
@@ -286,8 +307,10 @@ function editReq(r){
 /* files */
 function filesTab(){
   const{p,files}=P;
-  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="up">Upload files</button><input type="file" id="ff" multiple hidden><select id="k" style="max-width:180px"><option>Quote</option><option>Submittal</option><option>Application</option><option>Pre-approval</option><option>Invoice</option><option>Photo</option><option>Other</option></select></div>
+  $('#tb').innerHTML=`<div class="card"><b>📁 Unit folders</b>${P.units.map(u=>`<div class="small" style="padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer" data-uf="${u.id}">📁 ${esc(u.tag||u.equipment_type||'Unit')} <span class="mut">— 📷 ${(u.photos||[]).length}${(u.docs||[]).length?' · 📄 '+(u.docs||[]).length:''}</span></div>`).join('')||'<div class="mut small">No units yet.</div>'}</div>
+  <div class="row" style="margin-bottom:12px"><b>Project files</b><span class="sp"></span><button class="pri" id="up">Upload files</button><input type="file" id="ff" multiple hidden><select id="k" style="max-width:180px"><option>Quote</option><option>Submittal</option><option>Application</option><option>Pre-approval</option><option>Invoice</option><option>Photo</option><option>Other</option></select></div>
   <div class="card"><table><tr><th>File</th><th>Type</th><th>From</th><th>Added</th><th></th></tr>${files.map(f=>`<tr><td><a href="#" data-f="${esc(f.path)}">${esc(f.name)}</a></td><td>${esc(f.kind||'')}</td><td class="small">${esc(f.email_from||'upload')}</td><td class="small">${when(f.created_at)}</td><td><button class="sm red" data-x="${f.id}">✕</button></td></tr>`).join('')||'<tr><td colspan=5 class="mut">No files yet.</td></tr>'}</table></div>`;
+  document.querySelectorAll('[data-uf]').forEach(d=>d.onclick=()=>editUnit(P.units.find(u=>u.id===d.dataset.uf)));
   $('#up').onclick=()=>$('#ff').click();
   $('#ff').onchange=async e=>{for(const f of e.target.files){try{const path=`${p.id}/files/${Date.now()}-${f.name.replace(/[^\w.\- ]+/g,'_')}`;const{error}=await sb.storage.from('rebate-files').upload(path,f,{contentType:f.type});if(error)throw error;await q(sb.from('rebate_files').insert({rebate_id:p.id,name:f.name,path,mime:f.type,size:f.size,kind:$('#k').value}))}catch(err){toast(err.message)}}await event(p.id,`Uploaded ${e.target.files.length} file(s)`);projectView()};
   document.querySelectorAll('[data-f]').forEach(a=>a.onclick=async e=>{e.preventDefault();const u=await signed(a.dataset.f);if(u)window.open(u)});

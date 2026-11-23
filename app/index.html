@@ -1357,6 +1357,17 @@ const emailCfg=()=>S.settings.find(x=>x.id==='email')||{enabled:true,events:{},t
 let EMAIL_DEF=null,EMAIL_LOG=[];
 async function loadEmailInfo(){if(!sb)return;try{const[d,l]=await Promise.all([EMAIL_DEF?{data:EMAIL_DEF}:sb.rpc('email_defaults'),sb.from('email_queue').select('id,created_at,kind,status,error,to_addr,from_addr,subject,send_after,sent_at,customer_id').order('created_at',{ascending:false}).limit(60)]);
   EMAIL_DEF=d.data||{};EMAIL_LOG=l.data||[];const box=$('#emailcard');if(box)box.outerHTML=emailSettingsCard()}catch(e){}}
+let AI_INFO=null;
+const AI_P={anthropic:['Claude (Anthropic)','ANTHROPIC_API_KEY'],openai:['OpenAI (GPT)','OPENAI_API_KEY'],gemini:['Google Gemini','GEMINI_API_KEY']};
+async function loadAiInfo(){try{const{data}=await sb.functions.invoke('ai-assist',{body:{action:'status'}});AI_INFO=data||{};const b=$('#aicard');if(b)b.outerHTML=aiSettingsCard()}catch(e){AI_INFO={error:true}}}
+function aiSettingsCard(){if(!sb||!isAdmin())return '';if(!AI_INFO){setTimeout(loadAiInfo,0);return '<div class="card" id="aicard"><h3>🤖 AI assistant</h3><p class="mut small">Loading…</p></div>'}
+  const I=AI_INFO,k=I.keys||{};
+  return `<div class="card" id="aicard"><h3>🤖 AI assistant</h3><p class="mut small">Used for reading unit photos (rebate survey + tech app), drafting supplier pricing emails, reading supplier quotes and the tech troubleshooting chat. Pick the AI company here; its key goes in Supabase → Edge Functions → Secrets.</p>
+  <div class="grid2"><div><label>AI company</label><select id="ai_p" onchange="$('#ai_m').placeholder=(AI_INFO.defaults||{})[this.value]||''">${Object.entries(AI_P).map(([v,[n]])=>`<option value="${v}" ${v===I.provider?'selected':''}>${n}${k[v]?'':' — key not added'}</option>`).join('')}</select></div>
+  <div><label>Model (optional)</label><input id="ai_m" value="${esc(I.model&&I.model!==(I.defaults||{})[I.provider]?I.model:'')}" placeholder="${esc((I.defaults||{})[I.provider]||'')}"></div></div>
+  <div class="small" style="margin-top:8px">${Object.entries(AI_P).map(([v,[n,sec]])=>`${k[v]?'✅':'⚪'} ${n}: <code>${sec}</code>`).join('<br>')}</div>
+  <div style="margin-top:10px"><button class="pri" onclick="saveAi()">Save</button></div></div>`}
+async function saveAi(){const p=$('#ai_p').value,m=$('#ai_m').value.trim();const{error}=await sb.rpc('set_ai_settings',{p_provider:p,p_model:m});if(error)return toast(error.message);AI_INFO=null;toast('AI settings saved');loadAiInfo()}
 function emailSettingsCard(){if(!sb)return '';const c=emailCfg();if(!EMAIL_DEF){setTimeout(loadEmailInfo,0)}const D=EMAIL_DEF||{};const f=c.from||{};
   return `<div class="card" id="emailcard" style="max-width:800px;margin-top:14px"><h3>✉️ Automatic emails</h3>
   <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="em_enabled" style="width:auto" ${c.enabled!==false?'checked':''}> Send automatic emails</label>
@@ -1781,7 +1792,7 @@ const INV_CSS=`.invdoc{font-family:Inter,Arial,sans-serif;color:#111;font-size:1
 .invdoc table{width:100%;border-collapse:collapse;margin-top:6px}.invdoc .isv td{padding:5px 8px;border:1px solid #e3e3e3;vertical-align:top}.invdoc .isv td:nth-child(odd){color:#666;width:16%;background:#fafafa}.invdoc .isv th,.invdoc .iit th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#666;padding:6px 8px;border-bottom:2px solid #111}
 .invdoc .iit{margin-top:16px}.invdoc .iit td{padding:7px 8px;border-bottom:1px solid #eee}.invdoc th.r,.invdoc td.r{text-align:right}.invdoc .itot{margin:12px 0 0 auto;width:280px}.invdoc .itot div{display:flex;justify-content:space-between;padding:3px 0}.invdoc .ibal{border-top:2px solid #111;margin-top:4px;padding-top:6px!important;font-weight:800;font-size:15px}.invdoc .mut{color:#777}.invdoc .small{font-size:11.5px}`;
 function printInv(){syncInv();const i=edit.obj;const w=window.open('','_blank');if(!w){toast('Allow pop-ups to print');return}
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${esc(i.number)} – ${esc(company().name||'KOR HVAC')}</title><style>@page{margin:14mm}body{margin:0;padding:24px}${INV_CSS}@media print{body{padding:0}}</style></head><body>${invDoc(i)}<script>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
+  w.document.write(`<!DOCTYPE html><html><head><meta name="robots" content="noindex"><meta charset="utf-8"><title>Invoice ${esc(i.number)} – ${esc(company().name||'KOR HVAC')}</title><style>@page{margin:14mm}body{margin:0;padding:24px}${INV_CSS}@media print{body{padding:0}}</style></head><body>${invDoc(i)}<script>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
 
 function previewInv(){syncInv();const i=edit.obj;
   $('#modal2').innerHTML=`<h2>Invoice Preview<button class="sm" onclick="closeM2()">✕</button></h2><style>${INV_CSS}</style><div style="border:1px solid var(--line);border-radius:10px;padding:22px;background:#fff">${invDoc(i)}</div>
@@ -2041,6 +2052,7 @@ function vSettings(){const c=company();
   <div class="span3"><label>Invoice footer</label><textarea id="s_invoiceFooter">${esc(c.invoiceFooter||'Thank you for your business! Please remit payment by the due date.')}</textarea></div></div>
   <div class="mfoot"><span class="sp"></span><button class="pri" onclick="saveSettings()">Save Settings</button></div></div>
   ${smsSettingsCard()}
+  ${aiSettingsCard()}
   ${emailSettingsCard()}
   <div class="card" style="max-width:800px;margin-top:14px"><h3>Connections</h3>
   <p class="small"><b>Email:</b> ${mcp?'Customer emails send from your Microsoft 365 / Outlook account (you approve the first one).':'Email sending isn’t available in this view — emails open as a draft to copy.'}<br>
