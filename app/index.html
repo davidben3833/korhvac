@@ -1948,6 +1948,8 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   <div class="fg"><div class="span2"><label>Customer *</label><select id="f_customerId">${custOpts(e.customerId)}</select></div>
    <div><label>Status</label><select id="f_status">${opts(['Draft','Sent','Approved','Declined'],e.status)}</select></div>
    <div><label>Proposal #</label><input id="f_number" value="${esc(e.number)}" placeholder="26-001-01"></div>
+   <div class="span2"><label>Email to <span class="mut small">(more than one: separate with commas)</span></label><input id="f_emailTo" value="${esc(e.emailTo||'')}" placeholder="${esc((byId('customers',e.customerId)||{}).email||'customer email')}"></div>
+   <div><label>CC</label><input id="f_emailCc" value="${esc(e.emailCc||'')}" placeholder="name@company.com, …"></div>
    <div class="span2"><label>Title / scope</label><input id="f_title" value="${esc(e.title)}" placeholder="Replace RTU-2 with new 10-ton unit"></div>
    <div><label>Date</label><input type="date" id="f_date" value="${esc(e.date)}"></div>
    <div><label>Follow-up date</label><input type="date" id="f_followUp" value="${esc(e.followUp)}"></div>
@@ -1967,7 +1969,7 @@ function drawEst(){const e=edit.obj,isNew=!byId('estimates',e.id);
   ${!isNew&&!e.jobId?`<button onclick="estToJob()">Approve → Create Job</button>`:''}${e.jobId?`<button onclick="openJob('${e.jobId}')">View Job</button>`:''}
   <button onclick="closeM()">Cancel</button><button class="pri" onclick="saveEst()">Save</button></div>`);
   e.options.forEach((o,n)=>e.pro?proLines(n):itemsEditor('oi_'+n,o.items,()=>0));if(e.pro){proUnitsDraw();if(!(PR.rows||[]).length)loadPrices().then(()=>{if(edit.obj===e)e.options.forEach((o,n)=>proLines(n))}).catch(()=>{})}}
-function syncEst(){const e=edit.obj;proSync();grab(e,['customerId','status','number','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
+function syncEst(){const e=edit.obj;proSync();grab(e,['customerId','status','number','emailTo','emailCc','title','date','followUp','valid','rebate','notes']);e.options.forEach((o,n)=>{o.name=v('on_'+n)||o.name;o.desc=v('od_'+n)})}
 function finishEst(){syncEst();const e=edit.obj;proFinish(e);e.options.forEach(o=>o.items=o.items.filter(i=>i.desc||+i.price));if(e.status==='Sent'&&!e.followUp)e.followUp=addDays(today(),3);if(e.status==='Sent'&&!e.sentAt)e.sentAt=today();if(['Approved','Declined'].includes(e.status)&&!e.closedAt)e.closedAt=today();return e}
 async function saveEst(){if(deny('estimates'))return;const e=finishEst();if(!e.customerId){toast('Pick a customer');return}e.number=String(e.number||'').trim();if(!e.number){toast('Enter a proposal number');return}if(S.estimates.some(x=>x.id!==e.id&&String(x.number).trim().toLowerCase()===e.number.toLowerCase())){toast('Proposal # '+e.number+' is already used');return}try{await save('estimates',e);closeM();toast('Proposal saved');proLearn(e).then(()=>e.pro&&save('estimates',e).catch(()=>{}))}catch(x){}}
 async function followedUp(id){const e=byId('estimates',id);try{await save('estimates',{...e,followUp:addDays(today(),4),followUps:(e.followUps||0)+1});toast('Next follow-up in 4 days')}catch(x){}}
@@ -1980,9 +1982,10 @@ async function estToJob(){const e=finishEst();if(!e.customerId){toast('Pick a cu
    if(e.rebate==='Yes'&&!S.rebates.some(r=>r.estimateId===e.id))await save('rebates',{id:uid(),customerId:e.customerId,estimateId:e.id,jobId:j.id,measure:e.title,status:'Pre-approval',created:today()});
    openJob(j.id);toast('Job '+j.number+' created'+(e.rebate==='Yes'?' + rebate record':''))}catch(x){}}
 function emailEst(){if(deny('send_estimates'))return;const e=finishEst();const c=byId('customers',e.customerId)||{},co=company();
-  if(sb){if(!e.customerId){toast('Pick a customer');return}if(!(c.email||c.billEmail)){toast('No email on file for this customer');return}
-    if(e.status==='Draft'||!byId('estimates',e.id)){e.status='Sent';e.followUp=e.followUp||addDays(today(),3);save('estimates',e).then(()=>{toast('✉️ Sending estimate to '+(c.email||c.billEmail)+' from estimating@');drawEst()}).catch(()=>{})}
-    else{save('estimates',e).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'estimate',p_id:e.id});toast(error?sbErr(error):'✉️ Proposal re-sent to '+(c.email||c.billEmail))}).catch(()=>{})}
+  if(sb){if(!e.customerId){toast('Pick a customer');return}const bad=[e.emailTo,e.emailCc].join(',').split(/[;,\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}
+    const toList=(e.emailTo||'').trim()||c.email||c.billEmail;if(!toList){toast('Add an email in “Email to”');return}const who=toList+(e.emailCc?' (cc '+e.emailCc+')':'');
+    if(e.status==='Draft'||!byId('estimates',e.id)){e.status='Sent';e.followUp=e.followUp||addDays(today(),3);save('estimates',e).then(()=>{toast('✉️ Sending proposal to '+who+' from estimating@');drawEst()}).catch(()=>{})}
+    else{save('estimates',e).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'estimate',p_id:e.id});toast(error?sbErr(error):'✉️ Proposal re-sent to '+who)}).catch(()=>{})}
     return}
   const body=`Hello ${c.name||''},\n\nThank you for the opportunity. Here is our estimate ${e.number} for: ${e.title||'the work discussed'}${c.address?' at '+c.address:''}.\n\n`+
    e.options.map(o=>`${o.name.toUpperCase()}${o.desc?' – '+o.desc:''}\n${o.items.map(i=>`• ${i.desc}${+i.qty!==1?' (x'+i.qty+')':''}`).join('\n')}\nPrice: ${money(calc(o.items,0).sub)}`).join('\n\n')+
