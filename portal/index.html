@@ -195,7 +195,7 @@ function supabaseApi(){
     async notifs(){const{data,error}=await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(50);if(error)throw new Error(error.message);return data||[]},
     async markRead(ids){let q=sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);if(ids)q=q.in('id',ids);await q},
     onNotif(fn){const ch=sb.channel('portal-bell').on('postgres_changes',{event:'*',schema:'public',table:'notifications'},()=>fn()).subscribe();return()=>sb.removeChannel(ch)},
-    async request(r){await rpc('client_request_service',{p_customer:r.customerId,p_equipment:r.equipmentId||null,p_description:r.description,p_preferred_date:r.preferredDate||null,p_urgency:r.urgency,p_contact:r.contact,p_phone:r.phone})}
+    async request(r){await rpc('client_request_service',{p_customer:r.customerId,p_equipment:r.equipmentId||null,p_description:r.description,p_preferred_date:r.preferredDate||null,p_urgency:r.urgency,p_contact:r.contact,p_phone:r.phone,p_site:r.siteId||null})}
   };
 }
 
@@ -291,6 +291,7 @@ function vHome(){
   ${est.length?`<div class="card" style="border-color:#cfcfcf"><h2>📝 Proposal ready for your review</h2>${est.map(e=>`<div class="row"><div><b>${esc(e.title)}</b><div class="mut small">${esc(e.number)} · ${fdate(e.date)}${multi()?' · '+esc(locName(e.customerId)):''}</div></div><span class="sp"></span><button class="pri sm" onclick="openEst('${e.id}')">Review</button></div>`).join('<hr style="border:none;border-top:1px solid var(--line)">')}</div>`:''}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
    <div class="card"><h2>Most recent service</h2>${last?`<b>${esc(last.type)}</b> · ${fdate(last.date)}<p class="small" style="margin:8px 0">${esc(last.notes||last.description||'')}</p><a href="#history" class="small">See full history →</a>`:'<div class="empty">No completed service yet</div>'}</div>
+   ${(ss=>ss.length?`<div class="card"><h2>📍 Your service addresses (${ss.length})</h2><table class="small">${ss.map(x=>`<tr><td><b>${esc(x.name&&x.name!=='Main'?x.name:(x.c.company||x.c.name||''))}</b><div class="mut">${esc(x.address)}</div></td></tr>`).join('')}</table><p class="small mut" style="margin-bottom:0">Missing an address? Call or email us and we’ll add it.</p></div>`:'')(D.customers.filter(c=>loc==='all'||c.id===loc).flatMap(c=>(c.sites||[]).map(x=>({...x,c}))))}
    ${smsCard()}
    <div class="card"><h2>Need service?</h2><p class="small mut">Submit a request any time — our office will confirm a time with you.</p><a class="btn pri" href="#request">Request service</a>${CFG.phone?`<p class="small" style="margin-bottom:0">Emergency? Call <b>${esc(CFG.phone)}</b></p>`:''}</div>
   </div>`;
@@ -378,7 +379,8 @@ function vRequest(){const custs=D.customers;const cid=loc!=='all'?loc:(custs[0]&
   return `<h1>Request Service</h1><p class="sub">Tell us what’s going on and we’ll confirm a time with you.${CFG.phone?` For emergencies (no heat, no cooling in a care area, leaks) please also call <b>${esc(CFG.phone)}</b>.`:''}</p>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))"><div class="card">
    ${custs.length>1?`<label style="margin-top:0">Location</label><select id="rq_c" onchange="loc=this.value;render()">${custs.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${esc(c.company||c.name)}</option>`).join('')}</select>`:`<input type="hidden" id="rq_c" value="${esc(cid)}">`}
-   <label${custs.length>1?'':' style="margin-top:0"'}>Equipment (if known)</label><select id="rq_e"><option value="">Not sure / general</option>${D.equipment.filter(e=>e.customerId===cid).map(e=>`<option value="${e.id}" ${e.id===eqSel?'selected':''}>${esc(e.tag||'')} ${esc(e.type||'')} ${e.location?'– '+esc(e.location):''}</option>`).join('')}</select>
+   ${(s=>s.length>1?`<label${custs.length>1?'':' style="margin-top:0"'}>Service address *</label><select id="rq_s">${s.map(x=>`<option value="${x.id}">${esc((x.name&&x.name!=='Main'?x.name+' — ':'')+x.address)}</option>`).join('')}</select>`:`<input type="hidden" id="rq_s" value="${s[0]?s[0].id:''}">`)(((custs.find(c=>c.id===cid)||{}).sites)||[])}
+   <label>Equipment (if known)</label><select id="rq_e"><option value="">Not sure / general</option>${D.equipment.filter(e=>e.customerId===cid).map(e=>`<option value="${e.id}" ${e.id===eqSel?'selected':''}>${esc(e.tag||'')} ${esc(e.type||'')} ${e.location?'– '+esc(e.location):''}</option>`).join('')}</select>
    <label>What’s happening? *</label><textarea id="rq_d" placeholder="e.g. 2nd floor east wing is not getting heat; thermostat set to 72, reading 64."></textarea>
    <label>How urgent?</label><select id="rq_u"><option>Routine – within a few days</option><option>Soon – within 24 hours</option><option>Emergency – as soon as possible</option></select>
    <label>Preferred date</label><input type="date" id="rq_p" min="${today()}">
@@ -386,7 +388,7 @@ function vRequest(){const custs=D.customers;const cid=loc!=='all'?loc:(custs[0]&
    <button class="pri" style="width:100%;margin-top:16px" id="rq_btn" onclick="submitReq()">Submit request</button></div>
    <div class="card"><h2>Your recent requests</h2>${reqs.length?`<table class="small">${reqs.map(r=>`<tr><td class="nowrap">${fdate(r.createdAt)}</td><td>${esc(r.description)}${multi()?`<div class="mut">${esc(locName(r.customerId))}</div>`:''}</td><td>${badge(r.status)}</td></tr>`).join('')}</table>`:'<div class="empty">No requests yet</div>'}</div></div>`}
 async function submitReq(){const d=$('#rq_d').value.trim();if(d.length<5){toast('Please describe the problem');return}$('#rq_btn').disabled=true;
-  try{await api.request({customerId:$('#rq_c').value,equipmentId:$('#rq_e').value,description:d,urgency:$('#rq_u').value,preferredDate:$('#rq_p').value,contact:$('#rq_n').value.trim(),phone:$('#rq_ph').value.trim()});window._eq='';await refresh();toast('Request received — we’ll be in touch shortly.')}
+  try{await api.request({customerId:$('#rq_c').value,equipmentId:$('#rq_e').value,description:d,urgency:$('#rq_u').value,preferredDate:$('#rq_p').value,contact:$('#rq_n').value.trim(),phone:$('#rq_ph').value.trim(),siteId:($('#rq_s')||{}).value||''});window._eq='';await refresh();toast('Request received — we’ll be in touch shortly.')}
   catch(e){toast(e.message||'Could not submit — please call us');$('#rq_btn').disabled=false}}
 
 
