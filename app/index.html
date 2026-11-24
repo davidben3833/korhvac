@@ -1611,7 +1611,7 @@ function vCust(){
 }
 function openCust(id,pre,back){
   const c=id?{...byId('customers',id)}:{id:uid(),ctype:'Commercial',...(pre||{})};
-  const prevEdit=edit;edit={col:'customers',obj:c,back,prevEdit,sites:(id?custSites(id):[]).map(x=>({...x}))};
+  const prevEdit=edit;edit={col:'customers',obj:c,back,prevEdit,sites:(id?custSites(id):[]).map(x=>({...x})),contacts:(c.contacts||[]).map(x=>({...x}))};
   const jobs=id?S.jobs.filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||'')):[];
   const invs=id?S.invoices.filter(i=>i.customerId===id):[];const eqs=id?S.equipment.filter(e=>e.customerId===id):[];const ags=id?S.agreements.filter(a=>a.customerId===id):[];
   const tgt=back==='job'||back==='call'?'#ov2':'#ov';
@@ -1630,6 +1630,8 @@ function openCust(id,pre,back){
    `<label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--txt)"><input type="checkbox" id="f_smsOptIn" style="width:auto" ${c.smsOptIn?'checked':''}> Customer agreed to receive texts</label>
    <select id="f_smsOptInSource" style="margin-top:6px">${opts(['Phone call','In person','Paper form','Email','Customer portal'],c.smsOptInSource||'Phone call')}</select>${c.smsOptIn&&c.smsOptInAt?`<div class="small mut">Agreed ${fdt(c.smsOptInAt)} · ${esc(c.smsOptInSource||'')}</div>`:''}`}</div>
   </div>
+  <div class="sec">Contacts (<span id="conCnt">${edit.contacts.length}</span>) <button class="sm" onclick="conSync();edit.contacts.push({name:'',role:'',email:'',phone:''});conDraw()">+ Add contact</button></div>
+  <div style="overflow-x:auto"><table class="small" id="conTbl"></table></div>
   <div class="sec">Locations / service addresses (<span id="siteCnt">${edit.sites.length}</span>) <button class="sm" onclick="siteAdd()">+ Add location</button></div>
   <div style="overflow-x:auto"><table class="small sitetbl" id="siteTbl"></table></div>
   ${id?`<div class="sec">Text messages</div>${smsThread(id)}`:''}
@@ -1638,12 +1640,15 @@ function openCust(id,pre,back){
   <div class="sec">Job History (${jobs.length})</div>${jobs.length?`<table class="small">${jobs.slice(0,12).map(j=>`<tr class="click" onclick="openJob('${j.id}')"><td><b>${esc(j.number)}</b></td><td>${fdate(j.date)}</td><td>${esc(j.type)}</td><td>${esc(techName(j.techId))}</td><td>${badge(j.status)}</td></tr>`).join('')}</table>`:'<div class="mut small">No jobs yet</div>'}
   <div class="sec">Invoices (${invs.length})</div>${invs.length?`<table class="small">${invs.map(i=>`<tr class="click" onclick="openInv('${i.id}')"><td><b>${esc(i.number)}</b></td><td>${fdate(i.date)}</td><td>${badge(invStatus(i))}</td><td class="r">${money(invTotal(i))}</td><td class="r">bal ${money(invBal(i))}</td></tr>`).join('')}</table>`:'<div class="mut small">No invoices yet</div>'}`:''}
   <div class="mfoot">${id?`<button class="danger" onclick="delRec('customers','${c.id}')">Delete</button><button onclick="openJob(null,{customerId:'${c.id}',site:byId('customers','${c.id}').address||''})">+ New Job</button><button onclick="closeM();openEst(null,{customerId:'${c.id}'})">+ Proposal</button>`:''}<span class="sp"></span><button onclick="${tgt==='#ov2'?'closeM2()':'closeM()'}">Cancel</button><button class="pri" onclick="saveCust()">Save</button></div>`;
-  if(tgt==='#ov2'){$('#modal2').innerHTML=html;$('#ov2').classList.add('show')}else modal(html);drawSites();
+  if(tgt==='#ov2'){$('#modal2').innerHTML=html;$('#ov2').classList.add('show')}else modal(html);drawSites();conDraw();
 }
+function conDraw(){const t=el('conTbl');if(!t)return;const L=edit.contacts||[];el('conCnt').textContent=L.length;
+  t.innerHTML=L.length?`<tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th></th></tr>`+L.map((x,i)=>`<tr>${['name','role','email','phone'].map(k=>`<td><input data-ci="${i}" data-ck="${k}" value="${esc(x[k]||'')}" placeholder="${{name:'Full name',role:'e.g. Treasurer',email:'email@…',phone:'(555) 555-5555'}[k]}"></td>`).join('')}<td><button class="sm" onclick="conSync();edit.contacts.splice(${i},1);conDraw()">✕</button></td></tr>`).join(''):'<tr><td class="mut">No extra contacts — add people like a building manager or treasurer. Their emails can be picked when sending proposals and contracts, and they can sign in to the portal.</td></tr>'}
+function conSync(){document.querySelectorAll('#conTbl input[data-ci]').forEach(e=>{const x=edit.contacts[+e.dataset.ci];if(x)x[e.dataset.ck]=e.value.trim()});return (edit.contacts||[]).filter(x=>x.name||x.email||x.phone)}
 async function saveCust(){if(deny('customers'))return;const c=grab({...edit.obj},['name','company','ctype','phone','email','billEmail','address','notes','smsPhone']);{const ne=el('f_noEmail');if(ne)c.emailOptOutAt=ne.checked?(c.emailOptOutAt||new Date().toISOString()):null}
   const oi=el('f_smsOptIn');if(oi){const was=!!c.smsOptIn;c.smsOptIn=oi.checked;if(c.smsOptIn&&!was){c.smsOptInAt=new Date().toISOString();c.smsOptInSource=v('f_smsOptInSource')}if(!c.smsOptIn&&was)c.smsOptInAt=null}
   if(!c.name&&!c.company){toast('Enter a name');return}const{back,prevEdit}=edit;
-  siteSync();if(c.address&&!(edit.sites||[]).some(x=>(x.address||'').trim().toLowerCase()===c.address.trim().toLowerCase()))edit.sites.unshift({id:uid(),name:'Main',address:c.address,isPrimary:true});
+  if(el('conTbl'))c.contacts=conSync();siteSync();if(c.address&&!(edit.sites||[]).some(x=>(x.address||'').trim().toLowerCase()===c.address.trim().toLowerCase()))edit.sites.unshift({id:uid(),name:'Main',address:c.address,isPrimary:true});
   try{await save('customers',c)}catch(e){return}await saveSites(c.id);toast('Customer saved');
   if(back==='job'){closeM2();edit=prevEdit;edit.obj.customerId=c.id;edit.obj.site=edit.obj.site||c.address;drawJob()}
   else if(back==='call'){closeM2();UI.callQ='';UI.callCust=c.id;render()}
@@ -1894,7 +1899,8 @@ async function mcEmail(){if(deny('send_estimates'))return;mcSync();const a=mcFin
   if(!a.viewToken){const r=new Uint8Array(24);crypto.getRandomValues(r);a.viewToken=[...r].map(x=>x.toString(16).padStart(2,'0')).join('')}
   if(!(await mcSave(false)))return;
   try{toast('Making the contract PDF…');const{w}=await mcPdfDoc(a);const blob=await w.outputPdf('blob');await sb.storage.from('proposal-pdfs').upload(a.id+'.pdf',blob,{contentType:'application/pdf',upsert:true})}catch(e){toast('PDF upload failed — '+(e.message||e));return}
-  const text=`Hello ${c.name||''},\n\nAttached is our HVAC maintenance contract #${a.number} for ${String(a.site||c.address||'').replace(/\n/g,', ')}.\n\nIt covers ${a.mc.units.length} unit group(s) with ${a.mc.freq.toLowerCase()} visits from ${fdate(a.start)} to ${fdate(a.end)}. Total contract value: ${money(a.price)}, payable ${a.mc.plan.toLowerCase()}.\n\nThe contract is quoted at ${MC_TIERS[+a.mc.tier||2]}. You can review it, switch to another service level (Tier 1, 2 or 3) if you prefer, and approve it online in your customer portal (button below) — sign in with this email address. Or sign and return the PDF, or reply with any questions.\n\nThank you,\n${(me&&me.name)||''}\n${co.name||''}\n${co.phone||''}`;
+  const first=String(to).split(/[;,\s]+/)[0].toLowerCase(),ct=(c.contacts||[]).find(x=>(x.email||'').toLowerCase()===first),hi=ct&&ct.name?ct.name.split(' ')[0]:(c.name||'');
+  const text=`Hello ${hi},\n\nAttached is our HVAC maintenance contract #${a.number} for ${String(a.site||c.address||'').replace(/\n/g,', ')}.\n\nIt covers ${a.mc.units.length} unit group(s) with ${a.mc.freq.toLowerCase()} visits from ${fdate(a.start)} to ${fdate(a.end)}. Total contract value: ${money(a.price)}, payable ${a.mc.plan.toLowerCase()}.\n\nThe contract is quoted at ${MC_TIERS[+a.mc.tier||2]}. You can review it, switch to another service level (Tier 1, 2 or 3) if you prefer, and approve it online in your customer portal (button below) — sign in with this email address. Or sign and return the PDF, or reply with any questions.\n\nThank you,\n${(me&&me.name)||''}\n${co.name||''}\n${co.phone||''}`;
   const ok=await sendEmail(to,`Maintenance Contract ${a.number} – ${co.name||''}`,text,{kind:'agreement',ref:a.number,cc:a.emailCc,buttons:[{label:'Review & approve in portal',url:KOR.portalUrl||'https://korhvac.com/portal/'},{label:'View contract PDF',url:`${KOR.supabaseUrl||'https://bljdqwbbcfgouuekcqxl.supabase.co'}/functions/v1/proposal-view?t=${a.viewToken}`}],link:`${KOR.supabaseUrl||'https://bljdqwbbcfgouuekcqxl.supabase.co'}/functions/v1/proposal-view?t=${a.viewToken}`,attachments:async()=>{const{w}=await mcPdfDoc(a);const uri=await w.outputPdf('datauristring');return[{name:`Maintenance Contract ${a.number}.pdf`,contentType:'application/pdf',base64:String(uri).split(',')[1]}]}});
   if(ok&&a.status==='Draft'){a.status='Sent';a.sentAt=today();const f=el('f_status');if(f)f.value='Sent';await mcSave(false)}}
 // PM job text for a visit: per-unit checklist for that visit
