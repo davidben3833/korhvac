@@ -847,7 +847,7 @@ const JOB_TYPES=['Service Call','Repair','Maintenance','Install','Emergency','Es
 const PRIOS=['Normal','High','Emergency','Low'];
 const EQ_TYPES=['Rooftop Unit (RTU)','Split System','Heat Pump','Furnace','Boiler','Chiller','Air Handler','Mini-Split','PTAC','Cooling Tower','Exhaust Fan','Make-Up Air','Water Heater','Controls/BMS','Other'];
 const REBATE_ST=['Pre-approval','Approved','Installed','Submitted','Paid','Denied'];
-const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['techview','🧰','My Jobs (tech view) ↗'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Proposals'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['suppliers','🏭','Suppliers'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
+const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['techview','🧰','My Jobs (tech view) ↗'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Proposals'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['suppliers','🏭','Suppliers'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
 const VIEWS=NAV.filter(n=>n.length>1);
 let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null;
 const isAdmin=()=>!sb||(me&&(me.base||me.role)==='Admin');
@@ -1219,7 +1219,7 @@ function render(){
   hydratePhotos();
   if(sb&&view==='map')pollLive();
 }
-function route(){const h=location.hash.slice(1);if(h==='rebateportal'){location.href='/rebate/';return}if(h==='techview'){location.href='/tech/';return}view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
+function route(){const h=location.hash.slice(1);if(h==='rebateportal'){UI.rbTab='portal';location.hash='rebates';return}if(h==='techview'){location.href='/tech/';return}view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);
 
 /* ================= DASHBOARD ================= */
@@ -2437,9 +2437,11 @@ function previewInv(){syncInv();const i=edit.obj;
   <div class="mfoot"><span class="sp"></span><button onclick="copyTxt(invText(edit.obj))">Copy as text</button><button onclick="printInv()">🖨 Print / Save PDF</button><button class="pri" onclick="closeM2()">Close</button></div>`;$('#ov2').classList.add('show')}
 
 /* ================= REBATES ================= */
-function vReb(){const list=S.rebates.filter(r=>UI.rbSt==='All'||r.status===UI.rbSt).sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+function rebTabs(){const p=UI.rbTab==='portal';return `<div class="filters" style="margin-bottom:12px"><button class="sm ${p?'':'pri'}" onclick="UI.rbTab='track';render()">💲 Rebate tracking</button><button class="sm ${p?'pri':''}" onclick="UI.rbTab='portal';render()">🧰 Rebate projects</button></div>`}
+function vReb(){if(UI.rbTab==='portal')return `<div class="top"><h1>Rebates</h1></div>${rebTabs()}<iframe src="/rebate/?embed=1" style="width:100%;height:calc(100vh - 190px);min-height:520px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>`;
+  const list=S.rebates.filter(r=>UI.rbSt==='All'||r.status===UI.rbSt).sort((a,b)=>(b.created||'').localeCompare(a.created||''));
   const sum=s=>S.rebates.filter(r=>s.includes(r.status)).reduce((a,r)=>a+(+r.amount||0),0);
-  return `<div class="top"><h1>Rebate Tracking</h1><button class="pri" onclick="openReb()">+ New Rebate</button></div>
+  return `<div class="top"><h1>Rebates</h1><button class="pri" onclick="openReb()">+ New Rebate</button></div>${rebTabs()}
   <div class="kpis"><div class="card kpi"><div class="l">In pre-approval</div><div class="v">${money(sum(['Pre-approval']))}</div></div><div class="card kpi"><div class="l">Approved / installed</div><div class="v">${money(sum(['Approved','Installed']))}</div></div><div class="card kpi"><div class="l">Submitted, awaiting $</div><div class="v">${money(sum(['Submitted']))}</div></div><div class="card kpi"><div class="l">Paid</div><div class="v" style="color:var(--ok)">${money(sum(['Paid']))}</div></div></div>
   <div class="filters"><select onchange="UI.rbSt=this.value;render()">${opts(['All',...REBATE_ST],UI.rbSt)}</select></div>
   <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Customer</th><th>Program</th><th>Rebate company</th><th>Measure</th><th>App #</th><th>Submitted</th><th>Expected</th><th>Status</th><th class="r">Amount</th></tr>

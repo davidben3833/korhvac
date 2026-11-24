@@ -52,7 +52,7 @@ tr.click{cursor:pointer}tr.click:hover{background:#f8f9fc}
 .mnav{display:none;gap:6px;margin-bottom:12px}
 .stage{display:flex;gap:4px;flex-wrap:wrap}.stage span{font-size:12px;padding:3px 8px;border-radius:6px;background:#eef1f6;color:var(--mut)}.stage span.on{background:var(--ink);color:#fff}
 </style>
-</head>
+<style>.embed .mnav{display:flex!important;gap:6px;margin-bottom:12px}.embed header{display:none}.embed main{padding-top:12px}</style></head>
 <body>
 <div id="app"></div>
 <script>
@@ -85,10 +85,12 @@ function loginView(msg=''){
   $('#pw').onkeydown=e=>{if(e.key==='Enter')$('#go').click()};
   $('#fp').onclick=async e=>{e.preventDefault();const em=$('#em').value.trim();if(!em)return $('#er').textContent='Type your email first';await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+'/app/'});$('#er').textContent='Check your email for a reset link.'};
 }
+const EMBED=new URLSearchParams(location.search).has('embed')||window.self!==window.top;
+if(EMBED)document.documentElement.classList.add('embed');
 async function boot(){
   const{data:{session}}=await sb.auth.getSession();if(!session)return loginView();
   const{data,error}=await sb.rpc('rebate_me');
-  if(error||!data){location.replace('/app/');return}
+  if(error||!data){if(EMBED){document.getElementById('app').innerHTML='<p style="padding:20px">You don’t have access to rebate projects.</p>';return}location.replace('/app/');return}
   ME=data;await loadAll();route();
 }
 async function loadAll(){
