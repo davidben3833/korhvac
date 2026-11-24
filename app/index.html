@@ -934,9 +934,14 @@ async function sendEmail(to,subject,text,opt={}){
   if(!to){toast('No email address on file for this customer');return false}
   const html=text.split('\n\n').map(p=>'<p>'+esc(p).replace(/\n/g,'<br>')+'</p>').join('');
   if(sb){toast('Sending…');
-    let atts=[];try{atts=opt.attachments?await opt.attachments():[]}catch(e){toast('Couldn’t attach the PDF — sending without it')}
-    const{data,error}=await sb.functions.invoke('send-email',{body:{to,cc:opt.cc||undefined,subject,html:emailHtml(html),attachments:atts,kind:opt.kind,ref:opt.ref}});
-    if(!error&&data&&data.ok){toast('✅ Email sent to '+to+(atts.length?' (with PDF)':''));return true}
+    // attachments must stay under the 3 MB email limit: re-make the PDF lighter, and if it still won't fit, send a link instead
+    const big=a=>a.reduce((t,x)=>t+String(x.base64||'').length*.75,0)>2.8e6;let atts=[],body=html,linked=false;
+    try{if(opt.attachments){atts=await opt.attachments();const q0=PDF_Q,s0=PDF_S;
+      for(const[q,sc]of[[.45,1.2],[.35,1]]){if(!big(atts))break;toast('Making the PDF smaller…');PDF_Q=q;PDF_S=sc;try{atts=await opt.attachments()}finally{PDF_Q=q0;PDF_S=s0}}
+      if(big(atts)){atts=[];if(opt.link){linked=true;body+=`<p><b>View / download the PDF:</b> <a href="${esc(opt.link)}">${esc(opt.link)}</a></p>`}else toast('PDF is too large to attach — sending without it')}}}
+    catch(e){toast('Couldn’t attach the PDF — sending without it')}
+    const{data,error}=await sb.functions.invoke('send-email',{body:{to,cc:opt.cc||undefined,subject,html:emailHtml(body),attachments:atts,kind:opt.kind,ref:opt.ref}});
+    if(!error&&data&&data.ok){toast('✅ Email sent to '+to+(atts.length?' (with PDF)':linked?' (PDF as a link)':''));return true}
     let m=error&&error.message||'Email failed';try{const d=await error.context.json();if(d&&d.error)m=d.error}catch(_){}
     toast('Email not sent: '+m);return false}
   if(mcp){
@@ -1421,7 +1426,7 @@ async function saveEmailSettings(){if(deny('settings'))return;const c=emailCfg()
   try{await save('settings',{id:'email',enabled:el('em_enabled').checked,events:ev,templates:tp,from:fr});toast('Email settings saved')}catch(e){}}
 async function emailAct(a,id){const{error}=await sb.rpc(a==='send'?'email_send_now':'email_cancel',{p_id:id});if(error){toast(sbErr(error));return}toast(a==='send'?'Sending…':'Canceled');setTimeout(loadEmailInfo,a==='send'?4000:300)}
 // PDF size control for every PDF that goes out: JPEG pages at ~72% quality, 1.6x render (sharp on screen/print), compressed.
-let PDF_Q=.72,PDF_S=1.6;const PDF_LITE=()=>({image:{type:'jpeg',quality:PDF_Q},html2canvas:{scale:PDF_S,backgroundColor:'#ffffff',useCORS:true}});
+let PDF_Q=.6,PDF_S=1.4;const PDF_LITE=()=>({image:{type:'jpeg',quality:PDF_Q},html2canvas:{scale:PDF_S,backgroundColor:'#ffffff',useCORS:true}});
 async function uploadInvPdf(i){if(!sb||!i||!i.id)return;try{const blob=await invPdfJob(i,w=>w.outputPdf('blob'));await sb.storage.from('invoice-pdfs').upload(i.id+'.pdf',blob,{upsert:true,contentType:'application/pdf'})}catch(e){console.warn('invoice pdf upload failed',e)}}
 
 /* ================= JOBS ================= */
@@ -1886,7 +1891,7 @@ async function mcEmail(){if(deny('send_estimates'))return;mcSync();const a=mcFin
   if(!(await mcSave(false)))return;
   try{toast('Making the contract PDF…');const{w}=await mcPdfDoc(a);const blob=await w.outputPdf('blob');await sb.storage.from('proposal-pdfs').upload(a.id+'.pdf',blob,{contentType:'application/pdf',upsert:true})}catch(e){toast('PDF upload failed — '+(e.message||e));return}
   const text=`Hello ${c.name||''},\n\nAttached is our HVAC maintenance contract #${a.number} for ${String(a.site||c.address||'').replace(/\n/g,', ')}.\n\nIt covers ${a.mc.units.length} unit group(s) with ${a.mc.freq.toLowerCase()} visits from ${fdate(a.start)} to ${fdate(a.end)}. Total contract value: ${money(a.price)}, payable ${a.mc.plan.toLowerCase()}.\n\nThe contract is quoted at ${MC_TIERS[+a.mc.tier||2]}. You can review it, switch to another service level (Tier 1, 2 or 3) if you prefer, and approve it online in your customer portal: ${KOR.portalUrl||'https://korhvac.com/portal/'} — sign in with this email address. Or sign and return the PDF, or reply with any questions.\n\nThank you,\n${(me&&me.name)||''}\n${co.name||''}\n${co.phone||''}`;
-  const ok=await sendEmail(to,`Maintenance Contract ${a.number} – ${co.name||''}`,text,{kind:'agreement',ref:a.number,cc:a.emailCc,attachments:async()=>{const{w}=await mcPdfDoc(a);const uri=await w.outputPdf('datauristring');return[{name:`Maintenance Contract ${a.number}.pdf`,contentType:'application/pdf',base64:String(uri).split(',')[1]}]}});
+  const ok=await sendEmail(to,`Maintenance Contract ${a.number} – ${co.name||''}`,text,{kind:'agreement',ref:a.number,cc:a.emailCc,link:`${KOR.supabaseUrl||'https://bljdqwbbcfgouuekcqxl.supabase.co'}/functions/v1/proposal-view?t=${a.viewToken}`,attachments:async()=>{const{w}=await mcPdfDoc(a);const uri=await w.outputPdf('datauristring');return[{name:`Maintenance Contract ${a.number}.pdf`,contentType:'application/pdf',base64:String(uri).split(',')[1]}]}});
   if(ok&&a.status==='Draft'){a.status='Sent';a.sentAt=today();await mcSave(false)}}
 // PM job text for a visit: per-unit checklist for that visit
 function mcJobText(a,date){const ds=mcDates(a);let k=ds.indexOf(date);if(k<0)k=ds.findIndex(d=>d>=date);if(k<0)k=0;
