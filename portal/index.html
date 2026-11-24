@@ -192,6 +192,7 @@ function supabaseApi(){
       return{me,customers:me.customers||[],jobs:J(jobs),invoices:J(invoices),estimates:J(estimates),equipment:J(equipment),agreements:J(agreements),requests:J(requests),sms:sms||{optIn:false,phone:''}}},
     async setSms(optIn,phone){await rpc('client_set_sms',{p_opt_in:optIn,p_phone:phone})},
     async decide(id,optIdx,approve,name){await rpc('client_estimate_decide',{p_id:id,p_option:optIdx,p_approve:approve,p_name:name})},
+    async decideAgr(id,tier,approve,name){await rpc('client_agreement_decide',{p_id:id,p_tier:tier,p_approve:approve,p_name:name})},
     async notifs(){const{data,error}=await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(50);if(error)throw new Error(error.message);return data||[]},
     async markRead(ids){let q=sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);if(ids)q=q.in('id',ids);await q},
     onNotif(fn){const ch=sb.channel('portal-bell').on('postgres_changes',{event:'*',schema:'public',table:'notifications'},()=>fn()).subscribe();return()=>sb.removeChannel(ch)},
@@ -201,7 +202,7 @@ function supabaseApi(){
 
 /* ===================== STATE / ROUTING ===================== */
 let D=null,me=null,loc='all',N=[],bellOpen=false,bellSub=null;
-const TABS=[['home','Overview'],['history','Service History'],['invoices','Invoices'],['estimates','Proposals'],['equipment','Equipment'],['request','Request Service']];
+const TABS=[['home','Overview'],['history','Service History'],['invoices','Invoices'],['estimates','Proposals & Contracts'],['equipment','Equipment'],['request','Request Service']];
 const tab=()=>{const h=location.hash.slice(1);return TABS.some(t=>t[0]===h)?h:'home'};
 window.addEventListener('hashchange',()=>render());
 const inLoc=x=>loc==='all'||x.customerId===loc;
@@ -278,16 +279,17 @@ async function signOut(){await api.signOut();me=null;D=null;location.hash='';ren
 function vHome(){
   const inv=D.invoices.filter(inLoc),bal=inv.reduce((a,i)=>a+invBal(i),0),over=inv.filter(i=>invStatus(i)==='Overdue');
   const up=D.jobs.filter(inLoc).filter(j=>!['Completed','Canceled'].includes(j.status)&&j.date).sort((a,b)=>a.date.localeCompare(b.date));
-  const est=D.estimates.filter(inLoc).filter(e=>e.status==='Sent');
+  const est=D.estimates.filter(inLoc).filter(e=>e.status==='Sent');const pc=(D.agreements||[]).filter(inLoc).filter(a=>a.status==='Sent');
   const ag=D.agreements.filter(inLoc).filter(a=>a.status==='Active');
   const last=D.jobs.filter(inLoc).filter(j=>j.status==='Completed').sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
   return `<h1>Welcome${D.me&&D.me.name?', '+esc(D.me.name.split(' ')[0]):''}</h1><p class="sub">Here’s a summary of your account.</p>
   <div class="grid">
    <div class="card kpi ${bal?'due':''}"><div class="l">Balance due</div><div class="v">${money(bal)}</div><div class="s" style="${over.length?'color:var(--bad)':''}">${over.length?over.length+' overdue invoice'+(over.length>1?'s':''):'All caught up'}</div>${bal?`<a class="btn pri sm" href="#invoices" style="margin-top:10px">View & pay</a>`:''}</div>
    <div class="card kpi"><div class="l">Next visit</div><div class="v" style="font-size:20px">${up[0]?fdate(up[0].date):'None scheduled'}</div><div class="s">${up[0]?esc(up[0].type)+(up[0].time?' · '+ftime(up[0].time):'')+(multi()?'<br>'+esc(locName(up[0].customerId)):''):'<a href="#request">Request service</a>'}</div></div>
-   <div class="card kpi"><div class="l">Proposals awaiting you</div><div class="v">${est.length}</div><div class="s">${est.length?'<a href="#estimates">Review & approve</a>':'Nothing pending'}</div></div>
+   <div class="card kpi"><div class="l">Proposals awaiting you</div><div class="v">${est.length+pc.length}</div><div class="s">${est.length+pc.length?'<a href="#estimates">Review & approve</a>':'Nothing pending'}</div></div>
    <div class="card kpi"><div class="l">Maintenance plan</div><div class="v" style="font-size:20px">${ag.length?'Active':'—'}</div><div class="s">${ag.length?esc(ag[0].name)+'<br>Renews '+fdate(ag[0].end):'Ask us about a maintenance plan'}</div></div>
   </div>
+  ${pc.length?`<div class="card" style="border-color:#cfcfcf"><h2>🔧 Maintenance contract ready for your review</h2>${pc.map(a=>`<div class="row"><div><b>${esc(a.name||'Maintenance contract')}</b><div class="mut small">${esc(a.number)} · ${fdate(a.start)} – ${fdate(a.end)}</div></div><span class="sp"></span><button class="pri sm" onclick="openAgrP('${a.id}')">Choose plan & approve</button></div>`).join('')}</div>`:''}
   ${est.length?`<div class="card" style="border-color:#cfcfcf"><h2>📝 Proposal ready for your review</h2>${est.map(e=>`<div class="row"><div><b>${esc(e.title)}</b><div class="mut small">${esc(e.number)} · ${fdate(e.date)}${multi()?' · '+esc(locName(e.customerId)):''}</div></div><span class="sp"></span><button class="pri sm" onclick="openEst('${e.id}')">Review</button></div>`).join('<hr style="border:none;border-top:1px solid var(--line)">')}</div>`:''}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
    <div class="card"><h2>Most recent service</h2>${last?`<b>${esc(last.type)}</b> · ${fdate(last.date)}<p class="small" style="margin:8px 0">${esc(last.notes||last.description||'')}</p><a href="#history" class="small">See full history →</a>`:'<div class="empty">No completed service yet</div>'}</div>
@@ -343,8 +345,28 @@ function printInv(id){const i=D.invoices.find(x=>x.id===id);const w=window.open(
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${esc(i.number)}</title><style>${css}@page{margin:14mm}body{background:#fff;padding:24px}</style></head><body>${invDoc(i)}<script>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close()}
 
 /* ---------- Estimates ---------- */
+const TIER_N={1:'Tier 1 — Basic',2:'Tier 2 — Standard',3:'Tier 3 — Comprehensive'};
+const TIER_D={1:'Filters, belts, condensate drains and pans, visual inspection, thermostats, water leaks.',2:'Everything in Tier 1 plus lubrication / greasing, electrical components, fan motors and blowers, amp draws, refrigerant pressures, dampers, controls and safeties.',3:'Everything in Tier 2 plus chemical coil cleaning, compressor tests, superheat / subcooling, combustion analysis, heat exchanger and burner, cooling tower and strainer cleaning, and a full diagnostic report.'};
+function agContracts(){const cs=(D.agreements||[]).filter(inLoc).filter(a=>a.status==='Sent'||(a.tiers&&Object.keys(a.tiers).length));
+  return cs.length?`<div class="card" style="padding:0;overflow-x:auto;margin-bottom:16px"><table><tr><th>Maintenance contract</th><th class="hide-m">Term</th><th>Status</th><th></th></tr>${cs.map(a=>`<tr class="click" onclick="openAgrP('${a.id}')"><td><b>${esc(a.number)}</b> ${esc(a.name||'')}${multi()?`<div class="mut small">${esc(locName(a.customerId))}</div>`:''}</td><td class="hide-m small">${fdate(a.start)} – ${fdate(a.end)}</td><td>${badge(a.status==='Sent'?'Awaiting approval':a.status)}</td><td class="r"><button class="sm ${a.status==='Sent'?'pri':''}">${a.status==='Sent'?'Review':'View'}</button></td></tr>`).join('')}</table></div>`:''}
+let tpick=null;
+function openAgrP(id,keep){const a=(D.agreements||[]).find(x=>x.id===id);if(!a)return;const open=a.status==='Sent';if(!keep)tpick=+a.tier||2;
+  const ts=Object.keys(a.tiers||{}).map(Number).sort();const show=open&&a.offerTiers!==false?ts:[+a.tier||ts[0]].filter(Boolean);
+  modal(`<h2><span>Maintenance Contract ${esc(a.number)}</span><button class="sm" onclick="closeM()">✕</button></h2>
+  <div class="row small mut" style="margin-bottom:10px"><span>${esc(a.freq||'')} visits</span><span>${fdate(a.start)} – ${fdate(a.end)}</span>${a.site?`<span>${esc(a.site)}</span>`:''}${badge(open?'Awaiting approval':a.status)}</div>
+  ${a.pdf?`<p><a class="btn" href="${esc(a.pdf)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">📄 View full contract (PDF)</a></p>`:''}
+  ${(a.units||[]).length?`<p class="small"><b>Equipment covered:</b> ${a.units.map(esc).join(', ')}</p>`:''}
+  ${open?'<p class="small" style="margin:10px 0 4px"><b>Choose your service level:</b></p>':''}
+  ${show.map(t=>{const x=a.tiers[t]||{};const sel=open?tpick===t:+a.tier===t;return `<div class="opt ${sel?'sel':''}" onclick="${open?`tpick=${t};openAgrP('${a.id}',1)`:''}"><div class="row"><b style="font-size:17px">${TIER_N[t]}</b>${!open&&+a.tier===t?'<span class="badge b-Approved">Selected</span>':''}<span class="sp"></span><span class="price">${money(x.price)}<span class="small mut">/yr</span></span></div>
+   <div class="small mut">${TIER_D[t]}</div>${x.first?`<div class="small" style="margin-top:6px">${+a.initial?`First payment ${money(x.first)} (includes ${money(a.initial)} first major maintenance), then `:''}${x.count>1?`${x.count-1} payments of ${money(x.next)}`:''} — ${esc((a.plan||'').toLowerCase())}</div>`:''}</div>`}).join('')}
+  ${open?`<div class="card" style="background:#fafbfd"><label style="margin-top:0">Your name</label><input id="apn" value="${esc(D.me&&D.me.name||'')}" placeholder="Full name">
+   <label style="display:flex;gap:8px;align-items:flex-start;font-weight:500;color:var(--txt)"><input type="checkbox" id="apc" style="width:auto;margin-top:3px"> I have read the maintenance contract and authorize ${esc(CFG.company)} to provide the selected service level at the price and payment schedule shown. This counts as my signature.</label>
+   <div class="row" style="margin-top:12px"><button onclick="decideAgr('${a.id}',false)">Decline</button><span class="sp"></span><button class="grn" onclick="decideAgr('${a.id}',true)">✓ Approve ${tpick?TIER_N[tpick]:''}</button></div></div>`
+  :a.approvedBy?`<p class="small">${a.status==='Declined'?'Declined':'Approved'} by <b>${esc(a.approvedBy)}</b> on ${fdate(a.approvedAt)}.</p>`:''}`)}
+async function decideAgr(id,approve){const name=$('#apn').value.trim();if(approve&&!tpick){toast('Choose a service level');return}if(!name){toast('Please enter your name');return}if(approve&&!$('#apc').checked){toast('Please check the authorization box');return}
+  try{await api.decideAgr(id,approve?tpick:null,approve,name);closeM();await refresh();toast(approve?'Approved — thank you! We’ll schedule your first visit.':'Contract declined. Thank you for letting us know.')}catch(err){toast(err.message||'Something went wrong')}}
 function vEstimates(){const es=D.estimates.filter(inLoc).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return `<h1>Proposals</h1><p class="sub">Review proposals and approve the option that’s right for you.</p>
+  return `<h1>Proposals & Contracts</h1><p class="sub">Review proposals and maintenance contracts and approve the option that’s right for you.</p>${agContracts()}
   <div class="card" style="padding:0;overflow-x:auto">${es.length?`<table><tr><th>Proposal</th><th>Scope</th><th class="hide-m">Date</th><th>Status</th><th></th></tr>${es.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b></td><td>${esc(e.title)}${multi()?`<div class="mut small">${esc(locName(e.customerId))}</div>`:''}</td><td class="hide-m nowrap">${fdate(e.date)}</td><td>${badge(e.status==='Sent'?'Awaiting approval':e.status)}</td><td class="r"><button class="sm ${e.status==='Sent'?'pri':''}">${e.status==='Sent'?'Review':'View'}</button></td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
 let pick=null;
 function openEst(id,keep){const e=D.estimates.find(x=>x.id===id);if(!e)return;const open=e.status==='Sent';if(!keep)pick=null;pick=open?(e.options.length===1?0:pick):e.selected;

@@ -1719,8 +1719,8 @@ function mcUnitMat(a,u,T){T=T||mcTier(a,u);const n=mcN(a);const m=Array(n).fill(
   (u.extra||[]).forEach((x,i)=>{if(i<n)m[i]+=+x||0});return m}
 function mcUnit(a,u,T){T=T||mcTier(a,u);const p={...MC_DEF,...a.mc},h=mcUnitHours(a,u,T),m=mcUnitMat(a,u,T),lab=h.map(x=>x*(+p.rate||0)),vis=lab.map((x,i)=>x+m[i]);return{h,m,lab,vis,total:vis.reduce((s,x)=>s+x,0),hrs:h.reduce((s,x)=>s+x,0)}}
 function mcCalc(a,T){const units=(a.mc&&a.mc.units||[]).map(u=>({u,c:mcUnit(a,u,T)}));const total=Math.round(units.reduce((s,x)=>s+x.c.total,0)*100)/100;
-  const ov=T?0:+(a.mc||{}).final;const price=ov>0?ov:total;return{units,total,price,hrs:units.reduce((s,x)=>s+x.c.hrs,0)}}
-function mcSchedule(a){const p={...MC_DEF,...a.mc},{price}=mcCalc(a),init=Math.min(+p.initial||0,price);let P=MC_PLAN[p.plan];const dates=P?Array.from({length:P},(_,i)=>addMonths(a.start||today(),i*12/P)):mcDates(a);P=dates.length;
+  const p0=a.mc||{},tt=T||+p0.tier||2,ov=+((p0.finals||{})[tt])||0;const price=ov>0?ov:total;return{units,total,price,hrs:units.reduce((s,x)=>s+x.c.hrs,0)}}
+function mcSchedule(a,pr){const p={...MC_DEF,...a.mc},price=pr!=null?pr:mcCalc(a).price,init=Math.min(+p.initial||0,price);let P=MC_PLAN[p.plan];const dates=P?Array.from({length:P},(_,i)=>addMonths(a.start||today(),i*12/P)):mcDates(a);P=dates.length;
   const each=Math.floor((price-init)/P*100)/100;const rows=dates.map((d,i)=>({date:d,amount:each+(i===0?init:0)}));const diff=Math.round((price-rows.reduce((s,r)=>s+r.amount,0))*100)/100;if(rows.length)rows[rows.length-1].amount=Math.round((rows[rows.length-1].amount+diff)*100)/100;
   const old=a.mc&&a.mc.schedule||[];rows.forEach(r=>{const o=old.find(x=>x.date===r.date);if(o&&o.invoiceId)r.invoiceId=o.invoiceId});return rows}
 function mcNum(){const yy=String(new Date().getFullYear()).slice(2),re=new RegExp('^'+yy+'-(\\d+)-\\d+$');let m=0;[...S.estimates,...S.agreements].forEach(x=>{const r=re.exec(x.number||'');if(r)m=Math.max(m,+r[1])});return `${yy}-${String(m+1).padStart(3,'0')}-01`}
@@ -1729,12 +1729,15 @@ function mcNewUnit(type,e){const t=MC_TPL[type]||MC_TPL.Other;return{id:uid(),ty
 /* ---------- builder UI ---------- */
 function openAgr(id,pre){const a=id?JSON.parse(JSON.stringify(byId('agreements',id))):{id:uid(),number:mcNum(),status:'Draft',start:today(),end:addDays(addMonths(today(),12),-1),date:today(),...(pre||{})};
   if(!a.mc){a.mc={...MC_DEF,units:[],freq:{'1':'Annual','2':'Semi-annual','3':'3 times a year','4':'Quarterly','6':'Every 2 months','12':'Monthly'}[String(a.visits||'')]||'Quarterly',plan:a.billing==='Semi-Annual'?'Semi-annual':(a.billing||'Monthly')};if(a.price&&id)a.mc.final=+a.price}
+  if(a.mc.final&&!a.mc.finals){a.mc.finals={[+a.mc.tier||2]:+a.mc.final}}delete a.mc.final;
   a.mc.units.forEach(u=>{if(u.hours&&!u.th){u.th={[mcTier(a,u)]:u.hours};delete u.hours}(u.tasks||[]).forEach(t=>{if(t[3]==null)t[3]=mcTierOf(t[0])})});
   if(!a.mc.units.length&&a.customerId&&!id)mcFromEquip(a);edit={col:'agreements',obj:a};mcDraw()}
 function mcFromEquip(a){const eq=S.equipment.filter(e=>e.customerId===a.customerId&&(!a.siteId||!e.siteId||e.siteId===a.siteId));eq.forEach(e=>a.mc.units.push(mcNewUnit(mcGuessType(e),e)))}
 function mcSync(){const a=edit.obj,p=a.mc;if(!el('mc_rate'))return;grab(a,['customerId','status','number','name','start','end','techId','emailTo','emailCc']);a.date=v('f_date')||a.date;
-  ['rate','svcRate','emRate','emMin','resp','interest','initial','final','county'].forEach(k=>{const e=el('mc_'+k);if(e)p[k]=k==='county'?e.value.trim():e.value.trim()===''?'':+e.value});
-  ['freq','plan','filters'].forEach(k=>{const e=el('mc_'+k);if(e)p[k]=e.value});const tr=el('mc_tier');if(tr)p.tier=+tr.value;const sp=el('mc_showPrices');if(sp)p.showPrices=sp.checked;const ot=el('mc_offerTiers');if(ot)p.offerTiers=ot.checked;const ex=el('mc_excl');if(ex)p.excl=ex.value.trim();
+  {const tr=el('mc_tier');if(tr&&+tr.value!==+p.tier){p.tier=+tr.value;const fe0=el('mc_final');if(fe0)fe0.removeAttribute('id')}}
+  {const fe=el('mc_final');if(fe){p.finals=p.finals||{};const t0=+(p.tier||2);if(fe.value.trim()==='')delete p.finals[t0];else p.finals[t0]=+fe.value}}
+  ['rate','svcRate','emRate','emMin','resp','interest','initial','county'].forEach(k=>{const e=el('mc_'+k);if(e)p[k]=k==='county'?e.value.trim():e.value.trim()===''?'':+e.value});
+  ['freq','plan','filters'].forEach(k=>{const e=el('mc_'+k);if(e)p[k]=e.value});const sp=el('mc_showPrices');if(sp)p.showPrices=sp.checked;const ot=el('mc_offerTiers');if(ot)p.offerTiers=ot.checked;const ex=el('mc_excl');if(ex)p.excl=ex.value.trim();
   const st=el('mc_site');if(st){a.site=st.value.trim()}
   p.units.forEach((u,n)=>{['tag','make','model','serial','year','qty','floor','filter','belt','notes'].forEach(k=>{const e=el(`mu_${k}_${n}`);if(e)u[k]=e.value.trim()});
     const ut=el(`mu_tier_${n}`);if(ut)u.tier=ut.value?+ut.value:'';
@@ -1743,7 +1746,7 @@ function mcSync(){const a=edit.obj,p=a.mc;if(!el('mc_rate'))return;grab(a,['cust
 function mcDraw(){const a=edit.obj,p={...MC_DEF,...a.mc},isNew=!byId('agreements',a.id),c=byId('customers',a.customerId)||{},cal=mcCalc(a),dates=mcDates(a),sch=mcSchedule(a);
   modal(`<h2><span>${isNew?'New Maintenance Contract':'Maintenance Contract '+esc(a.number)} ${!isNew?badge(a.status):''}</span><button class="sm" onclick="closeM()">✕</button></h2>
   <div class="fg"><div class="span2"><label>Customer *</label><select id="f_customerId" onchange="mcSync();edit.obj.siteId='';edit.obj.site=(byId('customers',this.value)||{}).address||'';if(!edit.obj.mc.units.length)mcFromEquip(edit.obj);mcDraw()">${custOpts(a.customerId)}</select></div>
-   <div><label>Status</label><select id="f_status">${opts(['Draft','Sent','Active','Expired','Canceled'],a.status)}</select></div>
+   <div><label>Status</label><select id="f_status">${opts(['Draft','Sent','Active','Declined','Expired','Canceled'],a.status)}</select></div>
    <div class="span2"><label>Location</label>${siteOpts(a.customerId,a.site)}<input id="mc_site" value="${esc(a.site??c.address??'')}" ${custSites(a.customerId).length?'style="margin-top:4px"':''}></div>
    <div><label>Contract #</label><input id="f_number" value="${esc(a.number)}"></div>
    <div class="span2"><label>Plan name</label><input id="f_name" value="${esc(a.name||'')}" placeholder="Quarterly HVAC maintenance"></div><div><label>Contract date</label><input type="date" id="f_date" value="${esc(a.date||today())}"></div>
@@ -1765,7 +1768,7 @@ function mcDraw(){const a=edit.obj,p={...MC_DEF,...a.mc},isNew=!byId('agreements
   <div class="sec">Pricing & payments</div>
   <div class="fg"><div><label>Initial payment (first major maintenance)</label><input id="mc_initial" value="${esc(p.initial||'')}" placeholder="0" oninput="mcSync();mcTotals()"></div>
    <div><label>Payment plan</label><select id="mc_plan" onchange="mcSync();mcTotals()">${opts(Object.keys(MC_PLAN),p.plan)}</select></div>
-   <div><label>Final contract price (optional override)</label><input id="mc_final" value="${esc(p.final||'')}" placeholder="auto" oninput="mcSync();mcTotals()"></div>
+   <div><label>Final price for ${esc(MC_TIERS[+p.tier||2])} (optional)</label><input id="mc_final" value="${esc((p.finals||{})[+p.tier||2]||'')}" placeholder="auto" oninput="mcSync();mcTotals()"></div>
    <div><label>Service call $/hr</label><input id="mc_svcRate" value="${esc(p.svcRate)}"></div><div><label>Emergency $/hr</label><input id="mc_emRate" value="${esc(p.emRate)}"></div><div><label>Emergency minimum (hrs)</label><input id="mc_emMin" value="${esc(p.emMin)}"></div>
    <div><label>Emergency response (hrs)</label><input id="mc_resp" value="${esc(p.resp)}"></div><div><label>Late interest %/month</label><input id="mc_interest" value="${esc(p.interest)}"></div><div><label>Arbitration county</label><input id="mc_county" value="${esc(p.county)}"></div>
    <div class="span3"><label>Additional exclusions / notes for this contract</label><textarea id="mc_excl" rows="2" placeholder="e.g. BMS (by ABM) excluded">${esc(p.excl||'')}</textarea></div>
@@ -1773,7 +1776,7 @@ function mcDraw(){const a=edit.obj,p={...MC_DEF,...a.mc},isNew=!byId('agreements
   <div id="mc_tot"></div>
   <div class="fg" style="margin-top:8px"><div class="span2"><label>Email to</label><input id="f_emailTo" value="${esc(a.emailTo||'')}" placeholder="${esc(c.email||'customer email')}"></div><div><label>CC</label><input id="f_emailCc" value="${esc(a.emailCc||'')}"></div></div>
   <div class="mfoot">${!isNew?`<button class="danger" onclick="delRec('agreements','${a.id}')">Delete</button>`:''}<span class="sp"></span>
-   <button class="pri" onclick="mcPreview()">👁 Preview</button><button onclick="mcPdf()">📄 Contract PDF</button>${!isNew?`<button onclick="mcEmail()">✉️ Email to customer</button>`:''}
+   <button class="pri" onclick="mcPreview()">👁 Preview</button><button onclick="mcPdf()">📄 Contract PDF</button>${!isNew?`<button onclick="mcEmail()">✉️ Email + send to portal</button>`:''}
    ${a.status!=='Active'?`<button onclick="mcActivate()">✅ Signed → Activate</button>`:''}<button onclick="closeM()">Cancel</button><button class="pri" onclick="mcSave()">Save</button></div>`);
   mcTotals();mcThumbs()}
 function mcUnitCard(a,u,n,dates){const c=mcUnit(a,u),open=u._open!==false;
@@ -1795,11 +1798,11 @@ function mcUnitCard(a,u,n,dates){const c=mcUnit(a,u),open=u._open!==false;
     <button class="sm" onclick="mcSync();edit.obj.mc.units[${n}].tasks.push(['',0,'Every visit',mcTier(edit.obj,edit.obj.mc.units[${n}])]);mcDraw()">+ Task</button> <span class="small mut">Tick the visits (V1, V2…) each task is done on. Greyed tasks belong to a higher tier and are not included at this unit's tier. $ = material cost, added to the visit(s) that match its frequency.</span></details>`:''}</div>`}
 function mcTotals(){const a=edit.obj,cal=mcCalc(a),sch=mcSchedule(a),b=el('mc_tot');if(!b)return;
   cal.units.forEach(({c},n)=>{const t=el('mu_tot_'+n);if(t)t.textContent=money(c.total);c.vis.forEach((x,i)=>{const e=el(`mu_v_${n}_${i}`);if(e)e.textContent=money(x)})});
-  const tiers=[1,2,3].map(t=>mcCalc(a,t).total);
+  const tiers=[1,2,3].map(t=>mcCalc(a,t).price);
   b.innerHTML=`<div class="box" style="display:flex;gap:8px;flex-wrap:wrap">${tiers.map((v,k)=>`<div onclick="mcSync();edit.obj.mc.tier=${k+1};mcDraw()" style="cursor:pointer;flex:1;min-width:170px;border:2px solid ${+(a.mc.tier||2)===k+1?'var(--pri,#2563eb)':'var(--line)'};border-radius:10px;padding:8px"><b>${MC_TIERS[k+1]}</b><div style="font-size:18px;font-weight:700">${money(v)}<span class="small mut">/yr</span></div><div class="small mut">${esc(MC_TIER_DESC[k+1])}</div></div>`).join('')}</div>
   <div class="box"><div style="display:flex;gap:18px;flex-wrap:wrap"><div>Calculated total <b>${money(cal.total)}</b></div><div>Labor hours/yr <b>${(+cal.hrs).toFixed(2)}</b></div><div>Contract price <b style="font-size:16px">${money(cal.price)}</b></div></div>
    <table class="small" style="margin-top:6px"><tr><th>#</th><th>Due</th><th class="r">Amount</th></tr>${sch.map((r,i)=>`<tr><td>${i+1}</td><td>${fdate(r.date)}</td><td class="r">${money(r.amount)}</td></tr>`).join('')}</table></div>`}
-function mcFinish(a){a.mc={...MC_DEF,...a.mc};const cal=mcCalc(a);a.price=cal.price;a.visits=String(mcN(a));a.mc.schedule=mcSchedule(a);a.billing=a.mc.plan==='Semi-annual'?'Semi-Annual':a.mc.plan;
+function mcFinish(a){a.mc={...MC_DEF,...a.mc};const cal=mcCalc(a);a.price=cal.price;a.visits=String(mcN(a));a.mc.tiers=Object.fromEntries([1,2,3].map(T=>{const pr=mcCalc(a,T).price;return[T,{price:pr,schedule:mcSchedule(a,pr)}]}));a.mc.schedule=mcSchedule(a);a.billing=a.mc.plan==='Semi-annual'?'Semi-Annual':a.mc.plan;
   a.scope=a.mc.units.map(u=>`${u.tag||u.type}${+u.qty>1?' (x'+u.qty+')':''}`).join(', ');if(!a.name)a.name=`${a.mc.freq} HVAC maintenance`;
   if(!a.nextVisit||a.status!=='Active')a.nextVisit=mcDates(a).find(d=>d>=today())||a.start;const nb=a.mc.schedule.find(r=>!r.invoiceId);a.nextBill=nb?nb.date:'';a.kind='mc';return a}
 async function mcSave(close=true){if(deny('agreements'))return false;mcSync();const a=mcFinish(edit.obj);if(!a.customerId){toast('Pick a customer');return false}
@@ -1828,7 +1831,7 @@ function mcDoc(a){const c=byId('customers',a.customerId)||{},co=company(),p={...
   <h5 class="s">1.5 Reporting</h5><ul><li>A detailed report after each maintenance visit outlining the work performed, any issues identified, and recommendations for repairs or improvements.</li><li>A log of all services performed and parts replaced, available in the customer portal.</li></ul>
   <h4>PAYMENT TERMS</h4><h5 class="s">2.1 Total Contract Value</h5><div class="ar"><p>The total contract value for the ${esc(freq)} maintenance services, labor and material, is <b>${money(cal.price)}</b>. This amount covers all routine maintenance tasks outlined in this contract.</p></div>
   ${p.offerTiers!==false?`<h5 class="s">2.1.1 Maintenance Options</h5><div class="ar"><p>Please check the service level you choose. The contract value and payment schedule below are shown for ${esc(MC_TIERS[+p.tier||2])}; payments are adjusted proportionally for the level selected.</p></div>
-  <table class="mt"><tr><th></th><th>Service level</th><th>Includes</th><th class="r">Annual price</th></tr>${[1,2,3].map(t=>`<tr><td style="font-size:14pt;text-align:center">${+p.tier===t?'☒':'☐'}</td><td><b>${esc(MC_TIERS[t])}</b></td><td>${esc(MC_TIER_DESC[t])}</td><td class="r"><b>${money(t===+p.tier?cal.price:tierTot[t-1])}</b></td></tr>`).join('')}</table>`:''}
+  <table class="mt"><tr><th></th><th>Service level</th><th>Includes</th><th class="r">Annual price</th></tr>${[1,2,3].map(t=>`<tr><td style="font-size:14pt;text-align:center">${+p.tier===t?'☒':'☐'}</td><td><b>${esc(MC_TIERS[t])}</b></td><td>${esc(MC_TIER_DESC[t])}</td><td class="r"><b>${money(mcCalc(a,t).price)}</b></td></tr>`).join('')}</table>`:''}
   <h5 class="s">2.2 Payment Schedule</h5><div class="ar"><p>${+p.initial?`The initial payment, due on ${fdate(sch[0]&&sch[0].date)}, is ${money(sch[0]&&sch[0].amount)} (${money(p.initial)} for the major first-time maintenance plus the first installment). `:''}${sch.length>1?`Payments are made ${esc(p.plan.toLowerCase())} according to the following schedule:`:'Payment is due as follows:'}</p></div>
   <table class="mt" style="width:60%"><tr><th>Payment #</th><th>Due Date</th><th class="r">Amount</th></tr>${sch.map((r,i)=>`<tr><td>${i+1}</td><td>${fdate(r.date)}</td><td class="r">${money(r.amount)}</td></tr>`).join('')}</table>
   <h5 class="s">2.3 Payment Methods</h5><ul><li>Payments can be made via check, credit card, or electronic funds transfer (EFT). Invoices are emailed on the due date and are payable within 30 days.</li></ul>
@@ -1877,8 +1880,10 @@ async function mcPreview(){mcSync();const a=mcFinish(edit.obj),m=$('#modal2');m.
 async function mcEmail(){if(deny('send_estimates'))return;mcSync();const a=mcFinish(edit.obj),c=byId('customers',a.customerId)||{},co=company();
   const to=(a.emailTo||'').trim()||c.email||c.billEmail;if(!to){toast('Add an email in “Email to”');return}
   const bad=[to,a.emailCc].join(',').split(/[;,\s]+/).filter(x=>x&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));if(bad.length){toast('Check this email: '+bad[0]);return}
+  if(!a.viewToken){const r=new Uint8Array(24);crypto.getRandomValues(r);a.viewToken=[...r].map(x=>x.toString(16).padStart(2,'0')).join('')}
   if(!(await mcSave(false)))return;
-  const text=`Hello ${c.name||''},\n\nAttached is our HVAC maintenance contract #${a.number} for ${String(a.site||c.address||'').replace(/\n/g,', ')}.\n\nIt covers ${a.mc.units.length} unit group(s) with ${a.mc.freq.toLowerCase()} visits from ${fdate(a.start)} to ${fdate(a.end)}. Total contract value: ${money(a.price)}, payable ${a.mc.plan.toLowerCase()}.\n\nPlease review, sign and return it, or reply with any questions.\n\nThank you,\n${(me&&me.name)||''}\n${co.name||''}\n${co.phone||''}`;
+  try{toast('Making the contract PDF…');const{w}=await mcPdfDoc(a);const blob=await w.outputPdf('blob');await sb.storage.from('proposal-pdfs').upload(a.id+'.pdf',blob,{contentType:'application/pdf',upsert:true})}catch(e){toast('PDF upload failed — '+(e.message||e));return}
+  const text=`Hello ${c.name||''},\n\nAttached is our HVAC maintenance contract #${a.number} for ${String(a.site||c.address||'').replace(/\n/g,', ')}.\n\nIt covers ${a.mc.units.length} unit group(s) with ${a.mc.freq.toLowerCase()} visits from ${fdate(a.start)} to ${fdate(a.end)}. Total contract value: ${money(a.price)}, payable ${a.mc.plan.toLowerCase()}.\n\nYou can review it, choose the service level (Tier 1, 2 or 3) and approve it online in your customer portal: ${KOR.portalUrl||'https://korhvac.com/portal/'} — sign in with this email address. Or sign and return the PDF, or reply with any questions.\n\nThank you,\n${(me&&me.name)||''}\n${co.name||''}\n${co.phone||''}`;
   const ok=await sendEmail(to,`Maintenance Contract ${a.number} – ${co.name||''}`,text,{kind:'agreement',ref:a.number,cc:a.emailCc,attachments:async()=>{const{w}=await mcPdfDoc(a);const uri=await w.outputPdf('datauristring');return[{name:`Maintenance Contract ${a.number}.pdf`,contentType:'application/pdf',base64:String(uri).split(',')[1]}]}});
   if(ok&&a.status==='Draft'){a.status='Sent';a.sentAt=today();await mcSave(false)}}
 // PM job text for a visit: per-unit checklist for that visit
@@ -2448,6 +2453,7 @@ async function openNotif(id){const x=S.notifs.find(n=>n.id===id);if(!x)return;$(
   if(!x.read_at){x.read_at=new Date().toISOString();drawBell();sb.from('notifications').update({read_at:x.read_at}).eq('id',id).then(()=>{})}
   const[k,ref]=String(x.link||'').split(':');
   if(k==='job'&&byId('jobs',ref))openJob(ref);
+  else if(k==='agreement'&&byId('agreements',ref))openAgr(ref);
   else if(k==='timereq')openTreq(ref);
   else if(k==='vehicle'&&byId('vehicles',ref))openVeh(ref);
   else if(k==='estimate'&&byId('estimates',ref))openEst(ref);
