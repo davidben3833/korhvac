@@ -772,9 +772,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
  .mmore .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
  .mmore .tiles a{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 6px;text-align:center;text-decoration:none;color:var(--txt);font-size:12.5px;font-weight:600}
  .mmore .tiles a span{display:block;font-size:24px;margin-bottom:4px}.mmore .tiles a.on{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy) inset}
- .ov{padding:0!important;align-items:stretch}.modal{border-radius:0!important;max-width:none!important;min-height:100%;padding:14px 14px 90px!important}
- .modal h2{position:sticky;top:0;background:#fff;z-index:2;margin:-14px -14px 10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+ .ov{padding:0!important;align-items:stretch;background:#fff!important}.modal{border-radius:0!important;max-width:none!important;width:100%!important;min-height:100vh;min-height:100dvh;padding:14px 14px 90px!important;background:#fff!important;box-shadow:none!important}
+ .modal h2{position:sticky;top:-14px;background:#fff;z-index:2;margin:-14px -14px 14px;padding:12px 14px;border-bottom:1px solid var(--line)}
  input,select,textarea{font-size:16px!important}button{min-height:38px}
+ .modal .fg{grid-template-columns:1fr 1fr!important}.modal .fg>*{min-width:0}.modal .span2,.modal .span3{grid-column:1/-1!important}.modal input,.modal select,.modal textarea{width:100%;max-width:100%!important;min-width:0;box-sizing:border-box}.modal{overflow-x:hidden}
  .top{flex-wrap:wrap;gap:8px}.top h1{font-size:22px}
 }
 @media print {
