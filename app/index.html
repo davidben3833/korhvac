@@ -1881,12 +1881,26 @@ function mcDoc(a){const c=byId('customers',a.customerId)||{},co=company(),p={...
    ${cal.price!==cal.total?`<div class="tot2">Contract price: ${money(cal.price)}</div>`:''}`;
   return h+'</div>'}
 async function mcPdfDoc(a){const f=proFooter(company());
-  if(!window.html2pdf){try{await loadJs(new URL('html2pdf.bundle.min.js',location.href).href)}catch(_){await loadJs('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js')}}
   const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;width:740px;background:#fff';box.innerHTML=`<style>${PRO_CSS}${MC_CSS}</style><div style="background:#fff">${mcDoc(a).replace(INV_LOGO,`<img src="${INV_LOGO_PNG}" style="height:62px;width:auto;display:block">`)}</div>`;document.body.appendChild(box);
-  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Maintenance Contract ${a.number}.pdf`,...PDF_LITE(),jsPDF:{unit:'mm',format:'letter',compress:true,orientation:'portrait'},pagebreak:{mode:['css','legacy'],before:'.pb',avoid:['li','tr','table','p','.ar','.ack','h5','h4','.uh','.pbox']}}).from(box.lastElementChild).toPdf();
-    await w.get('pdf').then(pdf=>{const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
-      for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,13,H-13);pdf.text(`Page ${i} of ${n}`,W-13,H-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,H-8.5,{align:'center'})}});
-    return{w}}finally{setTimeout(()=>box.remove(),0)}}
+  try{const w=await pdfPaged(box.lastElementChild.firstElementChild,{margin:[12,13,22,13],name:`Maintenance Contract ${a.number}.pdf`,footer:f});return{w}}finally{setTimeout(()=>box.remove(),0)}}
+// Page-aware PDF: splits at .pb markers and only between rows/blocks (never through a table row, heading or signature block).
+async function pdfLibs(){const L=async(f,cdn)=>{try{await loadJs(new URL(f,location.href).href)}catch(_){await loadJs(cdn)}};if(!window.html2canvas)await L('html2canvas.min.js','https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');if(!(window.jspdf&&window.jspdf.jsPDF))await L('jspdf.umd.min.js','https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')}
+async function pdfPaged(doc,o={}){await pdfLibs();const[mt,ml,mb,mr]=o.margin||[12,13,22,13],iw=215.9-ml-mr,ih=279.4-mt-mb,q=o.q||PDF_Q,scale=o.scale||PDF_S;
+  const groups=[[]];[...doc.children].forEach(k=>{if(k.classList.contains('pb')){if(groups[groups.length-1].length)groups.push([])}else groups[groups.length-1].push(k)});
+  const host=doc.parentNode,conts=groups.filter(g=>g.length).map(g=>{const c=doc.cloneNode(false);g.forEach(x=>c.appendChild(x));host.appendChild(c);return c});doc.remove();
+  const pdf=new window.jspdf.jsPDF({unit:'mm',format:'letter',orientation:'portrait',compress:true});let first=true;
+  for(const c of conts){const R=c.getBoundingClientRect(),k=R.width/iw,ph=ih*k,H=R.height;
+    const rel=e=>{const r=e.getBoundingClientRect();return[r.top-R.top,r.bottom-R.top]};
+    const heads=[...c.querySelectorAll('h1,h2,h3,h4,h5,h6,.pbox')].map(rel),whole=[...c.querySelectorAll('tr,.sig,.ack,.uh,.lh,.sub,.tot2,thead')].map(rel).filter(([t,b])=>b-t<ph*.9);
+    const bad=y=>heads.some(([t,b])=>y>t+1&&y<b+30)||whole.some(([t,b])=>y>t+1&&y<b-1);
+    const cands=[...new Set([...c.querySelectorAll('tr,p,li,table,div,ul,ol,h4,h5')].filter(e=>e.tagName==='TR'||!e.closest('tr')).flatMap(e=>{const[t,b]=rel(e);return[Math.round(t),Math.round(b)]}))].filter(y=>y>0&&y<H).sort((a,b)=>a-b);
+    const cuts=[];let s=0;while(s<H-2){const lim=s+ph;let e;if(lim>=H-2)e=H;else{const ok=cands.filter(y=>y>s+ph*.35&&y<=lim&&!bad(y));e=ok.length?ok[ok.length-1]:lim}cuts.push([s,e]);s=e}
+    const cv=await window.html2canvas(c,{scale,backgroundColor:'#ffffff',useCORS:true,logging:false}),sc=cv.width/R.width;
+    for(const[s0,e0]of cuts){const y0=Math.floor(s0*sc),hp=Math.max(1,Math.min(cv.height-y0,Math.ceil((e0-s0)*sc)));const pc=document.createElement('canvas');pc.width=cv.width;pc.height=hp;const g=pc.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,pc.width,hp);g.drawImage(cv,0,y0,cv.width,hp,0,0,cv.width,hp);
+      if(!first)pdf.addPage();first=false;pdf.addImage(pc.toDataURL('image/jpeg',q),'JPEG',ml,mt,iw,hp/sc/k,undefined,'FAST')}}
+  const f=o.footer;if(f){const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),Hh=pdf.internal.pageSize.getHeight();for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,ml,Hh-13);pdf.text(`Page ${i} of ${n}`,W-mr,Hh-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,Hh-8.5,{align:'center'})}}
+  return{pdf,outputPdf:t=>Promise.resolve(t==='blob'?pdf.output('blob'):pdf.output('datauristring')),save:()=>pdf.save(o.name||'document.pdf')}}
+
 async function mcPdf(){mcSync();const a=mcFinish(edit.obj);toast('Preparing PDF…');try{const{w}=await mcPdfDoc(a);await w.save();toast('PDF downloaded')}catch(e){toast('PDF failed: '+(e.message||e))}}
 async function mcPreview(){mcSync();const a=mcFinish(edit.obj),m=$('#modal2');m.style.maxWidth='1000px';
   m.innerHTML=`<h2>Preview — Maintenance Contract ${esc(a.number)}<span><button class="sm" onclick="mcPdf()">📄 Download PDF</button> <button class="sm" onclick="closeM2()">✕</button></span></h2><div id="pv_box" style="height:78vh;background:#525659;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff">Building preview…</div>`;
