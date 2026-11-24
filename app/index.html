@@ -963,7 +963,7 @@ function exportQBPayments(){exportCSV('quickbooks-payments.csv',[['Customer','In
 
 /* ================= LIVE DATABASE (Supabase) ================= */
 const TBL={
- customers:{t:'customers',f:{name:'name',company:'company',ctype:'ctype',phone:'phone',email:'email',billEmail:'bill_email',address:'address',notes:'notes',smsPhone:'sms_phone',smsOptIn:'sms_opt_in',smsOptInAt:'sms_opt_in_at',smsOptInSource:'sms_opt_in_source',smsOptOutAt:'sms_opt_out_at',emailOptOutAt:'email_opt_out_at',updated:'updated_at'}},
+ customers:{t:'customers',f:{name:'name',company:'company',ctype:'ctype',phone:'phone',email:'email',billEmail:'bill_email',address:'address',notes:'notes',smsPhone:'sms_phone',smsOptIn:'sms_opt_in',smsOptInAt:'sms_opt_in_at',smsOptInSource:'sms_opt_in_source',smsOptOutAt:'sms_opt_out_at',emailOptOutAt:'email_opt_out_at',mergedInto:'merged_into',updated:'updated_at'},ro:['mergedInto'],keep:o=>!o.mergedInto},
  techs:{t:'techs',f:{name:'name',phone:'phone',email:'email',title:'title',access:'role',color:'color',payRate:'pay_rate',costRate:'cost_rate',commission:'commission',active:'active',skills:'skills',userId:'user_id',locationAckAt:'location_ack_at',locationAckName:'location_ack_name'},ro:['userId','locationAckAt','locationAckName']},
  jobs:{t:'jobs',f:{number:'number',customerId:'customer_id',techId:'tech_id',equipmentId:'equipment_id',invoiceId:'invoice_id',estimateId:'estimate_id',agreementId:'agreement_id',site:'site',siteId:'site_id',type:'type',priority:'priority',status:'status',date:'date',time:'time',duration:'duration',description:'description',notes:'notes',po:'po',items:'items',timeLog:'time_log',photos:'photos',signature:'signature',signedBy:'signed_by',signedAt:'signed_at',completedAt:'completed_at',trips:'trips',enRouteAt:'en_route_at',arrivedAt:'arrived_at',updated:'updated_at'},ro:['enRouteAt','arrivedAt']},
  estimates:{t:'estimates',f:{number:'number',customerId:'customer_id',title:'title',siteId:'site_id',date:'date',valid:'valid_days',status:'status',options:'options',selected:'selected',notes:'notes',followUp:'follow_up',closedAt:'closed_at',sentAt:'sent_at',jobId:'job_id',approvedBy:'approved_by',approvedAt:'approved_at'}},
@@ -1008,7 +1008,7 @@ async function sbSaveSettings(o){
   setSettings(data);schedRender()}
 function setSettings(r){S.settings=[{...(r.office||{}),id:'company',name:r.company_name||(r.office||{}).name,phone:r.company_phone||(r.office||{}).phone},{id:'sms',enabled:r.sms_enabled,events:r.sms_events,templates:r.sms_templates,portalUrl:r.portal_url},{id:'email',enabled:r.email_enabled,events:r.email_events||{},templates:r.email_templates||{},from:r.email_from||{}}]}
 async function sbLoadAll(){
-  const jobs=Object.entries(TBL).map(async([col,m])=>{let q=sb.from(m.t).select('*').limit(m.limit||10000);if(m.order)q=q.order(m.order[0],{ascending:m.order[1]});const{data,error}=await q;if(error)throw new Error(m.t+': '+error.message);S[col]=(data||[]).map(r=>fromRow(col,r))});
+  const jobs=Object.entries(TBL).map(async([col,m])=>{let q=sb.from(m.t).select('*').limit(m.limit||10000);if(m.order)q=q.order(m.order[0],{ascending:m.order[1]});const{data,error}=await q;if(error)throw new Error(m.t+': '+error.message);S[col]=(data||[]).map(r=>fromRow(col,r)).filter(m.keep||(()=>1))});
   jobs.push((async()=>{const{data}=await sb.from('company_settings').select('*').eq('id',1).maybeSingle();if(data)setSettings(data)})());
   jobs.push(loadPortalUsers());
   jobs.push((async()=>{const{data}=await sb.from('app_roles').select('*').order('builtin',{ascending:false});S.roles=data||[]})());
@@ -1018,7 +1018,7 @@ function sbRealtime(){
   const ch=sb.channel('office-live');
   Object.entries(TBL).forEach(([col,m])=>ch.on('postgres_changes',{event:'*',schema:'public',table:m.t},p=>{
     if(p.eventType==='DELETE'){S[col]=S[col].filter(x=>x.id!==(p.old&&p.old.id))}
-    else{const o=fromRow(col,p.new);const a=S[col],i=a.findIndex(x=>x.id===o.id);if(i>=0)a[i]=o;else a.push(o)}
+    else{const o=fromRow(col,p.new);if(m.keep&&!m.keep(o)){S[col]=S[col].filter(x=>x.id!==o.id)}else{const a=S[col],i=a.findIndex(x=>x.id===o.id);if(i>=0)a[i]=o;else a.push(o)}}
     schedRender()}));
   ch.on('postgres_changes',{event:'*',schema:'public',table:'company_settings'},p=>{if(p.new)setSettings(p.new);schedRender()});
   ch.on('postgres_changes',{event:'*',schema:'public',table:'portal_users'},()=>loadPortalUsers().then(schedRender));
