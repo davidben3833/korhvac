@@ -351,7 +351,7 @@ function agContracts(){const cs=(D.agreements||[]).filter(inLoc).filter(a=>a.sta
   return cs.length?`<div class="card" style="padding:0;overflow-x:auto;margin-bottom:16px"><table><tr><th>Maintenance contract</th><th class="hide-m">Term</th><th>Status</th><th></th></tr>${cs.map(a=>`<tr class="click" onclick="openAgrP('${a.id}')"><td><b>${esc(a.number)}</b> ${esc(a.name||'')}${multi()?`<div class="mut small">${esc(locName(a.customerId))}</div>`:''}</td><td class="hide-m small">${fdate(a.start)} – ${fdate(a.end)}</td><td>${badge(a.status==='Sent'?'Awaiting approval':a.status)}</td><td class="r"><button class="sm ${a.status==='Sent'?'pri':''}">${a.status==='Sent'?'Review':'View'}</button></td></tr>`).join('')}</table></div>`:''}
 let tpick=null;
 function openAgrP(id,keep){const a=(D.agreements||[]).find(x=>x.id===id);if(!a)return;const open=a.status==='Sent';if(!keep)tpick=+a.tier||2;
-  const ts=Object.keys(a.tiers||{}).map(Number).sort();const show=open&&a.offerTiers!==false?ts:[+a.tier||ts[0]].filter(Boolean);
+  const ts=Object.keys(a.tiers||{}).map(Number).sort();const show=open?ts:[+a.tier||ts[0]].filter(Boolean);
   modal(`<h2><span>Maintenance Contract ${esc(a.number)}</span><button class="sm" onclick="closeM()">✕</button></h2>
   <div class="row small mut" style="margin-bottom:10px"><span>${esc(a.freq||'')} visits</span><span>${fdate(a.start)} – ${fdate(a.end)}</span>${a.site?`<span>${esc(a.site)}</span>`:''}${badge(open?'Awaiting approval':a.status)}</div>
   ${a.pdf?`<p><a class="btn" href="${esc(a.pdf)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">📄 View full contract (PDF)</a></p>`:''}
