@@ -88,7 +88,7 @@ function loginView(msg=''){
 async function boot(){
   const{data:{session}}=await sb.auth.getSession();if(!session)return loginView();
   const{data,error}=await sb.rpc('rebate_me');
-  if(error||!data){await sb.auth.signOut();return loginView('This account does not have rebate portal access.')}
+  if(error||!data){location.replace('/app/');return}
   ME=data;await loadAll();route();
 }
 async function loadAll(){
@@ -99,7 +99,7 @@ async function loadAll(){
 }
 function shell(inner){
   const nav=[['projects','Projects'],['suppliers','Suppliers']];
-  $('#app').innerHTML=`<header><div class="hw"><b>KOR HVAC · Rebates</b><nav>${nav.map(([k,l])=>`<button data-nav="${k}" class="${V.page===k?'on':''}">${l}</button>`).join('')}</nav><span class="sp"></span><span class="small" style="color:#bbb">${esc(ME.name)}</span><button class="sm" id="lo">Sign out</button></div></header>
+  $('#app').innerHTML=`<header><div class="hw"><b>KOR HVAC · Rebates</b><nav>${nav.map(([k,l])=>`<button data-nav="${k}" class="${V.page===k?'on':''}">${l}</button>`).join('')}</nav><span class="sp"></span>${['Office','Admin'].includes(ME.base)?'<a href="/app/" class="sm" style="color:#fff;margin-right:8px;text-decoration:none;border:1px solid #555;border-radius:6px;padding:4px 10px">← Office</a>':''}<span class="small" style="color:#bbb">${esc(ME.name)}</span><button class="sm" id="lo">Sign out</button></div></header>
   <main><div class="mnav">${nav.map(([k,l])=>`<button data-nav="${k}" class="sm ${V.page===k?'pri':''}">${l}</button>`).join('')}</div>${inner}</main>`;
   document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{V={page:b.dataset.nav};location.hash=b.dataset.nav;route()});
   $('#lo').onclick=async()=>{await sb.auth.signOut();loginView()};

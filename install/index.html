@@ -15,10 +15,10 @@ ol{padding-left:20px;margin:8px 0 0}li{margin:8px 0;line-height:1.45}.k{display:
 <header><img src="/email/logo.png" alt="KOR HVAC"></header>
 <main id="m"></main>
 <script>
-const APPS={tech:{name:'KOR HVAC Tech',who:'For technicians — your jobs, clock in/out, photos and signatures.',url:'/tech/'},
- office:{name:'KOR HVAC Office',who:'For the office team — dispatch, proposals, invoices and customers.',url:'/app/'},
+const STAFF={name:'KOR HVAC',who:'For the whole team — sign in and it opens the right screens for you (technician, office, rebate).',url:'/app/'};
+const APPS={tech:STAFF,office:STAFF,staff:STAFF,
  portal:{name:'KOR HVAC Customer Portal',who:'For customers — proposals, invoices, service history and requests.',url:'/portal/'}};
-const qp=new URLSearchParams(location.search);let key=APPS[qp.get('app')]?qp.get('app'):'tech';
+const qp=new URLSearchParams(location.search);let key=APPS[qp.get('app')]?qp.get('app'):'staff';
 const ua=navigator.userAgent,ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),android=/Android/.test(ua);
 let os=ios?'ios':android?'android':'ios';
 const safariIOS=ios&&!/CriOS|FxiOS|EdgiOS/.test(ua);

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="manifest" href="/app/manifest.json"><link rel="apple-touch-icon" href="/app/icon-512.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="KOR Office"><meta name="theme-color" content="#111111">
+<link rel="manifest" href="/app/manifest.json"><link rel="apple-touch-icon" href="/app/icon-512.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="KOR HVAC"><meta name="theme-color" content="#111111">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KOR HVAC Service</title>
@@ -847,7 +847,7 @@ const JOB_TYPES=['Service Call','Repair','Maintenance','Install','Emergency','Es
 const PRIOS=['Normal','High','Emergency','Low'];
 const EQ_TYPES=['Rooftop Unit (RTU)','Split System','Heat Pump','Furnace','Boiler','Chiller','Air Handler','Mini-Split','PTAC','Cooling Tower','Exhaust Fan','Make-Up Air','Water Heater','Controls/BMS','Other'];
 const REBATE_ST=['Pre-approval','Approved','Installed','Submitted','Paid','Denied'];
-const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Proposals'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['suppliers','🏭','Suppliers'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
+const NAV=[['OFFICE'],['dashboard','📊','Dashboard'],['calls','📞','Call Booking'],['dispatch','🗓️','Dispatch Board'],['map','📍','Live Map'],['messages','💬','Messages'],['jobs','🔧','Jobs'],['FIELD'],['tech','📱','Tech App'],['techview','🧰','My Jobs (tech view) ↗'],['CUSTOMERS'],['customers','👥','Customers'],['equipment','🏭','Equipment'],['agreements','🔁','Agreements'],['SALES & MONEY'],['estimates','📝','Proposals'],['invoices','💵','Invoices'],['rebates','♻️','Rebates'],['prices','🏷️','Equipment Prices'],['suppliers','🏭','Suppliers'],['rebateportal','🧰','Rebate Portal ↗'],['TEAM & REPORTS'],['reports','📈','Reports'],['payroll','🧾','Payroll'],['techs','👷','Technicians'],['fleet','🚚','Fleet & Mileage'],['users','🔐','Users & Access'],['pricebook','📚','Pricebook'],['settings','⚙️','Settings']];
 const VIEWS=NAV.filter(n=>n.length>1);
 let db=null,mcp=null,assets=null,downloads=null,view='dashboard',sb=null,me=null;
 const isAdmin=()=>!sb||(me&&(me.base||me.role)==='Admin');
@@ -1095,6 +1095,8 @@ async function enter(){
   if(error||!data){let t=null;try{const r=await sb.rpc('tech_me');t=r.data}catch(e){}
     if(t&&['Rebate'].includes(roleBase(t.role))||t&&t.role==='Rebate'){location.href='/rebate/';return}
     try{const rb=await sb.rpc('rebate_me');if(rb.data){location.href='/rebate/';return}}catch(e){}
+    if(t){location.replace('/tech/');return}
+    try{const pc=await sb.rpc('client_me');if(pc.data&&!pc.error){location.replace('/portal/');return}}catch(e){}
     authScreen(t?`<h2>You’re all set, ${esc(t.name)}</h2><p>Your password is saved. Sign in on the <b>KOR HVAC Tech</b> app on your phone with this email and password.</p><button onclick="signOut()">Sign out</button>`
       :`<h2>No office access</h2><p>This login isn’t set up for the office system. If you’re a customer, use the customer portal${KOR.portalUrl?` at <a href="${esc(KOR.portalUrl)}">${esc(KOR.portalUrl.replace(/^https?:\/\//,''))}</a>`:''}. Otherwise ask an Admin to give you access.</p><button onclick="signOut()">Sign out</button>`);return}
   me=data;setSync('Loading…');
@@ -1217,7 +1219,7 @@ function render(){
   hydratePhotos();
   if(sb&&view==='map')pollLive();
 }
-function route(){const h=location.hash.slice(1);if(h==='rebateportal'){window.open('/rebate/','_blank');history.replaceState(null,'','#'+(view||'dashboard'));render();return}view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
+function route(){const h=location.hash.slice(1);if(h==='rebateportal'){location.href='/rebate/';return}if(h==='techview'){location.href='/tech/';return}view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);
 
 /* ================= DASHBOARD ================= */

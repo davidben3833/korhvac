@@ -1,1 +1,1 @@
-{"name": "KOR HVAC Office", "short_name": "KOR Office", "start_url": "/app/", "scope": "/app/", "display": "standalone", "background_color": "#111111", "theme_color": "#111111", "icons": [{"src": "/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]}
+{"name": "KOR HVAC", "short_name": "KOR HVAC", "start_url": "/app/", "scope": "/", "display": "standalone", "background_color": "#111111", "theme_color": "#111111", "icons": [{"src": "/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]}
