@@ -1992,7 +1992,7 @@ function proCalc(e,o){const p={...PRO_DEF,...(e.pro||{})};let equip=0,cost=0,lab
   const tax=equip*(+p.tax||0)/100,raw=equip+tax+labor+other,r=+p.roundTo||0,calcd=r?Math.ceil(raw/r)*r:Math.round(raw*100)/100;
   const price=o.final!==''&&o.final!=null&&!isNaN(+o.final)&&+o.final>0?+o.final:calcd;
   return{equip,tax,labor,other,raw,calcd,price,cost,profit:price-tax-cost,margin:price-tax>0?(price-tax-cost)/(price-tax)*100:0}}
-function proNum(){const yy=String(new Date().getFullYear()).slice(2),re=new RegExp('^'+yy+'-(\\d+)-\\d+$');let m=0;S.estimates.forEach(x=>{const r=re.exec(x.number||'');if(r)m=Math.max(m,+r[1])});return `${yy}-${String(m+1).padStart(3,'0')}-01`}
+function proNum(){const yy=String(new Date().getFullYear()).slice(2),re=new RegExp('^'+yy+'-(\\d{3})-\\d+$');let m=0;[...S.estimates,...(S.agreements||[])].forEach(x=>{const r=re.exec(x.number||'');if(r)m=Math.max(m,+r[1])});return `${yy}-${String(m+1).padStart(3,'0')}-01`}
 function proRevise(){proSync();syncEst();const e=edit.obj,base=/^(\d{2}-\d+)-(\d+)$/.exec(e.number||'');let num;
   if(base){let r=0;S.estimates.forEach(x=>{const m=new RegExp('^'+base[1]+'-(\\d+)$').exec(x.number||'');if(m)r=Math.max(r,+m[1])});num=`${base[1]}-${String(r+1).padStart(2,'0')}`}else num=proNum();
   const n=JSON.parse(JSON.stringify(e));Object.assign(n,{id:uid(),number:num,status:'Draft',date:today(),sentAt:null,closedAt:null,approvedBy:null,approvedAt:null,jobId:null,selected:null,revOf:e.id});
