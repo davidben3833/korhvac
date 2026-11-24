@@ -711,7 +711,7 @@ async function fetchStatus(){
   if(!r.ok) throw new Error('unavailable');return r.json();
 }
 let demoStep=0;
-function demo(){demoStep++;const t=Date.now();return{state:demoStep>8?'arrived':'en_route',company:'KOR HVAC',phone:'(347) 744-6665',tech:'Jim',job:'J-1041',site:'120 Oak St, Edison, NJ',lat:40.50+demoStep*0.0025,lng:-74.44+demoStep*0.003,at:new Date(t-60000).toISOString(),demo:true}}
+function demo(){demoStep++;const t=Date.now();return{state:demoStep>8?'arrived':'en_route',company:'KOR HVAC',phone:'(718) 688-9359',tech:'Jim',job:'J-1041',site:'120 Oak St, Edison, NJ',lat:40.50+demoStep*0.0025,lng:-74.44+demoStep*0.003,at:new Date(t-60000).toISOString(),demo:true}}
 function call(s){return s.phone?`<a class="btn" href="tel:${esc(s.phone.replace(/[^\d+]/g,''))}">Call ${esc(s.company||'us')} · ${esc(s.phone)}</a>`:''}
 async function tick(){
   let s;try{s=await fetchStatus()}catch(e){$('#note').textContent='Connection problem — retrying…';return}
