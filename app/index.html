@@ -934,13 +934,15 @@ async function sendEmail(to,subject,text,opt={}){
   if(!to){toast('No email address on file for this customer');return false}
   const html=text.split('\n\n').map(p=>'<p>'+esc(p).replace(/\n/g,'<br>')+'</p>').join('');
   if(sb){toast('Sending…');
-    // attachments must stay under the 3 MB email limit: re-make the PDF lighter, and if it still won't fit, send a link instead
-    const big=a=>a.reduce((t,x)=>t+String(x.base64||'').length*.75,0)>2.8e6;let atts=[],body=html,linked=false;
+    // attachments must stay under ~17 MB (email limit ~25 MB): re-make the PDF lighter, and if it still won't fit, send a link instead
+    const big=a=>a.reduce((t,x)=>t+String(x.base64||'').length*.75,0)>17e6;let atts=[],body=html,linked=false;
     try{if(opt.attachments){atts=await opt.attachments();const q0=PDF_Q,s0=PDF_S;
       for(const[q,sc]of[[.45,1.2],[.35,1]]){if(!big(atts))break;toast('Making the PDF smaller…');PDF_Q=q;PDF_S=sc;try{atts=await opt.attachments()}finally{PDF_Q=q0;PDF_S=s0}}
       if(big(atts)){atts=[];if(opt.link){linked=true;body+=`<p><b>View / download the PDF:</b> <a href="${esc(opt.link)}">${esc(opt.link)}</a></p>`}else toast('PDF is too large to attach — sending without it')}}}
     catch(e){toast('Couldn’t attach the PDF — sending without it')}
-    const{data,error}=await sb.functions.invoke('send-email',{body:{to,cc:opt.cc||undefined,subject,html:emailHtml(body),attachments:atts,kind:opt.kind,ref:opt.ref}});
+    let{data,error}=await sb.functions.invoke('send-email',{body:{to,cc:opt.cc||undefined,subject,html:emailHtml(body),attachments:atts,kind:opt.kind,ref:opt.ref}});
+    if(error&&atts.length&&opt.link){atts=[];linked=true;body+=`<p><b>View / download the PDF:</b> <a href="${esc(opt.link)}">${esc(opt.link)}</a></p>`;
+      ({data,error}=await sb.functions.invoke('send-email',{body:{to,cc:opt.cc||undefined,subject,html:emailHtml(body),attachments:[],kind:opt.kind,ref:opt.ref}}))}
     if(!error&&data&&data.ok){toast('✅ Email sent to '+to+(atts.length?' (with PDF)':linked?' (PDF as a link)':''));return true}
     let m=error&&error.message||'Email failed';try{const d=await error.context.json();if(d&&d.error)m=d.error}catch(_){}
     toast('Email not sent: '+m);return false}
