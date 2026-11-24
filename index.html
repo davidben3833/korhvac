@@ -501,7 +501,7 @@ footer a:hover { color: var(--ink); }
     </section>
   </div></div>
   <div class="view" data-view="schedule" hidden><div class="page">
-      <div class="pagehead wrap"><h1>Schedule Service</h1><p>Tell us what’s going on and when works for you. Our service team will confirm the appointment by phone or email. For an emergency, call <a href="tel:+17186889359" style="color:var(--ink);white-space:nowrap">(347)&nbsp;744-6665</a>.</p></div>
+      <div class="pagehead wrap"><h1>Schedule Service</h1><p>Tell us what’s going on and when works for you. Our service team will confirm the appointment by phone or email. For an emergency, call <a href="tel:+17186889359" style="color:var(--ink);white-space:nowrap">(718)&nbsp;688-9359</a>.</p></div>
     <section style="padding-top:20px">
       <div class="wrap">
         <form id="schedForm" name="service-request" method="POST" novalidate><p hidden><label>Leave empty <input name="_honey"></label></p>
@@ -872,7 +872,7 @@ window.KOR = {
   var open = document.getElementById('aiOpen'), chat = document.getElementById('aiChat'), body = document.getElementById('aiBody'), form = document.getElementById('aiForm'), input = document.getElementById('aiInput');
   var flow = null, step = 0, data = {}, history = [], started = false;
   function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-  function linkify(t) { return esc(t).replace(/\(347\) 744-6665/g, '<a href="tel:+17186889359">(718) 688-9359</a>').replace(/([a-z]+@korhvac\.com)/g, '<a href="mailto:$1">$1</a>'); }
+  function linkify(t) { return esc(t).replace(/\(718\) 688-9359/g, '<a href="tel:+17186889359">(718) 688-9359</a>').replace(/([a-z]+@korhvac\.com)/g, '<a href="mailto:$1">$1</a>'); }
   function say(t, chips) {
     var m = document.createElement('div'); m.className = 'msg bot'; m.innerHTML = linkify(t); body.appendChild(m);
     if (chips && chips.length) { var c = document.createElement('div'); c.className = 'chips'; chips.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.onclick = function () { c.remove(); handle(x); }; c.appendChild(b); }); body.appendChild(c); }
