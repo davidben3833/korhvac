@@ -939,7 +939,7 @@ async function sendEmail(to,subject,text,opt={}){
     // attachments must stay under ~17 MB (email limit ~25 MB): re-make the PDF lighter, and if it still won't fit, send a link instead
     const big=a=>a.reduce((t,x)=>t+String(x.base64||'').length*.75,0)>17e6;let atts=[],body=html,linked=false;
     try{if(opt.attachments){atts=await opt.attachments();const q0=PDF_Q,s0=PDF_S;
-      for(const[q,sc]of[[.45,1.2],[.35,1]]){if(!big(atts))break;toast('Making the PDF smaller…');PDF_Q=q;PDF_S=sc;try{atts=await opt.attachments()}finally{PDF_Q=q0;PDF_S=s0}}
+      for(const[q,sc]of[[.75,1.6],[.6,1.4]]){if(!big(atts))break;toast('Making the PDF smaller…');PDF_Q=q;PDF_S=sc;try{atts=await opt.attachments()}finally{PDF_Q=q0;PDF_S=s0}}
       if(big(atts)){atts=[];if(opt.link){linked=true;body+=`<p><b>View / download the PDF:</b> <a href="${esc(opt.link)}">${esc(opt.link)}</a></p>`}else toast('PDF is too large to attach — sending without it')}}}
     catch(e){toast('Couldn’t attach the PDF — sending without it')}
     let{data,error}=await sb.functions.invoke('send-email',{body:{to,cc:opt.cc||undefined,subject,html:emailHtml(body),attachments:atts,kind:opt.kind,ref:opt.ref}});
@@ -1430,7 +1430,7 @@ async function saveEmailSettings(){if(deny('settings'))return;const c=emailCfg()
   try{await save('settings',{id:'email',enabled:el('em_enabled').checked,events:ev,templates:tp,from:fr});toast('Email settings saved')}catch(e){}}
 async function emailAct(a,id){const{error}=await sb.rpc(a==='send'?'email_send_now':'email_cancel',{p_id:id});if(error){toast(sbErr(error));return}toast(a==='send'?'Sending…':'Canceled');setTimeout(loadEmailInfo,a==='send'?4000:300)}
 // PDF size control for every PDF that goes out: JPEG pages at ~72% quality, 1.6x render (sharp on screen/print), compressed.
-let PDF_Q=.6,PDF_S=1.4;const PDF_LITE=()=>({image:{type:'jpeg',quality:PDF_Q},html2canvas:{scale:PDF_S,backgroundColor:'#ffffff',useCORS:true}});
+let PDF_Q=.92,PDF_S=2;const PDF_LITE=()=>({image:{type:'jpeg',quality:PDF_Q},html2canvas:{scale:PDF_S,backgroundColor:'#ffffff',useCORS:true}});
 async function uploadInvPdf(i){if(!sb||!i||!i.id)return;try{const blob=await invPdfJob(i,w=>w.outputPdf('blob'));await sb.storage.from('invoice-pdfs').upload(i.id+'.pdf',blob,{upsert:true,contentType:'application/pdf'})}catch(e){console.warn('invoice pdf upload failed',e)}}
 
 /* ================= JOBS ================= */
@@ -1693,7 +1693,7 @@ async function runAgreements(){const da=dueAgreements();let nj=0,ni=0;const t=to
 
 /* ================= MAINTENANCE CONTRACT BUILDER (agreements) — David's maintenance contract layout ================= */
 // Per unit: visit dates × labor hours × rate + materials. Contract total = sum of units. Payments: initial + equal installments.
-const MC_DEF={tier:2,offerTiers:false,rate:299,svcRate:299,emRate:379,emMin:3,resp:12,interest:1.5,freq:'Quarterly',plan:'Monthly',initial:0,filters:'client',showPrices:true,county:'Kings'};
+const MC_DEF={tier:2,offerTiers:true,rate:299,svcRate:299,emRate:379,emMin:3,resp:12,interest:1.5,freq:'Quarterly',plan:'Monthly',initial:0,filters:'client',showPrices:true,county:'Kings'};
 const MC_FREQ={Monthly:12,'Every 2 months':6,Quarterly:4,'3 times a year':3,'Semi-annual':2,Annual:1};
 const MC_PLAN={Monthly:12,Quarterly:4,'Semi-annual':2,Annual:1,'Per visit':0};
 const MC_TFQ=['Every visit','Annual','Semi-annual','Seasonal','As needed'];
@@ -1767,7 +1767,7 @@ function mcDraw(){const a=edit.obj,p={...MC_DEF,...a.mc},isNew=!byId('agreements
    <div><label>Filters</label><select id="mc_filters">${['client','included'].map(x=>`<option value="${x}" ${p.filters===x?'selected':''}>${x==='client'?'Client provides filters':'Filters included (add cost per visit)'}</option>`).join('')}</select></div>
    <div><label>Assigned tech</label><select id="f_techId">${techOpts(a.techId,'Any')}</select></div>
    <div><label>Service level</label><select id="mc_tier" onchange="mcSync();mcDraw()">${[1,2,3].map(t=>`<option value="${t}" ${+p.tier===t?'selected':''}>${MC_TIERS[t]}</option>`).join('')}</select></div>
-   <div class="span2"><label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt);margin-top:22px"><input type="checkbox" id="mc_offerTiers" style="width:auto" ${p.offerTiers===true?'checked':''}> Also list all 3 tiers in the PDF (the customer can always switch tiers in the portal)</label></div>
+   <div class="span2"><label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt);margin-top:22px"><input type="checkbox" id="mc_offerTiers" style="width:auto" ${p.offerTiers!==false?'checked':''}> Show all 3 tiers in the PDF (Tier 2 marked; the customer can switch tiers in the portal)</label></div>
   </div>
   <div class="sec">Visit dates: ${dates.map(fdate).join(' · ')}</div>
   <div class="sec">Equipment covered (${p.units.length}) <select id="mc_addType" style="width:auto">${Object.keys(MC_TPL).map(t=>`<option>${t}</option>`).join('')}</select><button class="sm" onclick="mcSync();edit.obj.mc.units.push(mcNewUnit(el('mc_addType').value));mcDraw()">+ Add unit</button>
@@ -1841,7 +1841,7 @@ function mcDoc(a){const c=byId('customers',a.customerId)||{},co=company(),p={...
   <h5 class="s">1.4 Additional Services</h5><ul><li><b>Emergency Repair Services</b> — available 24/7 for urgent HVAC issues, with a response time within ${esc(p.resp)} hours.</li><li><b>Seasonal Start-Up and Shutdown</b> — preparation and adjustment of HVAC systems for seasonal changes.</li></ul>
   <h5 class="s">1.5 Reporting</h5><ul><li>A detailed report after each maintenance visit outlining the work performed, any issues identified, and recommendations for repairs or improvements.</li><li>A log of all services performed and parts replaced, available in the customer portal.</li></ul>
   <h4>PAYMENT TERMS</h4><h5 class="s">2.1 Total Contract Value</h5><div class="ar"><p>The total contract value for the ${esc(freq)} maintenance services, labor and material, is <b>${money(cal.price)}</b>. This amount covers all routine maintenance tasks outlined in this contract.</p></div>
-  ${p.offerTiers===true?`<h5 class="s">2.1.1 Maintenance Options</h5><div class="ar"><p>Please check the service level you choose. The contract value and payment schedule below are shown for ${esc(MC_TIERS[+p.tier||2])}; payments are adjusted proportionally for the level selected.</p></div>
+  ${p.offerTiers!==false?`<h5 class="s">2.1.1 Maintenance Options</h5><div class="ar"><p>Please check the service level you choose. The contract value and payment schedule below are shown for ${esc(MC_TIERS[+p.tier||2])}; payments are adjusted proportionally for the level selected.</p></div>
   <table class="mt"><tr><th></th><th>Service level</th><th>Includes</th><th class="r">Annual price</th></tr>${[1,2,3].map(t=>`<tr><td style="font-size:14pt;text-align:center">${+p.tier===t?'☒':'☐'}</td><td><b>${esc(MC_TIERS[t])}</b></td><td>${esc(MC_TIER_DESC[t])}</td><td class="r"><b>${money(mcCalc(a,t).price)}</b></td></tr>`).join('')}</table>`:''}
   <h5 class="s">2.2 Payment Schedule</h5><div class="ar"><p>${+p.initial?`The initial payment, due on ${fdate(sch[0]&&sch[0].date)}, is ${money(sch[0]&&sch[0].amount)} (${money(p.initial)} for the major first-time maintenance plus the first installment). `:''}${sch.length>1?`Payments are made ${esc(p.plan.toLowerCase())} according to the following schedule:`:'Payment is due as follows:'}</p></div>
   <table class="mt" style="width:60%"><tr><th>Payment #</th><th>Due Date</th><th class="r">Amount</th></tr>${sch.map((r,i)=>`<tr><td>${i+1}</td><td>${fdate(r.date)}</td><td class="r">${money(r.amount)}</td></tr>`).join('')}</table>
@@ -1878,7 +1878,7 @@ function mcDoc(a){const c=byId('customers',a.customerId)||{},co=company(),p={...
 async function mcPdfDoc(a){const f=proFooter(company());
   if(!window.html2pdf){try{await loadJs(new URL('html2pdf.bundle.min.js',location.href).href)}catch(_){await loadJs('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js')}}
   const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;width:740px;background:#fff';box.innerHTML=`<style>${PRO_CSS}${MC_CSS}</style><div style="background:#fff">${mcDoc(a).replace(INV_LOGO,`<img src="${INV_LOGO_PNG}" style="height:62px;width:auto;display:block">`)}</div>`;document.body.appendChild(box);
-  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Maintenance Contract ${a.number}.pdf`,...PDF_LITE(),jsPDF:{unit:'mm',format:'letter',compress:true,orientation:'portrait'},pagebreak:{mode:['css','legacy'],before:'.pb',avoid:['li','tr','.ack','h5','h4','.uh']}}).from(box.lastElementChild).toPdf();
+  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Maintenance Contract ${a.number}.pdf`,...PDF_LITE(),jsPDF:{unit:'mm',format:'letter',compress:true,orientation:'portrait'},pagebreak:{mode:['css','legacy'],before:'.pb',avoid:['li','tr','table','p','.ar','.ack','h5','h4','.uh','.pbox']}}).from(box.lastElementChild).toPdf();
     await w.get('pdf').then(pdf=>{const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
       for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,13,H-13);pdf.text(`Page ${i} of ${n}`,W-13,H-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,H-8.5,{align:'center'})}});
     return{w}}finally{setTimeout(()=>box.remove(),0)}}
