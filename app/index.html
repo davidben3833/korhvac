@@ -1785,7 +1785,7 @@ function mcDraw(){const a=edit.obj,p={...MC_DEF,...a.mc},isNew=!byId('agreements
    <div class="span3"><label>Additional exclusions / notes for this contract</label><textarea id="mc_excl" rows="2" placeholder="e.g. BMS (by ABM) excluded">${esc(p.excl||'')}</textarea></div>
    <div class="span3"><label style="display:flex;gap:6px;align-items:center;font-weight:400;color:var(--txt)"><input type="checkbox" id="mc_showPrices" style="width:auto" ${p.showPrices!==false?'checked':''}> Show per-unit cost breakdown pages to the customer</label></div></div>
   <div id="mc_tot"></div>
-  <div class="fg" style="margin-top:8px"><div class="span2"><label>Email to</label><input id="f_emailTo" value="${esc(a.emailTo||'')}" placeholder="${esc(c.email||'customer email')}"></div><div><label>CC</label><input id="f_emailCc" value="${esc(a.emailCc||'')}"></div></div>
+  <div class="fg" style="margin-top:8px"><div class="span2"><label>Email to <span class="mut small">(more than one: separate with commas — each one can sign in to the portal)</span></label><input id="f_emailTo" value="${esc(a.emailTo||'')}" placeholder="${esc(c.email||'customer email')}"></div><div><label>CC</label><input id="f_emailCc" value="${esc(a.emailCc||'')}"></div></div>
   <div class="mfoot">${!isNew?`<button class="danger" onclick="delRec('agreements','${a.id}')">Delete</button>`:''}<span class="sp"></span>
    <button class="pri" onclick="mcPreview()">👁 Preview</button><button onclick="mcPdf()">📄 Contract PDF</button>${!isNew?`<button onclick="mcEmail()">✉️ Email + send to portal</button>`:''}
    ${a.status!=='Active'?`<button onclick="mcActivate()">✅ Signed → Activate</button>`:''}<button onclick="closeM()">Cancel</button><button class="pri" onclick="mcSave()">Save</button></div>`);
