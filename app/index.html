@@ -1420,6 +1420,8 @@ async function saveEmailSettings(){if(deny('settings'))return;const c=emailCfg()
   const fr={...(c.from||{})};['jobs','billing','estimates','tech_estimates','tech','office_to'].forEach(k=>{const x=v('em_from_'+k).toLowerCase();if(x)fr[k]=x});
   try{await save('settings',{id:'email',enabled:el('em_enabled').checked,events:ev,templates:tp,from:fr});toast('Email settings saved')}catch(e){}}
 async function emailAct(a,id){const{error}=await sb.rpc(a==='send'?'email_send_now':'email_cancel',{p_id:id});if(error){toast(sbErr(error));return}toast(a==='send'?'Sending…':'Canceled');setTimeout(loadEmailInfo,a==='send'?4000:300)}
+// PDF size control for every PDF that goes out: JPEG pages at ~72% quality, 1.6x render (sharp on screen/print), compressed.
+let PDF_Q=.72,PDF_S=1.6;const PDF_LITE=()=>({image:{type:'jpeg',quality:PDF_Q},html2canvas:{scale:PDF_S,backgroundColor:'#ffffff',useCORS:true}});
 async function uploadInvPdf(i){if(!sb||!i||!i.id)return;try{const blob=await invPdfJob(i,w=>w.outputPdf('blob'));await sb.storage.from('invoice-pdfs').upload(i.id+'.pdf',blob,{upsert:true,contentType:'application/pdf'})}catch(e){console.warn('invoice pdf upload failed',e)}}
 
 /* ================= JOBS ================= */
@@ -1867,7 +1869,7 @@ function mcDoc(a){const c=byId('customers',a.customerId)||{},co=company(),p={...
 async function mcPdfDoc(a){const f=proFooter(company());
   if(!window.html2pdf){try{await loadJs(new URL('html2pdf.bundle.min.js',location.href).href)}catch(_){await loadJs('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js')}}
   const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;width:740px;background:#fff';box.innerHTML=`<style>${PRO_CSS}${MC_CSS}</style><div style="background:#fff">${mcDoc(a).replace(INV_LOGO,`<img src="${INV_LOGO_PNG}" style="height:62px;width:auto;display:block">`)}</div>`;document.body.appendChild(box);
-  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Maintenance Contract ${a.number}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},pagebreak:{mode:['css','legacy'],before:'.pb',avoid:['li','tr','.ack','h5','h4','.uh']}}).from(box.lastElementChild).toPdf();
+  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Maintenance Contract ${a.number}.pdf`,...PDF_LITE(),jsPDF:{unit:'mm',format:'letter',compress:true,orientation:'portrait'},pagebreak:{mode:['css','legacy'],before:'.pb',avoid:['li','tr','.ack','h5','h4','.uh']}}).from(box.lastElementChild).toPdf();
     await w.get('pdf').then(pdf=>{const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
       for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,13,H-13);pdf.text(`Page ${i} of ${n}`,W-13,H-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,H-8.5,{align:'center'})}});
     return{w}}finally{setTimeout(()=>box.remove(),0)}}
@@ -2170,7 +2172,7 @@ function proPrint(){proSync();syncEst();proFinish(edit.obj);const w=window.open(
 async function proPdfDoc(e){const f=proFooter(company());
   if(!window.html2pdf){try{await loadJs(new URL('html2pdf.bundle.min.js',location.href).href)}catch(_){await loadJs('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js')}}
   const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;width:740px;background:#fff';box.innerHTML=`<style>${PRO_CSS}</style><div style="background:#fff">${proDoc(e).replace(INV_LOGO,`<img src="${INV_LOGO_PNG}" style="height:62px;width:auto;display:block">`)}</div>`;document.body.appendChild(box);
-  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Proposal ${e.number}${e.title?' - '+e.title.replace(/[\\/:*?"<>|]/g,''):''}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['li','.price','.ack','h5','h4']}}).from(box.lastElementChild).toPdf();
+  try{const w=html2pdf().set({margin:[12,13,22,13],filename:`Proposal ${e.number}${e.title?' - '+e.title.replace(/[\\/:*?"<>|]/g,''):''}.pdf`,...PDF_LITE(),jsPDF:{unit:'mm',format:'letter',compress:true,orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['li','.price','.ack','h5','h4']}}).from(box.lastElementChild).toPdf();
     await w.get('pdf').then(pdf=>{const n=pdf.internal.getNumberOfPages(),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
        for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text(f.a,13,H-13);pdf.text(`Page ${i} of ${n}`,W-13,H-13,{align:'right'});pdf.setFontSize(8);pdf.text(f.b,W/2,H-8.5,{align:'center'})}});
     return{w}}finally{setTimeout(()=>box.remove(),0)}}
@@ -2308,7 +2310,7 @@ function loadJs(src){return new Promise((res,rej)=>{if([...document.scripts].som
 async function invPdfJob(i,run){
   if(!window.html2pdf){try{await loadJs(new URL('html2pdf.bundle.min.js',location.href).href)}catch(e){try{await loadJs('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js')}catch(_){throw new Error('Could not load the PDF tool')}}}
   const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;width:760px;background:#fff;padding:0';box.innerHTML=`<style>${INV_CSS}</style><div style="background:#fff">${invDoc(i).replace(INV_LOGO,`<img src="${INV_LOGO_PNG}" style="width:145px;height:86px;display:block">`)}</div>`;document.body.appendChild(box);
-  try{return await run(html2pdf().set({margin:[10,10,10,10],filename:`KOR-HVAC-Invoice-${i.number}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'letter',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(box.lastElementChild))}finally{box.remove()}}
+  try{return await run(html2pdf().set({margin:[10,10,10,10],filename:`KOR-HVAC-Invoice-${i.number}.pdf`,...PDF_LITE(),jsPDF:{unit:'mm',format:'letter',compress:true,orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(box.lastElementChild))}finally{box.remove()}}
 async function pdfInv(){if($('#modal').querySelector('#f_customerId'))syncInv();const i=edit.obj;toast('Preparing PDF…');
   try{await invPdfJob(i,w=>w.save());toast('PDF downloaded')}catch(e){toast('PDF failed — use Print → Save as PDF')}}
 async function invPdfB64(i){const uri=await invPdfJob(i,w=>w.outputPdf('datauristring'));return[{name:`KOR-HVAC-Invoice-${i.number}.pdf`,contentType:'application/pdf',base64:String(uri).split(',')[1]}]}
