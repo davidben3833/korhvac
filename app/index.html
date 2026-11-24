@@ -1186,7 +1186,7 @@ function vDash(){
   const todays=S.jobs.filter(j=>j.date===t&&j.status!=='Canceled').sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   const ar=S.invoices.filter(i=>invBal(i)>0);const arAmt=ar.reduce((a,i)=>a+invBal(i),0);const overdue=ar.filter(i=>invStatus(i)==='Overdue');
   const mo=t.slice(0,7);const coll=S.invoices.flatMap(i=>i.payments||[]).filter(p=>(p.date||'').slice(0,7)===mo).reduce((a,p)=>a+(+p.amount||0),0);
-  const pend=S.estimates.filter(e=>['Draft','Sent'].includes(e.status));const pendAmt=pend.reduce((a,e)=>a+estValue(e),0);
+  const pendMc=(S.agreements||[]).filter(a=>a.mc&&['Draft','Sent'].includes(a.status)&&!/-T\d+$/.test(a.number||''));const pend=[...S.estimates.filter(e=>['Draft','Sent'].includes(e.status)),...pendMc];const pendAmt=S.estimates.filter(e=>['Draft','Sent'].includes(e.status)).reduce((a,e)=>a+estValue(e),0)+pendMc.reduce((a,x)=>a+(+x.price||0),0);
   const fu=S.estimates.filter(e=>e.status==='Sent'&&e.followUp&&e.followUp<=t);
   const unsched=open.filter(j=>!j.date||!j.techId);
   const da=dueAgreements();
@@ -2217,8 +2217,11 @@ async function proPreview(){proSync();syncEst();proFinish(edit.obj);const e=edit
 
 function vEst(){const t=today();
   const list=S.estimates.filter(e=>UI.estSt==='All'||e.status===UI.estSt).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const mcs=(S.agreements||[]).filter(a=>a.mc&&(UI.estSt==='All'?['Draft','Sent','Declined'].includes(a.status):(UI.estSt==='Approved'?a.status==='Active':a.status===UI.estSt))).sort((a,b)=>(b.date||b.start||'').localeCompare(a.date||a.start||''));
+  const mcRows=mcs.length?`<div class="card" style="padding:0;overflow-x:auto;margin-bottom:12px"><table><tr><th>Contract #</th><th>Customer</th><th>Maintenance contract</th><th>Tier</th><th>Start</th><th>Status</th><th class="r">Value / yr</th></tr>${mcs.map(a=>`<tr class="click" onclick="openAgr('${a.id}')"><td><b>${esc(a.number)}</b> <span class="badge">🔧 Contract</span></td><td>${esc(custName(a.customerId))}</td><td>${esc(a.name||'')}</td><td>${esc(String(a.mc.tier||2))}</td><td>${fdate(a.start)}</td><td>${badge(a.status==='Active'?'Approved':a.status)}</td><td class="r">${money(a.price)}</td></tr>`).join('')}</table></div>`:'';
   return `<div class="top"><h1>Proposals</h1><button class="pri" onclick="openEst()">+ New Proposal</button></div>
   <div class="filters"><select onchange="UI.estSt=this.value;render()">${opts(['All','Draft','Sent','Approved','Declined'],UI.estSt)}</select></div>
+  ${mcRows}
   <div class="card" style="padding:0;overflow-x:auto">${list.length?`<table><tr><th>Proposal #</th><th>Customer</th><th>Title</th><th>Options</th><th>Date</th><th>Follow-up</th><th>Status</th><th class="r">Value</th></tr>
   ${list.map(e=>`<tr class="click" onclick="openEst('${e.id}')"><td><b>${esc(e.number)}</b>${e.byTech?` <span class="badge" title="Requested by ${esc(e.techName||'tech')}">🛠️ Tech</span>`:''}</td><td>${esc(custName(e.customerId))}</td><td>${esc(e.title)}</td><td>${(e.options||[]).length}</td><td>${fdate(e.date)}</td><td>${e.status==='Sent'&&e.followUp?(e.followUp<=t?`<b style="color:var(--bad)">${fdate(e.followUp)}</b>`:fdate(e.followUp)):'—'}</td><td>${badge(e.status)}</td><td class="r">${money(estValue(e))}</td></tr>`).join('')}</table>`:'<div class="empty">No estimates</div>'}</div>`}
 function openEst(id,pre){
