@@ -213,6 +213,7 @@ function supabaseApi(){
     async rebNote(rid,t){await rpc('client_rebate_note',{p_rebate:rid,p_text:t})},
     async upload(path,blob){const{error}=await sb.storage.from('rebate-files').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(error)throw new Error(error.message)},
     async signed(paths){if(!paths.length)return{};const{data}=await sb.storage.from('rebate-files').createSignedUrls(paths,3600);const o={};(data||[]).forEach(x=>{if(x.signedUrl)o[x.path]=x.signedUrl});return o},
+    async groupUnits(images){const{data:{session}}=await sb.auth.getSession();const r=await fetch(CFG.supabaseUrl+'/functions/v1/portal-ai',{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.supabaseAnonKey,Authorization:'Bearer '+(session&&session.access_token)},body:JSON.stringify({action:'group',images})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'AI could not sort the photos');return d},
     async readUnit(images){const{data:{session}}=await sb.auth.getSession();const r=await fetch(CFG.supabaseUrl+'/functions/v1/portal-ai',{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.supabaseAnonKey,Authorization:'Bearer '+(session&&session.access_token)},body:JSON.stringify({images})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'AI could not read the photos');return d.unit},
     async decide(id,optIdx,approve,name){await rpc('client_estimate_decide',{p_id:id,p_option:optIdx,p_approve:approve,p_name:name})},
     async decideAgr(id,tier,approve,name){await rpc('client_agreement_decide',{p_id:id,p_tier:tier,p_approve:approve,p_name:name})},
@@ -449,7 +450,7 @@ async function openRb(id){const r=(D.rebates||[]).find(x=>x.id===id);if(!r)retur
   <div class="mut small">${esc(r.site||'')}</div>${rbStageBar(r.stage)}
   <div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0">
    ${[['Rebate status',badge(r.status||'Pre-approval')],['Utility / program',esc(r.program||'—')],['Application #',esc(r.appNo||'—')],['Rebate amount',+r.amount?money(r.amount):'—'],['Submitted',fdate(r.submitted)||'—'],['Expected',fdate(r.expected)||'—'],['Paid',fdate(r.paidDate)||'—']].map(([k,v])=>`<div class="card" style="margin:0;padding:10px"><div class="small mut">${k}</div><div style="font-weight:700">${v}</div></div>`).join('')}</div>
-  <h3 style="margin-top:16px">Units (${r.units.length}) ${edit?`<button class="sm pri" style="float:right" onclick="rbUnit('${r.id}')">+ Add unit</button>`:''}</h3>
+  <h3 style="margin-top:16px">Units (${r.units.length}) ${edit?`<span style="float:right;display:flex;gap:6px"><label class="btn sm" style="margin:0;cursor:pointer">📸 Upload all site photos<input type="file" accept="image/*" multiple hidden onchange="rbBulk('${r.id}',this.files);this.value=''"></label><button class="sm pri" onclick="rbUnit('${r.id}')">+ Add unit</button></span>`:''}</h3>
   ${r.units.length?r.units.map(u=>`<div class="card" style="padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center${edit?';cursor:pointer':''}" ${edit?`onclick="rbUnit('${r.id}','${u.id}')"`:''}><div class="rbth" data-p="${esc((u.photos||[])[0]||'')}" style="width:56px;height:56px;border-radius:8px;background:#eef1f6 center/cover;flex-shrink:0"></div>
     <div style="flex:1;min-width:0"><b>${esc(u.tag||u.type||'Unit')}</b>${+u.qty>1?` ×${u.qty}`:''} <span class="mut small">${esc(u.location||'')}</span><div class="small">${esc([u.type,u.make,u.model].filter(Boolean).join(' · '))}${u.tonnage?` · ${u.tonnage} ton`:''}${u.year?` · ${u.year}`:''}</div>${u.ai==='read'?'<div class="small" style="color:#1f9d55">✨ Read by AI</div>':''}</div></div>`).join('')
    :`<p class="mut">No units yet. ${edit?'Tap <b>+ Add unit</b> and take a photo of the nameplate — AI fills in the details.':''}</p>`}
@@ -468,6 +469,36 @@ async function rbThumbs(){const els=[...document.querySelectorAll('.rbth[data-p]
 async function rbOpenFile(path){const w=window.open('','_blank');const o=await api.signed([path]).catch(()=>({}));if(o[path]){if(w)w.location=o[path];else location.href=o[path]}else{if(w)w.close();toast('Could not open the file')}}
 async function rbPricing(id){try{await api.reqPricing(id);await refresh();openRb(id);toast('Sent — we’ll get pricing from our suppliers')}catch(e){toast(e.message)}}
 async function rbMsg(id){const t=$('#rb_msg').value.trim();if(!t)return;try{await api.rebNote(id,t);await refresh();openRb(id);toast('Sent to KOR HVAC')}catch(e){toast(e.message)}}
+/* ---- bulk: all site photos at once → AI sorts them into units ---- */
+let RB=null;
+async function rbBulk(rid,files){const fs=[...files].slice(0,40);if(!fs.length)return;
+  modal(`<h2><span>Sorting ${fs.length} photos…</span></h2><p class="mut">Preparing photos and asking AI to group them into units and read the nameplates. This can take up to a minute.</p><div id="rbb_p" class="small mut"></div>`);
+  const shots=[];for(let i=0;i<fs.length;i++){$('#rbb_p').textContent=`Preparing photo ${i+1} of ${fs.length}…`;try{const b=await shrinkImg(fs[i],1280);shots.push({blob:b,url:URL.createObjectURL(b)})}catch(e){}}
+  RB={rid,shots,units:[],unassigned:[]};
+  try{$('#rbb_p').textContent='AI is sorting the photos…';const imgs=[];for(const x of shots)imgs.push({media_type:'image/jpeg',data:await blob64(x.blob)});
+    const d=await api.groupUnits(imgs);
+    RB.units=(d.units||[]).map((g,k)=>{const u=g.unit||{};return{keep:true,photos:g.photos,tag:g.tag||`Unit ${k+1}`,location:g.location||'',type:u.equipment_type||'',make:u.make||'',model:u.model||'',serial:u.serial||'',tonnage:u.tonnage??'',capacity:u.capacity||'',voltage:u.voltage||'',refrigerant:u.refrigerant||'',fuel:u.fuel||'',year:u.mfg_year??'',mounting:u.mounting||'',notes:[u.install_notes,u.notes].filter(Boolean).join(' — '),ai_raw:u}});
+    RB.unassigned=d.unassigned||[];toast(`AI found ${RB.units.length} unit${RB.units.length===1?'':'s'} — check and save`)}
+  catch(e){toast(e.message+' — each photo was made its own unit; merge as needed');RB.units=shots.map((_,i)=>({keep:true,photos:[i],tag:`Unit ${i+1}`,location:'',type:'',make:'',model:'',notes:''}))}
+  rbBulkDraw()}
+function rbBulkSync(){RB.units.forEach((u,k)=>{['tag','location','type','make','model'].forEach(f=>{const e=document.getElementById(`rbb_${f}_${k}`);if(e)u[f]=e.value.trim()});const c=document.getElementById(`rbb_keep_${k}`);if(c)u.keep=c.checked})}
+function rbBulkMove(i,to){rbBulkSync();RB.units.forEach(u=>u.photos=u.photos.filter(x=>x!==i));RB.unassigned=RB.unassigned.filter(x=>x!==i);
+  if(to==='new')RB.units.push({keep:true,photos:[i],tag:`Unit ${RB.units.length+1}`,location:'',type:'',make:'',model:'',notes:''});else if(to==='none')RB.unassigned.push(i);else RB.units[+to].photos.push(i);
+  RB.units=RB.units.filter(u=>u.photos.length);rbBulkDraw()}
+function rbBulkDraw(){const th=(i,k)=>`<div style="position:relative"><img src="${RB.shots[i].url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block"><select onchange="rbBulkMove(${i},this.value)" style="width:64px;font-size:11px!important;padding:1px;min-height:0;margin-top:2px">${RB.units.map((_,j)=>`<option value="${j}" ${j===k?'selected':''}>Unit ${j+1}</option>`).join('')}<option value="new">+ New</option><option value="none" ${k==null?'selected':''}>None</option></select></div>`;
+  modal(`<h2><span>Review ${RB.units.length} unit${RB.units.length===1?'':'s'}</span><button class="sm" onclick="openRb('${RB.rid}')">Cancel</button></h2>
+  <p class="small mut" style="margin-top:0">AI grouped the photos and read the nameplates. Fix anything wrong, move a photo with the box under it, then save. You can edit every unit later.</p>
+  ${RB.units.map((u,k)=>`<div class="card" style="padding:10px;margin-bottom:10px"><label style="display:flex;gap:8px;align-items:center;margin:0 0 6px;font-weight:700"><input type="checkbox" id="rbb_keep_${k}" style="width:auto" ${u.keep?'checked':''}> Unit ${k+1}</label>
+   <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${u.photos.map(i=>th(i,k)).join('')}</div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${[['tag','Tag'],['location','Location'],['type','Type'],['make','Make'],['model','Model #']].map(([f,l])=>`<input id="rbb_${f}_${k}" value="${esc(u[f]??'')}" placeholder="${l}">`).join('')}<div class="small mut" style="align-self:center">${esc([u.serial&&'S/N '+u.serial,u.tonnage&&u.tonnage+' ton',u.voltage,u.year].filter(Boolean).join(' · '))}</div></div></div>`).join('')}
+  ${RB.unassigned.length?`<div class="card" style="padding:10px"><b>Not assigned (${RB.unassigned.length})</b><div class="small mut">Building or overview photos — assign them to a unit or leave them out.</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${RB.unassigned.map(i=>th(i,null)).join('')}</div></div>`:''}
+  <button class="pri" id="rbb_save" style="width:100%;margin-top:8px" onclick="rbBulkSave()">Save ${RB.units.length} unit${RB.units.length===1?'':'s'}</button>`);$('#modal').style.maxWidth='860px'}
+async function rbBulkSave(){rbBulkSync();const b=$('#rbb_save');b.disabled=true;const L=RB.units.filter(u=>u.keep);let n=0;
+  try{for(const u of L){b.textContent=`Saving unit ${++n} of ${L.length}…`;const id=crypto.randomUUID?crypto.randomUUID():String(Date.now()+n);const paths=[];
+      for(const i of u.photos){const p=`${RB.rid}/units/${id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.jpg`;await api.upload(p,RB.shots[i].blob);paths.push(p)}
+      const x={...u,id,photos:paths,qty:1};delete x.keep;if(!x.ai_raw)delete x.ai_raw;await api.unitSave(RB.rid,x)}
+    const rid=RB.rid;RB=null;await refresh();openRb(rid);toast(`${L.length} unit${L.length===1?'':'s'} added`)}
+  catch(e){toast(e.message);b.disabled=false;b.textContent='Try saving again'}}
 let RU=null;
 function rbUnit(rid,uid){const r=D.rebates.find(x=>x.id===rid);const u=uid?{...r.units.find(x=>x.id===uid)}:{id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),photos:[],qty:1};RU={rid,u,isNew:!uid,blobs:[]};rbUnitDraw()}
 function rbUnitDraw(){const{u}=RU;const f=(k,l,ph='')=>`<div><label>${l}</label><input id="ru_${k}" value="${esc(u[k]??'')}" placeholder="${ph}"></div>`;
