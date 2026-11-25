@@ -158,7 +158,9 @@ async function projectView(){
     q(sb.from('supplier_requests').select('*').eq('rebate_id',p.id).order('created_at',{ascending:false})),
     q(sb.from('rebate_files').select('*').eq('rebate_id',p.id).order('created_at',{ascending:false})),
     q(sb.from('rebate_events').select('*').eq('rebate_id',p.id).order('at',{ascending:false}).limit(200))]);
-  P={p,units,reqs,files,events};
+  const opts=await q(sb.from('rebate_options').select('*').eq('rebate_id',p.id).order('sort')).catch(()=>[]);
+  const items=opts.length?await q(sb.from('rebate_option_items').select('*').in('option_id',opts.map(o=>o.id))).catch(()=>[]):[];
+  P={p,units,reqs,files,events,opts,items};
   if(chan)sb.removeChannel(chan);
   chan=sb.channel('rb-'+p.id).on('postgres_changes',{event:'*',schema:'public',table:'supplier_requests',filter:'rebate_id=eq.'+p.id},()=>refresh())
     .on('postgres_changes',{event:'*',schema:'public',table:'rebate_files',filter:'rebate_id=eq.'+p.id},()=>refresh()).subscribe();
@@ -173,14 +175,74 @@ function drawProject(){
   <div class="card"><div class="row"><div><div class="mut small">${esc(p.number||'')}</div><h2 style="margin:2px 0">${esc(p.title||'')}</h2><div class="mut">${esc(p.site||'')}${cust?' · '+esc(cust.company||cust.name):''}</div>
   <div class="small mut">${esc([p.program,p.company,p.app_no&&('App # '+p.app_no)].filter(Boolean).join(' · '))}</div></div><span class="sp"></span><button class="sm" id="ed">Edit</button></div>
   <div class="stage" style="margin-top:10px">${STAGES.map(s=>`<span class="${s===p.stage?'on':''}" data-stage="${s}" style="cursor:pointer">${s}</span>`).join('')}</div></div>
-  <div class="tabs">${[['survey',`Survey (${units.length})`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['files',`Files (${files.length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
+  <div class="tabs">${[['survey',`Survey (${units.length})`],['table','Unit table'],['options',`Options (${(P.opts||[]).length})${optIssues()?' ⚠️':''}`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['files',`Files (${files.length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
   <div id="tb"></div>`);
   $('#bk').onclick=e=>{e.preventDefault();location.hash=''};
   $('#ed').onclick=()=>editProject(p);
   document.querySelectorAll('[data-stage]').forEach(s=>s.onclick=async()=>{if(s.dataset.stage===p.stage)return;await q(sb.from('rebates').update({stage:s.dataset.stage,updated_at:new Date().toISOString()}).eq('id',p.id));await event(p.id,'Stage → '+s.dataset.stage);await loadAll();projectView()});
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{V.tab=b.dataset.tab;drawProject()});
-  ({survey:surveyTab,pricing:pricingTab,files:filesTab,activity:activityTab})[tab]();
+  ({survey:surveyTab,table:tableTab,options:optionsTab,pricing:pricingTab,files:filesTab,activity:activityTab})[tab]();
 }
+
+/* ===== UNIT TABLE — one row per unit, everything a supplier needs to price it ===== */
+const SPEC=[['tag','Tag','col'],['equipment_type','Type','col'],['qty','Qty','col'],['make','Make','col'],['model','Model','col'],['tonnage','Tons','col'],['voltage','Voltage','col'],['fuel','Fuel','col'],
+ ['heat_in','Heat input (MBH)','spec'],['heat_out','Heat output (MBH)','spec'],['economizer','Economizer','yn'],['co2','CO₂ sensor','yn'],['enthalpy','Enthalpy sensor','yn'],['smoke','Smoke detector','yn'],['curb','Curb adapter','yn'],['spec_notes','Notes for supplier','spec']];
+const uval=(u,[k,,t])=>t==='col'?(u[k]??''):((u.specs||{})[k]??'');
+function tableTab(){const{units}=P;
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:10px"><span class="mut small">Everything the supplier needs to price each unit. Changes save as you type. This table is what goes out with pricing requests.</span><span class="sp"></span><button class="sm" id="csv">⬇ Export CSV</button></div>
+  <div style="overflow-x:auto"><table class="small" style="min-width:1400px"><tr>${SPEC.map(c=>`<th>${c[1]}</th>`).join('')}</tr>
+  ${units.map(u=>`<tr>${SPEC.map(c=>c[2]==='yn'?`<td><select data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" style="min-width:70px"><option value=""></option>${['Yes','No','Existing'].map(x=>`<option ${uval(u,c)===x?'selected':''}>${x}</option>`).join('')}</select></td>`
+   :`<td><input data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" value="${esc(uval(u,c))}" style="min-width:${c[0]==='spec_notes'?220:c[0]==='model'?150:80}px"></td>`).join('')}</tr>`).join('')}</table></div>
+  ${units.length?'':'<p class="mut">No units yet — add them in the Survey tab.</p>'}`;
+  document.querySelectorAll('#tb [data-u]').forEach(e=>e.onchange=async()=>{const u=P.units.find(x=>x.id===e.dataset.u),k=e.dataset.k,v=e.value.trim();let up;
+    if(e.dataset.t==='col'){up={[k]:k==='qty'?(parseInt(v)||1):k==='tonnage'?(parseFloat(v)||null):v||null};Object.assign(u,up)}else{u.specs={...(u.specs||{}),[k]:v};up={specs:u.specs}}
+    try{await q(sb.from('rebate_units').update({...up,updated_at:new Date().toISOString()}).eq('id',u.id));e.style.background='#eefaf3';setTimeout(()=>e.style.background='',700)}catch(err){toast(err.message)}});
+  $('#csv').onclick=()=>{const rows=[SPEC.map(c=>c[1]),...P.units.map(u=>SPEC.map(c=>uval(u,c)))];const csv=rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`${P.p.number||'units'} unit table.csv`;a.click()}}
+
+/* ===== OPTIONS — each option assigns every unit to a supplier/model; quote, submittal and AHRI live on each unit inside the option ===== */
+const RATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];
+function itemOf(oid,uid){return (P.items||[]).find(i=>i.option_id===oid&&i.unit_id===uid)}
+function optCheck(o){const req=P.p.requirements||{},out={missing:[],low:[],nodocs:[],total:0,covered:0};
+  P.units.forEach(u=>{const it=itemOf(o.id,u.id);const name=u.tag||u.equipment_type||'Unit';
+    if(!it||!(it.model||'').trim()){out.missing.push(name);return}out.covered++;out.total+=(+it.price||0)*(u.qty||1);
+    RATE.forEach(([k,l])=>{const need=+req[k],have=+((it.ratings||{})[k]);if(need&&have&&have<need)out.low.push(`${name}: ${l} ${have} < ${need}`);if(need&&!have)out.low.push(`${name}: ${l} not entered (program needs ${need})`)});
+    const miss=[!it.submittal&&'submittal',!it.ahri&&'AHRI',!it.quote&&'quote'].filter(Boolean);if(miss.length)out.nodocs.push(`${name}: ${miss.join(', ')}`)});return out}
+function optIssues(){return (P.opts||[]).reduce((n,o)=>{const c=optCheck(o);return n+c.missing.length+c.low.length},0)}
+function optionsTab(){const{units,opts}=P;const req=P.p.requirements||{};
+  $('#tb').innerHTML=`<div class="card" style="padding:12px"><b>Program requirements</b> <span class="mut small">— minimum ratings for this rebate program. Every option is checked against them.</span>
+   <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">${RATE.map(([k,l])=>`<label class="small" style="display:flex;gap:4px;align-items:center">${l} ≥ <input data-req="${k}" value="${esc(req[k]??'')}" style="width:70px"></label>`).join('')}</div></div>
+  <div class="row" style="margin:12px 0"><button class="pri" id="nopt">+ New option</button>${opts.length?`<button class="sm" id="copt">⧉ Copy option ${opts.length}</button>`:''}<span class="sp"></span><span class="mut small">${units.length} units in the survey</span></div>
+  ${opts.map((o,oi)=>{const c=optCheck(o);return `<div class="card" style="padding:12px;margin-bottom:12px"><div class="row"><input data-oname="${o.id}" value="${esc(o.name)}" style="font-weight:700;max-width:260px"><span class="sp"></span>
+    <span class="small"><b>${c.covered}/${units.length}</b> units · total <b>${(c.total||0).toLocaleString('en-US',{style:'currency',currency:'USD'})}</b></span> <button class="sm red" data-odel="${o.id}">Delete</button></div>
+    ${c.missing.length?`<div class="small" style="color:var(--bad);margin-top:6px">❌ Missing ${c.missing.length} unit${c.missing.length>1?'s':''}: ${c.missing.map(esc).join(', ')}</div>`:`<div class="small" style="color:var(--ok);margin-top:6px">✓ All ${units.length} units covered</div>`}
+    ${c.low.length?`<div class="small" style="color:var(--bad)">⚠️ Doesn't meet the program: ${c.low.map(esc).join(' · ')}</div>`:''}
+    ${c.nodocs.length?`<div class="small" style="color:var(--warn)">📄 Missing paperwork: ${c.nodocs.map(esc).join(' · ')}</div>`:''}
+    <div style="overflow-x:auto;margin-top:8px"><table class="small" style="min-width:1250px"><tr><th>Unit</th><th>Supplier</th><th>Make</th><th>Model</th><th>AHRI #</th>${RATE.map(r=>`<th>${r[1]}</th>`).join('')}<th>Price ea.</th><th>Lead</th><th>Docs</th></tr>
+    ${units.map(u=>{const it=itemOf(o.id,u.id)||{};const rt=it.ratings||{};const bad=k=>{const need=+req[k],have=+rt[k];return need&&have&&have<need};
+      return `<tr><td><b>${esc(u.tag||u.equipment_type||'Unit')}</b>${u.qty>1?' ×'+u.qty:''}<div class="mut">${esc([u.tonnage&&u.tonnage+'T',u.make].filter(Boolean).join(' · '))}</div></td>
+      <td><select data-oi="${o.id}|${u.id}" data-f="supplier_id" style="min-width:120px"><option value=""></option>${D.suppliers.map(sp=>`<option value="${sp.id}" ${it.supplier_id===sp.id?'selected':''}>${esc(sp.company)}</option>`).join('')}</select></td>
+      ${['make','model','ahri_no'].map(f=>`<td><input data-oi="${o.id}|${u.id}" data-f="${f}" value="${esc(it[f]||'')}" style="min-width:${f==='model'?150:90}px"></td>`).join('')}
+      ${RATE.map(([k])=>`<td><input data-oi="${o.id}|${u.id}" data-r="${k}" value="${esc(rt[k]??'')}" style="width:58px;${bad(k)?'background:#fde8e8;color:var(--bad)':''}"></td>`).join('')}
+      <td><input data-oi="${o.id}|${u.id}" data-f="price" value="${esc(it.price??'')}" style="width:80px"></td><td><input data-oi="${o.id}|${u.id}" data-f="lead" value="${esc(it.lead||'')}" style="width:70px"></td>
+      <td style="white-space:nowrap">${[['quote','💲'],['submittal','📐'],['ahri','🏷']].map(([d,ic])=>it[d]?`<a href="#" data-open="${esc(it[d].path)}" title="${d}">${ic}</a>`:`<label title="Upload ${d}" style="cursor:pointer;opacity:.35">${ic}<input type="file" hidden data-up="${o.id}|${u.id}|${d}"></label>`).join(' ')}</td></tr>`}).join('')}</table></div>
+    <div class="small mut" style="margin-top:4px">💲 quote · 📐 submittal · 🏷 AHRI certificate — faded = missing, tap to upload.</div></div>`}).join('')||'<p class="mut">No options yet. Create one and assign a supplier and model to every unit — e.g. 7 Lennox, 2 York, 6 Trane.</p>'}`;
+  document.querySelectorAll('[data-req]').forEach(e=>e.onchange=async()=>{const r={...(P.p.requirements||{})};const v=e.value.trim();if(v)r[e.dataset.req]=+v;else delete r[e.dataset.req];P.p.requirements=r;await q(sb.from('rebates').update({requirements:r}).eq('id',P.p.id));optionsTab()});
+  $('#nopt').onclick=async()=>{const o=(await q(sb.from('rebate_options').insert({rebate_id:P.p.id,name:'Option '+(opts.length+1),sort:opts.length}).select()))[0];P.opts.push(o);await event(P.p.id,'Created '+o.name);optionsTab()};
+  if($('#copt'))$('#copt').onclick=async()=>{const src=opts[opts.length-1];const o=(await q(sb.from('rebate_options').insert({rebate_id:P.p.id,name:'Option '+(opts.length+1),sort:opts.length}).select()))[0];
+    const its=P.items.filter(i=>i.option_id===src.id).map(i=>({option_id:o.id,unit_id:i.unit_id,supplier_id:i.supplier_id,make:i.make,model:i.model,ahri_no:i.ahri_no,ratings:i.ratings,price:i.price,lead:i.lead,submittal:i.submittal,ahri:i.ahri,quote:i.quote}));
+    if(its.length)P.items.push(...await q(sb.from('rebate_option_items').insert(its).select()));P.opts.push(o);optionsTab()};
+  document.querySelectorAll('[data-oname]').forEach(e=>e.onchange=async()=>{await q(sb.from('rebate_options').update({name:e.value.trim()||'Option'}).eq('id',e.dataset.oname));P.opts.find(o=>o.id===e.dataset.oname).name=e.value.trim()});
+  document.querySelectorAll('[data-odel]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this option and everything entered in it?'))return;await q(sb.from('rebate_options').delete().eq('id',b.dataset.odel));P.opts=P.opts.filter(o=>o.id!==b.dataset.odel);P.items=P.items.filter(i=>i.option_id!==b.dataset.odel);optionsTab()});
+  const save=async(oid,uid,patch)=>{let it=itemOf(oid,uid);if(it){Object.assign(it,patch);await q(sb.from('rebate_option_items').update({...patch,updated_at:new Date().toISOString()}).eq('id',it.id))}
+    else{it=(await q(sb.from('rebate_option_items').insert({option_id:oid,unit_id:uid,...patch}).select()))[0];P.items.push(it)}};
+  document.querySelectorAll('[data-oi]').forEach(e=>e.onchange=async()=>{const[oid,uid]=e.dataset.oi.split('|');const v=e.value.trim();
+    try{if(e.dataset.r){const it=itemOf(oid,uid)||{};await save(oid,uid,{ratings:{...(it.ratings||{}),[e.dataset.r]:v===''?null:+v}})}
+      else{const f=e.dataset.f;await save(oid,uid,{[f]:f==='price'?(v===''?null:+v.replace(/[^\d.]/g,'')):(v||null)});if(f==='supplier_id'){const sp=D.suppliers.find(x=>x.id===v);const it=itemOf(oid,uid);if(sp&&!it.make&&(sp.brands||[]).length===1){await save(oid,uid,{make:sp.brands[0]})}}}
+      optionsTab()}catch(err){toast(err.message)}});
+  document.querySelectorAll('[data-up]').forEach(e=>e.onchange=async()=>{const[oid,uid,d]=e.dataset.up.split('|');const f=e.files[0];if(!f)return;
+    try{const up=await upload(P.p.id,f,`options/${oid}`);await save(oid,uid,{[d]:{path:up.path,name:f.name}});await q(sb.from('rebate_files').insert({rebate_id:P.p.id,name:f.name,path:up.path,mime:up.mime,size:up.size,kind:d==='quote'?'Quote':d==='submittal'?'Submittal':'AHRI'}));toast('Uploaded');optionsTab()}catch(err){toast(err.message)}});
+  document.querySelectorAll('[data-open]').forEach(a=>a.onclick=async ev=>{ev.preventDefault();const u=await signed(a.dataset.open);if(u)window.open(u,'_blank')});}
 
 /* survey — every unit is its own folder: rebate-files/<project>/units/<unit id>/ (photos + docs) */
 const unitDir=(uid)=>`units/${uid}`;
