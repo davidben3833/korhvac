@@ -216,8 +216,8 @@ function optionsTab(){const{units,opts}=P;const req=P.p.requirements||{};
   ${opts.map((o,oi)=>{const c=optCheck(o);return `<div class="card" style="padding:12px;margin-bottom:12px"><div class="row"><input data-oname="${o.id}" value="${esc(o.name)}" style="font-weight:700;max-width:260px"><span class="sp"></span>
     <span class="small"><b>${c.covered}/${units.length}</b> units · supplier cost <b>${(c.total||0).toLocaleString('en-US',{style:'currency',currency:'USD'})}</b></span> <button class="sm red" data-odel="${o.id}">Delete</button></div>
     <div class="row" style="gap:10px;margin-top:8px;flex-wrap:wrap;background:#f6f8fb;border-radius:8px;padding:8px">
-     <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" data-oshare="${o.id}" ${o.shared?'checked':''}> Show to partner</label>
-     <label class="small" style="display:flex;gap:4px;align-items:center">Our price $<input data-oprice="${o.id}" value="${esc(o.our_price??'')}" style="width:110px" placeholder="sell price"></label>
+     <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700;text-transform:none;letter-spacing:0;margin:0;color:inherit"><input type="checkbox" style="width:auto" data-oshare="${o.id}" ${o.shared?'checked':''}> Show to partner</label>
+     <label class="small" style="display:flex;gap:4px;align-items:center;text-transform:none;letter-spacing:0;margin:0;color:inherit">Our price $<input data-oprice="${o.id}" value="${esc(o.our_price??'')}" style="width:110px" placeholder="sell price"></label>
      <input data-onotes="${o.id}" value="${esc(o.notes||'')}" placeholder="Note for partner (e.g. best efficiency, 3-week lead)" style="flex:1;min-width:200px">
      ${(P.p.extra||{}).chosenOption===o.id?'<span class="badge" style="background:#e7f6ee;color:#1f9d55">✓ Partner chose this</span>':''}</div>
     <div class="small mut" style="margin-top:4px">Partner sees: your price, makes/models, ratings vs program, submittals & AHRIs. Never supplier names, supplier prices or quotes.</div>
