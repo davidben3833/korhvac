@@ -214,7 +214,13 @@ function optionsTab(){const{units,opts}=P;const req=P.p.requirements||{};
    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">${RATE.map(([k,l])=>`<label class="small" style="display:flex;gap:4px;align-items:center">${l} ≥ <input data-req="${k}" value="${esc(req[k]??'')}" style="width:70px"></label>`).join('')}</div></div>
   <div class="row" style="margin:12px 0"><button class="pri" id="nopt">+ New option</button>${opts.length?`<button class="sm" id="copt">⧉ Copy option ${opts.length}</button>`:''}<span class="sp"></span><span class="mut small">${units.length} units in the survey</span></div>
   ${opts.map((o,oi)=>{const c=optCheck(o);return `<div class="card" style="padding:12px;margin-bottom:12px"><div class="row"><input data-oname="${o.id}" value="${esc(o.name)}" style="font-weight:700;max-width:260px"><span class="sp"></span>
-    <span class="small"><b>${c.covered}/${units.length}</b> units · total <b>${(c.total||0).toLocaleString('en-US',{style:'currency',currency:'USD'})}</b></span> <button class="sm red" data-odel="${o.id}">Delete</button></div>
+    <span class="small"><b>${c.covered}/${units.length}</b> units · supplier cost <b>${(c.total||0).toLocaleString('en-US',{style:'currency',currency:'USD'})}</b></span> <button class="sm red" data-odel="${o.id}">Delete</button></div>
+    <div class="row" style="gap:10px;margin-top:8px;flex-wrap:wrap;background:#f6f8fb;border-radius:8px;padding:8px">
+     <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" data-oshare="${o.id}" ${o.shared?'checked':''}> Show to partner</label>
+     <label class="small" style="display:flex;gap:4px;align-items:center">Our price $<input data-oprice="${o.id}" value="${esc(o.our_price??'')}" style="width:110px" placeholder="sell price"></label>
+     <input data-onotes="${o.id}" value="${esc(o.notes||'')}" placeholder="Note for partner (e.g. best efficiency, 3-week lead)" style="flex:1;min-width:200px">
+     ${(P.p.extra||{}).chosenOption===o.id?'<span class="badge" style="background:#e7f6ee;color:#1f9d55">✓ Partner chose this</span>':''}</div>
+    <div class="small mut" style="margin-top:4px">Partner sees: your price, makes/models, ratings vs program, submittals & AHRIs. Never supplier names, supplier prices or quotes.</div>
     ${c.missing.length?`<div class="small" style="color:var(--bad);margin-top:6px">❌ Missing ${c.missing.length} unit${c.missing.length>1?'s':''}: ${c.missing.map(esc).join(', ')}</div>`:`<div class="small" style="color:var(--ok);margin-top:6px">✓ All ${units.length} units covered</div>`}
     ${c.low.length?`<div class="small" style="color:var(--bad)">⚠️ Doesn't meet the program: ${c.low.map(esc).join(' · ')}</div>`:''}
     ${c.nodocs.length?`<div class="small" style="color:var(--warn)">📄 Missing paperwork: ${c.nodocs.map(esc).join(' · ')}</div>`:''}
@@ -232,6 +238,12 @@ function optionsTab(){const{units,opts}=P;const req=P.p.requirements||{};
   if($('#copt'))$('#copt').onclick=async()=>{const src=opts[opts.length-1];const o=(await q(sb.from('rebate_options').insert({rebate_id:P.p.id,name:'Option '+(opts.length+1),sort:opts.length}).select()))[0];
     const its=P.items.filter(i=>i.option_id===src.id).map(i=>({option_id:o.id,unit_id:i.unit_id,supplier_id:i.supplier_id,make:i.make,model:i.model,ahri_no:i.ahri_no,ratings:i.ratings,price:i.price,lead:i.lead,submittal:i.submittal,ahri:i.ahri,quote:i.quote}));
     if(its.length)P.items.push(...await q(sb.from('rebate_option_items').insert(its).select()));P.opts.push(o);optionsTab()};
+  document.querySelectorAll('[data-oshare]').forEach(e=>e.onchange=async()=>{const id=e.dataset.oshare;const o=P.opts.find(x=>x.id===id);
+    if(e.checked){const c=optCheck(o);if(c.missing.length&&!confirm(`${o.name} is missing ${c.missing.length} unit(s). Show it to the partner anyway?`)){e.checked=false;return}}
+    await q(sb.from('rebate_options').update({shared:e.checked,shared_at:e.checked?new Date().toISOString():null}).eq('id',id));o.shared=e.checked;await event(P.p.id,(e.checked?'Shared ':'Hid ')+o.name+(e.checked?' with partner':' from partner'));toast(e.checked?'Partner can now see '+o.name:'Hidden from partner')});
+  document.querySelectorAll('[data-oprice]').forEach(e=>e.onchange=async()=>{const v=e.value.replace(/[$,\s]/g,'');const n=v===''?null:+v;if(v!==''&&isNaN(n)){toast('Enter a number');return}
+    await q(sb.from('rebate_options').update({our_price:n}).eq('id',e.dataset.oprice));P.opts.find(x=>x.id===e.dataset.oprice).our_price=n;toast('Saved')});
+  document.querySelectorAll('[data-onotes]').forEach(e=>e.onchange=async()=>{await q(sb.from('rebate_options').update({notes:e.value.trim()||null}).eq('id',e.dataset.onotes));P.opts.find(x=>x.id===e.dataset.onotes).notes=e.value.trim()});
   document.querySelectorAll('[data-oname]').forEach(e=>e.onchange=async()=>{await q(sb.from('rebate_options').update({name:e.value.trim()||'Option'}).eq('id',e.dataset.oname));P.opts.find(o=>o.id===e.dataset.oname).name=e.value.trim()});
   document.querySelectorAll('[data-odel]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this option and everything entered in it?'))return;await q(sb.from('rebate_options').delete().eq('id',b.dataset.odel));P.opts=P.opts.filter(o=>o.id!==b.dataset.odel);P.items=P.items.filter(i=>i.option_id!==b.dataset.odel);optionsTab()});
   const save=async(oid,uid,patch)=>{let it=itemOf(oid,uid);if(it){Object.assign(it,patch);await q(sb.from('rebate_option_items').update({...patch,updated_at:new Date().toISOString()}).eq('id',it.id))}

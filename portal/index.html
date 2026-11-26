@@ -211,6 +211,7 @@ function supabaseApi(){
     async unitDel(rid,uid){await rpc('client_rebate_unit_delete',{p_rebate:rid,p_unit:uid})},
     async reqPricing(rid){await rpc('client_rebate_request_pricing',{p_rebate:rid})},
     async rebNote(rid,t){await rpc('client_rebate_note',{p_rebate:rid,p_text:t})},
+    async chooseOpt(rid,oid){await rpc('client_rebate_choose_option',{p_rebate:rid,p_option:oid})},
     async upload(path,blob){const{error}=await sb.storage.from('rebate-files').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(error)throw new Error(error.message)},
     async signed(paths){if(!paths.length)return{};const{data}=await sb.storage.from('rebate-files').createSignedUrls(paths,3600);const o={};(data||[]).forEach(x=>{if(x.signedUrl)o[x.path]=x.signedUrl});return o},
     async groupUnits(images){const{data:{session}}=await sb.auth.getSession();const r=await fetch(CFG.supabaseUrl+'/functions/v1/portal-ai',{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.supabaseAnonKey,Authorization:'Bearer '+(session&&session.access_token)},body:JSON.stringify({action:'group',images})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'AI could not sort the photos');return d},
@@ -457,6 +458,7 @@ async function openRb(id){const r=(D.rebates||[]).find(x=>x.id===id);if(!r)retur
   ${edit&&r.units.length?(r.pricingRequested?`<p class="small" style="color:#1f9d55">✓ Survey sent to KOR HVAC for pricing on ${fdate(r.pricingRequested)}. You can still add units.</p>`:`<button class="pri" style="width:100%;margin-top:6px" onclick="rbPricing('${r.id}')">✓ Survey complete — get pricing</button>`):''}
   <h3 style="margin-top:18px">Pricing requests</h3>
   ${r.suppliers.length?`<table><tr><th>Sent to</th><th>Brands</th><th>Status</th></tr>${r.suppliers.map(q=>`<tr><td><b>${esc(q.company||'Supplier')}</b><div class="small mut">${q.units} unit${q.units===1?'':'s'}${q.sentAt?' · sent '+fdate(q.sentAt):''}</div></td><td class="small">${esc((q.brands||[]).join(', '))}</td><td>${badge(q.repliedAt?'Quote received':q.sentAt?'Waiting for quote':q.status||'Pending')}</td></tr>`).join('')}</table>`:`<p class="mut small">${r.pricingRequested?'We are preparing the supplier pricing requests (Carrier, York, Lennox, Daikin…).':'Pricing is requested from our suppliers after the survey is complete.'}</p>`}
+  ${rbOptions(r)}
   <h3 style="margin-top:18px">Documents — submittals, revisions & approvals</h3>
   ${r.files.length?`<table>${r.files.map(f=>`<tr><td>${f.kind==='Submittal'?'📐':f.kind==='Application'?'📝':f.kind==='Pre-approval'?'✅':f.kind==='Photo'?'📷':'📄'} <a href="#" onclick="rbOpenFile('${esc(f.path)}');return false">${esc(f.name)}</a></td><td>${badge(f.kind)}</td><td class="small mut">${fdate(f.at)}</td></tr>`).join('')}</table>`:'<p class="mut small">No documents yet.</p>'}
   <h3 style="margin-top:18px">Proposals from KOR HVAC</h3>
@@ -468,6 +470,28 @@ async function openRb(id){const r=(D.rebates||[]).find(x=>x.id===id);if(!r)retur
 async function rbThumbs(){const els=[...document.querySelectorAll('.rbth[data-p]')].filter(e=>e.dataset.p);const need=[...new Set(els.map(e=>e.dataset.p))].filter(p=>!RBURL[p]);if(need.length)Object.assign(RBURL,await api.signed(need).catch(()=>({})));els.forEach(e=>{const u=RBURL[e.dataset.p];if(u){if(e.tagName==='IMG')e.src=u;else e.style.backgroundImage=`url("${u}")`}})}
 async function rbOpenFile(path){const w=window.open('','_blank');const o=await api.signed([path]).catch(()=>({}));if(o[path]){if(w)w.location=o[path];else location.href=o[path]}else{if(w)w.close();toast('Could not open the file')}}
 async function rbPricing(id){try{await api.reqPricing(id);await refresh();openRb(id);toast('Sent — we’ll get pricing from our suppliers')}catch(e){toast(e.message)}}
+/* ---- options side by side: our price, program check per unit, submittal + AHRI per unit (no supplier prices) ---- */
+const RBRATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];
+function rbOptCheck(r,o){const req=r.requirements||{};let ok=0,cov=0,docs=0;const rows=r.units.map(u=>{const it=o.items.find(i=>i.unitId===u.id);if(!it||!(it.model||it.make))return{u,it:null};cov++;
+  const rt=it.ratings||{};const fails=RBRATE.filter(([k])=>+req[k]&&+rt[k]&&+rt[k]<+req[k]).map(([k,l])=>`${l} ${rt[k]} < ${req[k]}`);const unknown=RBRATE.filter(([k])=>+req[k]&&!(+rt[k])&&rt[k]!==0).length;
+  const pass=!fails.length&&!unknown;if(pass)ok++;if(it.submittal&&it.ahri)docs++;return{u,it,fails,pass,unknown}});return{rows,ok,cov,docs,hasReq:Object.values(req).some(v=>+v)}}
+function rbOptions(r){const os=r.options||[];if(!os.length)return `<h3 style="margin-top:18px">Equipment options</h3><p class="mut small">${r.pricingRequested?'Once supplier quotes are in, the equipment options will show here side by side.':'Equipment options appear here after pricing.'}</p>`;
+  const req=r.requirements||{};const reqTxt=RBRATE.filter(([k])=>+req[k]).map(([k,l])=>`${l} ≥ ${req[k]}`).join(' · ');
+  return `<h3 style="margin-top:18px">Equipment options (${os.length})</h3>${reqTxt?`<div class="small mut" style="margin-bottom:8px">Program minimums: <b>${esc(reqTxt)}</b></div>`:''}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px">${os.map(o=>{const c=rbOptCheck(r,o);const chosen=r.chosenOption===o.id;const n=r.units.length;
+   return `<div class="card" style="margin:0;padding:12px;${chosen?'border:2px solid #1f9d55':''}"><div class="row"><b style="font-size:16px">${esc(o.name)}</b><span class="sp"></span>${chosen?'<span class="badge" style="background:#e7f6ee;color:#1f9d55">✓ Chosen</span>':''}</div>
+    <div style="font-size:22px;font-weight:800;margin:6px 0">${+o.ourPrice?money(o.ourPrice):'<span class="mut small">Price on proposal</span>'}</div>
+    <div class="small">${c.cov<n?`<div style="color:#c0392b">❌ ${n-c.cov} unit${n-c.cov>1?'s':''} not included</div>`:`<div style="color:#1f9d55">✓ All ${n} units included</div>`}
+     ${c.hasReq?(c.ok===c.cov&&c.cov?`<div style="color:#1f9d55">✓ Meets the program</div>`:`<div style="color:#c0392b">⚠️ ${c.cov-c.ok} unit${c.cov-c.ok===1?'':'s'} below or not yet confirmed</div>`):''}
+     <div class="mut">📐🏷 Paperwork complete on ${c.docs}/${c.cov} units</div></div>
+    ${o.notes?`<div class="small mut" style="margin-top:6px">${esc(o.notes)}</div>`:''}
+    <div style="margin-top:8px;border-top:1px solid #eef1f6">${c.rows.map(x=>`<div class="small" style="padding:6px 0;border-bottom:1px solid #eef1f6"><b>${esc(x.u.tag||x.u.type||'Unit')}</b>${+x.u.qty>1?' ×'+x.u.qty:''}
+      ${x.it?`<div>${esc([x.it.make,x.it.model].filter(Boolean).join(' '))}${x.it.lead?` <span class="mut">· ${esc(x.it.lead)}</span>`:''}</div>
+       <div>${RBRATE.filter(([k])=>x.it.ratings[k]!=null&&x.it.ratings[k]!=='').map(([k,l])=>{const bad=+req[k]&&+x.it.ratings[k]<+req[k];return `<span style="${bad?'color:#c0392b;font-weight:700':''}">${l} ${esc(x.it.ratings[k])}${+req[k]?(bad?' ✗':' ✓'):''}</span>`}).join(' · ')||'<span class="mut">Ratings pending</span>'}</div>
+       <div>${x.it.submittal?`<a href="#" onclick="rbOpenFile('${esc(x.it.submittal)}');return false">📐 Submittal</a>`:'<span class="mut">📐 pending</span>'} &nbsp; ${x.it.ahri?`<a href="#" onclick="rbOpenFile('${esc(x.it.ahri)}');return false">🏷 AHRI${x.it.ahriNo?' '+esc(x.it.ahriNo):''}</a>`:`<span class="mut">🏷 ${x.it.ahriNo?'AHRI '+esc(x.it.ahriNo):'pending'}</span>`}</div>`
+      :'<div style="color:#c0392b">Not included in this option</div>'}</div>`).join('')}</div>
+    ${chosen?`<p class="small" style="color:#1f9d55;margin-top:8px">You chose this option on ${fdate(r.chosenAt)}.</p>`:`<button class="${r.chosenOption?'':'pri'}" style="width:100%;margin-top:10px" onclick="rbChoose('${r.id}','${o.id}','${esc(o.name).replace(/'/g,'')}')">Choose ${esc(o.name)}</button>`}</div>`}).join('')}</div>`}
+async function rbChoose(rid,oid,name){if(!confirm(`Choose ${name}? KOR HVAC will be notified and prepare the paperwork for this option.`))return;try{await api.chooseOpt(rid,oid);await refresh();openRb(rid);toast('Sent — KOR HVAC has your choice')}catch(e){toast(e.message)}}
 async function rbMsg(id){const t=$('#rb_msg').value.trim();if(!t)return;try{await api.rebNote(id,t);await refresh();openRb(id);toast('Sent to KOR HVAC')}catch(e){toast(e.message)}}
 /* ---- bulk: all site photos at once → AI sorts them into units ---- */
 let RB=null;
