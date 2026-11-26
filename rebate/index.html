@@ -248,7 +248,7 @@ function drawProject(){
 
 /* ===== UNIT TABLE — one row per unit, everything a supplier needs to price it ===== */
 const UTYPES=['RTU','Condensing unit','Air handler','Furnace','Heat pump','Mini split','VRF','PTAC','Fan coil','DOAS / ERV','Boiler','Water heater','Storage tank','Pump','Fan / fan motor','Exhaust fan','Unit heater','Chiller','Cooling tower','Compressor','Expansion tank','Controls','Other'];
-const SPEC=[['tag','Tag','col'],['equipment_type','Type','type'],['qty','Qty','col'],['make','Make','col'],['model','Model','col'],['serial','Serial','col'],['tonnage','Tons','col'],['voltage','Voltage','col'],['fuel','Fuel','col'],['refrigerant','Refrig.','col'],['mfg_year','Year','col'],['efficiency','Efficiency','col'],
+const SPEC=[['tag','Tag','col'],['equipment_type','Type','type'],['qty','Qty','col'],['make','Make','col'],['model','Model','col'],['serial','Serial','col'],['tonnage','Tons','col'],['voltage','Voltage','col'],['fuel','Fuel','col'],['refrigerant','Refrig.','col'],['mfg_year','Year','col'],['efficiency','Efficiency','col'],['warranty','Warranty','spec'],
  ['heat_in','Heat input (MBH)','spec'],['heat_out','Heat output (MBH)','spec'],['economizer','Economizer','yn'],['co2','CO₂ sensor','yn'],['enthalpy','Enthalpy sensor','yn'],['smoke','Smoke detector','yn'],['curb','Curb adapter','yn'],['spec_notes','Notes for supplier','spec']];
 const uval=(u,[k,,t])=>(t==='col'||t==='type')?(u[k]??''):((u.specs||{})[k]??'');
 const aiCell=(u,k)=>((u.specs||{}).ai_fields||[]).includes(k)?'background:#f3edff':'';
@@ -259,7 +259,7 @@ function tableTab(){const{units}=P;
    <label class="small" style="text-transform:none;letter-spacing:0;margin:0;display:flex;gap:4px;align-items:center"><input type="checkbox" id="aiow" style="width:auto"> overwrite</label><button class="sm pri" id="aifill">🤖 Fill with AI</button><button class="sm" id="csv">⬇ Export CSV</button></div>
   <div class="small mut" id="aifst" style="margin-bottom:6px"></div>
   <div style="overflow-x:auto"><table class="small" style="min-width:1700px"><tr>${SPEC.map(c=>`<th>${c[1]}</th>`).join('')}</tr>
-  ${units.filter(u=>!V.tf||u.equipment_type===V.tf).map(u=>`<tr title="${esc((u.specs||{}).ai_why?('AI: '+(u.specs.ai_why)+' ('+(u.specs.ai_conf||'')+')'):'')}">${SPEC.map(c=>c[2]==='yn'?`<td><select data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" style="min-width:70px;${aiCell(u,c[0])}"><option value=""></option>${['Yes','No','Existing'].map(x=>`<option ${uval(u,c)===x?'selected':''}>${x}</option>`).join('')}</select></td>`
+  ${units.filter(u=>!V.tf||u.equipment_type===V.tf).map(u=>`<tr title="${esc((u.specs||{}).ai_why?('AI: '+(u.specs.ai_why)+' ('+(u.specs.ai_conf||'')+')'+((u.specs||{}).year_how?'\nYear: '+u.specs.year_how:'')):'')}">${SPEC.map(c=>c[2]==='yn'?`<td><select data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" style="min-width:70px;${aiCell(u,c[0])}"><option value=""></option>${['Yes','No','Existing'].map(x=>`<option ${uval(u,c)===x?'selected':''}>${x}</option>`).join('')}</select></td>`
    :c[2]==='type'?`<td><select data-u="${u.id}" data-k="${c[0]}" data-t="col" style="min-width:130px;${aiCell(u,c[0])}"><option value=""></option>${[...UTYPES,...(u.equipment_type&&!UTYPES.includes(u.equipment_type)?[u.equipment_type]:[])].map(x=>`<option ${uval(u,c)===x?'selected':''}>${esc(x)}</option>`).join('')}</select></td>`
    :`<td><input data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" value="${esc(uval(u,c))}" style="min-width:${c[0]==='spec_notes'?220:c[0]==='model'||c[0]==='serial'?140:70}px;${aiCell(u,c[0])}"></td>`).join('')}</tr>`).join('')}</table></div>
   ${units.length?'':'<p class="mut">No units yet — add them in the Survey tab.</p>'}`;
@@ -269,7 +269,7 @@ function tableTab(){const{units}=P;
     try{await q(sb.from('rebate_units').update({...up,updated_at:new Date().toISOString()}).eq('id',u.id));e.style.background='#eefaf3';setTimeout(()=>e.style.background='',700)}catch(err){toast(err.message)}});
   $('#tf').onchange=e=>{V.tf=e.target.value.replace(/ \(\d+\)$/,'');tableTab()};
   $('#aifill').onclick=async()=>{const btn=$('#aifill');btn.disabled=true;const st=$('#aifst');let off=0,n=0;
-    try{const{data:{session}}=await sb.auth.getSession();while(true){st.textContent=`🤖 Reading units ${off+1}–${Math.min(off+6,P.units.length)} of ${P.units.length}…`;
+    try{const{data:{session}}=await sb.auth.getSession();while(true){st.textContent=`🤖 Researching units ${off+1}–${Math.min(off+2,P.units.length)} of ${P.units.length} (nameplate → brand → serial year)…`;
       const r=await fetch(SB_URL+'/functions/v1/rebate-photomap',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({rebateId:P.p.id,action:'classify',offset:off,force:$('#aiow').checked})}).then(x=>x.json());
       if(r.error)throw new Error(r.error);n+=r.filled||0;if(r.done)break;off=r.next}
       await event(P.p.id,`AI filled unit details for ${n} unit(s)`);P.units=await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at'));toast(`Done — ${n} units updated`);tableTab()}catch(e){toast(e.message);btn.disabled=false;st.textContent=''}};
@@ -438,6 +438,7 @@ function pricingTab(){
   const unitName=id=>{const u=units.find(x=>x.id===id);return u?(u.tag||u.equipment_type)+(u.model?' ('+u.model+')':''):''};
   $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="ai">✨ AI: pick suppliers & draft pricing emails</button><button id="man">+ Manual request</button><span class="sp"></span><button class="sm" id="chk">Check mailbox now</button></div>
   <div class="mut small" style="margin-bottom:10px">Emails go out from the person who filed the project (cc rebates@korhvac.com), only after you approve them. Supplier replies and attached quotes/submittals are filed here automatically.</div>
+  <div class="card" id="smap"></div>
   ${reqs.map(r=>`<div class="req"><div class="row"><b>${esc(sup(r.supplier_id).company||r.to_addr)}</b><span class="b ${esc(r.status)}">${esc(r.status)}</span>${r.quote_total?`<b>${money(r.quote_total)}</b>`:''}<span class="sp"></span><span class="small mut">${r.sent_at?'Sent '+when(r.sent_at):'Created '+when(r.created_at)}</span></div>
    <div class="small mut">To: ${esc(r.to_addr||'')}${r.cc?' · Cc: '+esc(r.cc):''} · Ref KOR-${esc(r.token)}</div>
    ${r.ai_reason?`<div class="ai" style="margin:6px 0">AI: ${esc(r.ai_reason)}</div>`:''}
@@ -446,6 +447,7 @@ function pricingTab(){
    ${r.error?`<div class="err">${esc(r.error)}</div>`:''}
    <div class="row" style="margin-top:8px">${['Draft','Failed'].includes(r.status)?`<button class="sm" data-open="${r.id}">Review / edit</button>${canP('rebate_approve')?`<button class="sm grn" data-send="${r.id}">Approve & send</button>`:'<span class="small mut">Waiting for approval</span>'}<button class="sm red" data-del="${r.id}">Discard</button>`:`<button class="sm" data-open="${r.id}">View email</button>`}
    ${['Sent','Replied'].includes(r.status)?`<button class="sm" data-mark="${r.id}">Mark quoted</button>`:''}${!['Declined','Draft'].includes(r.status)?`<button class="sm" data-dec="${r.id}">Declined</button>`:''}</div></div>`).join('')||'<div class="card mut">No pricing requests yet. Add units in Survey, then let the AI pick suppliers and draft the emails.</div>'}`;
+  smapRender();
   $('#ai').onclick=async e=>{if(!units.length)return toast('Add units first');e.target.disabled=true;e.target.textContent='Drafting…';try{const r=await fn('ai-assist',{action:'rebate_plan',rebate_id:p.id});toast(`${r.drafted} draft(s) ready for approval`);await projectView()}catch(err){toast(err.message);e.target.disabled=false}};
   $('#man').onclick=()=>editReq({rebate_id:p.id,status:'Draft',unit_ids:units.map(u=>u.id),subject:`Pricing needed for job ${p.site||p.title}`,body:''});
   $('#chk').onclick=async e=>{e.target.disabled=true;try{const r=await fn('rebate-mail',{action:'poll'});toast(`Checked: ${r.matched} new repl${r.matched===1?'y':'ies'}, ${r.files} file(s)`);projectView()}catch(err){toast(err.message)}e.target.disabled=false};
@@ -454,6 +456,29 @@ function pricingTab(){
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Discard this draft?'))return;await q(sb.from('supplier_requests').delete().eq('id',b.dataset.del));projectView()});
   document.querySelectorAll('[data-mark]').forEach(b=>b.onclick=async()=>{const t=prompt('Quote total (optional)');await q(sb.from('supplier_requests').update({status:'Quoted',quote_total:t?Number(t.replace(/[^\d.]/g,''))||null:null}).eq('id',b.dataset.mark));projectView()});
   document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=async()=>{await q(sb.from('supplier_requests').update({status:'Declined'}).eq('id',b.dataset.dec));projectView()});
+}
+
+/* ===== Supplier map: which item goes to which supplier ===== */
+function smapRender(){const el=$('#smap');if(!el)return;const{p,units}=P;const map=p.supplier_map||{};
+  const sup=id=>D.suppliers.find(s=>s.id===id)||{company:'?'};
+  let cols=[...new Set([...Object.values(map).flat().map(x=>x.id),...(V.smExtra||[])])].filter(id=>D.suppliers.some(s=>s.id===id));
+  const has=(u,s)=>(map[u]||[]).some(x=>x.id===s), why=(u,s)=>((map[u]||[]).find(x=>x.id===s)||{}).why||'';
+  const cnt=s=>units.filter(u=>has(u.id,s)).length;
+  el.innerHTML=`<div class="row" style="gap:8px;flex-wrap:wrap"><b>🗺 Supplier map — what goes to who</b><span class="sp"></span>
+   <button class="sm pri" id="smai">🤖 ${Object.keys(map).length?'Re-map':'Map items to suppliers'}</button>
+   <select id="smadd" style="max-width:200px"><option value="">+ Add supplier column</option>${D.suppliers.filter(s=>s.active&&!cols.includes(s.id)).map(s=>`<option value="${s.id}">${esc(s.company)}</option>`).join('')}</select>
+   ${cols.length?`<button class="sm grn" id="smdraft">✉ Draft one email per supplier (${cols.filter(c=>cnt(c)).length})</button>`:''}</div>
+   <div class="small mut" style="margin:4px 0 8px">Each supplier only gets the items ticked in its column. Hover a tick to see why the AI picked it.</div>
+   ${cols.length?`<div style="overflow-x:auto"><table class="small"><tr><th>Item</th>${cols.map(c=>`<th style="min-width:90px;white-space:normal" title="${esc((sup(c).line_card||{}).summary||'')}">${esc(sup(c).company)}<div class="mut" style="font-weight:400;text-transform:none">${cnt(c)} item${cnt(c)===1?'':'s'}</div></th>`).join('')}</tr>
+   ${units.map(u=>`<tr><td><b>${esc(u.tag||'Unit')}</b> <span class="mut">${esc([u.equipment_type,u.make,u.model,u.tonnage?u.tonnage+'T':''].filter(Boolean).join(' · '))}</span></td>${cols.map(c=>`<td style="text-align:center" title="${esc(why(u.id,c))}"><input type="checkbox" style="width:auto" data-smu="${u.id}" data-sms="${c}" ${has(u.id,c)?'checked':''}></td>`).join('')}</tr>`).join('')}</table></div>`:'<div class="mut small">Not mapped yet.</div>'}`;
+  const save=async()=>{await q(sb.from('rebates').update({supplier_map:P.p.supplier_map}).eq('id',P.p.id))};
+  el.querySelectorAll('[data-smu]').forEach(c=>c.onchange=async()=>{const m={...(P.p.supplier_map||{})};const u=c.dataset.smu,s=c.dataset.sms;m[u]=(m[u]||[]).filter(x=>x.id!==s);if(c.checked)m[u].push({id:s,why:'added by hand'});P.p.supplier_map=m;await save();smapRender()});
+  $('#smadd').onchange=e=>{if(!e.target.value)return;V.smExtra=[...(V.smExtra||[]),e.target.value];smapRender()};
+  $('#smai').onclick=async e=>{if(!units.length)return toast('Add units first');e.target.disabled=true;e.target.textContent='🤖 Mapping…';
+    try{const r=await fn('rebate-photomap',{rebateId:P.p.id,action:'supplier_map'});P.p.supplier_map=r.map;toast('Mapped — check the ticks');smapRender()}catch(err){toast(err.message);e.target.disabled=false}};
+  if($('#smdraft'))$('#smdraft').onclick=async e=>{const groups={};for(const[u,l]of Object.entries(P.p.supplier_map||{}))for(const x of l)(groups[x.id]=groups[x.id]||[]).push(u);
+    if(!Object.keys(groups).length)return toast('Tick at least one item');if(!confirm(`Draft ${Object.keys(groups).length} pricing email(s)? Nothing is sent until you approve each one.`))return;
+    e.target.disabled=true;e.target.textContent='Drafting…';try{const r=await fn('rebate-photomap',{rebateId:P.p.id,action:'draft',groups});toast(`${r.drafted} draft(s) ready for approval`);await projectView()}catch(err){toast(err.message);e.target.disabled=false}};
 }
 async function approve(r,btn){if(!canP('rebate_approve'))return toast('You don’t have permission to send supplier emails — ask an Admin');
   if(!confirm(`Send this pricing request to ${r.to_addr} from the project owner's email (cc rebates@)?`))return;
@@ -554,11 +579,12 @@ function activityTab(){
 /* ───────── suppliers ───────── */
 function suppliersView(){
   shell(`<div class="row" style="margin-bottom:12px"><h2 style="margin:0">Suppliers</h2><span class="sp"></span>${canP('suppliers')?'<button class="pri" id="ns">+ Add supplier</button>':''}</div>
-  <div class="mut small" style="margin-bottom:10px">The AI picks suppliers from this list by equipment type, brand and region, and learns from who replies and quotes.</div>
+  <div class="row" style="margin-bottom:10px"><span class="mut small">The AI picks suppliers from this list by equipment type, brand and region (from each supplier's line card), and learns from who replies and quotes.</span><span class="sp"></span>${canP('suppliers')?'<button class="sm" id="lcall">🔎 Update all line cards</button>':''}</div><div class="small mut" id="lcst"></div>
   <div class="card" style="overflow:auto"><table><tr><th>Company</th><th>Contact</th><th>Equipment</th><th>Brands</th><th>Regions</th><th>Record</th></tr>
-  ${D.suppliers.map(s=>`<tr class="click" data-s="${s.id}" style="${s.active?'':'opacity:.5'}"><td><b>${esc(s.company)}</b></td><td class="small">${esc(s.contact_name||'')}<br>${esc(s.email||'')}</td><td class="small">${esc((s.categories||[]).join(', '))}</td><td class="small">${esc((s.brands||[]).join(', '))}</td><td class="small">${esc((s.regions||[]).join(', '))}</td>
+  ${D.suppliers.map(s=>`<tr class="click" data-s="${s.id}" style="${s.active?'':'opacity:.5'}"><td><b>${esc(s.company)}</b>${s.line_card?.summary?`<div class="small mut" style="max-width:260px">${esc(s.line_card.summary)}</div>`:''}${s.website?`<div class="small"><a href="${esc(/^https?:/.test(s.website)?s.website:'https://'+s.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(s.website.replace(/^https?:\/\//,''))}</a></div>`:''}</td><td class="small">${esc(s.contact_name||'')}<br>${esc(s.email||'')}</td><td class="small">${esc((s.categories||[]).join(', '))}</td><td class="small">${esc((s.brands||[]).join(', '))}</td><td class="small">${esc((s.regions||[]).join(', '))}</td>
   <td class="small">${s.stats?.sent?`${s.stats.sent} sent · ${s.stats.quoted||0} quoted${s.stats.avgReplyHrs!=null?' · ~'+s.stats.avgReplyHrs+'h reply':''}`:'<span class="mut">new</span>'}</td></tr>`).join('')}</table></div>`);
   if($('#ns'))$('#ns').onclick=()=>editSupplier({active:true});
+  if($('#lcall'))$('#lcall').onclick=async e=>{e.target.disabled=true;const L=D.suppliers.filter(s=>s.active);let i=0;for(const s of L){i++;$('#lcst').textContent=`🔎 ${i}/${L.length} — ${s.company}…`;try{await fn('rebate-photomap',{action:'linecard',supplier_id:s.id})}catch(err){}}await loadAll();suppliersView();toast('Line cards updated')};
   document.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>editSupplier(D.suppliers.find(s=>s.id===r.dataset.s)));
 }
 function editSupplier(s){
@@ -569,13 +595,18 @@ function editSupplier(s){
   <label>Equipment types (comma separated)</label><input id="cat" value="${esc(arr(s.categories))}" placeholder="RTU, Split system, Boiler, PTAC…">
   <label>Brands</label><input id="br" value="${esc(arr(s.brands))}"><label>Regions / states</label><input id="rg" value="${esc(arr(s.regions))}" placeholder="NJ, NY, MA">
   <label>Notes (the AI reads these)</label><textarea id="nt">${esc(s.notes||'')}</textarea>
+  <label>Website</label><input id="ws" value="${esc(s.website||'')}" placeholder="lionhvac.com">
+  ${s.line_card?`<div class="ai" style="margin-top:8px"><b>Line card</b> (${esc(String(s.line_card.updated_at||'').slice(0,10))}): ${esc(s.line_card.summary||'')}${s.line_card.branches?'<br>Branches: '+esc(s.line_card.branches):''}</div>`:''}
+  ${s.id&&canP('suppliers')?'<button class="sm" id="lc1" style="margin-top:6px">🔎 Look up what they sell</button>':''}
   ${s.learned?.quoted?`<div class="ai">Learned: quoted ${esc(Object.entries(s.learned.quoted).map(([k,v])=>k+' ×'+v).join(', '))}</div>`:''}
   <label style="text-transform:none"><input type="checkbox" id="ac" style="width:auto" ${s.active!==false?'checked':''}> Active</label>
   <div class="row" style="margin-top:14px">${canP('suppliers')?'<button class="pri" id="sv">Save</button>':''}<button id="cx">Close</button></div>`);
   m.querySelector('#cx').onclick=()=>m.remove();
-  if(m.querySelector('#sv'))m.querySelector('#sv').onclick=async()=>{const o={company:m.querySelector('#c').value.trim(),contact_name:m.querySelector('#n').value.trim()||null,email:m.querySelector('#e').value.trim()||null,phone:m.querySelector('#p').value.trim()||null,categories:split(m.querySelector('#cat').value),brands:split(m.querySelector('#br').value),regions:split(m.querySelector('#rg').value),notes:m.querySelector('#nt').value.trim()||null,active:m.querySelector('#ac').checked,updated_at:new Date().toISOString()};
+  if(m.querySelector('#sv'))m.querySelector('#sv').onclick=async()=>{const o={company:m.querySelector('#c').value.trim(),contact_name:m.querySelector('#n').value.trim()||null,email:m.querySelector('#e').value.trim()||null,phone:m.querySelector('#p').value.trim()||null,categories:split(m.querySelector('#cat').value),brands:split(m.querySelector('#br').value),regions:split(m.querySelector('#rg').value),notes:m.querySelector('#nt').value.trim()||null,website:m.querySelector('#ws').value.trim()||null,active:m.querySelector('#ac').checked,updated_at:new Date().toISOString()};
     if(!o.company)return toast('Company is required');
-    try{if(s.id)await q(sb.from('suppliers').update(o).eq('id',s.id));else await q(sb.from('suppliers').insert({...o,source:'manual'}));m.remove();await loadAll();suppliersView()}catch(e){toast(e.message)}};
+    try{let nid=s.id;if(s.id)await q(sb.from('suppliers').update(o).eq('id',s.id));else nid=(await q(sb.from('suppliers').insert({...o,source:'manual'}).select('id').single())).id;m.remove();await loadAll();suppliersView();
+      if(!s.id){toast('Saved — looking up what they sell…');fn('rebate-photomap',{action:'linecard',supplier_id:nid}).then(async()=>{await loadAll();if(V.page==='suppliers')suppliersView();toast(o.company+': line card added')}).catch(err=>toast('Line card: '+err.message))}}catch(e){toast(e.message)}};
+  if(m.querySelector('#lc1'))m.querySelector('#lc1').onclick=async e=>{e.target.disabled=true;e.target.textContent='🔎 Searching the web…';try{await fn('rebate-photomap',{action:'linecard',supplier_id:s.id});m.remove();await loadAll();suppliersView();editSupplier(D.suppliers.find(x=>x.id===s.id))}catch(err){toast(err.message);e.target.disabled=false}};
 }
 boot();
 </script>
