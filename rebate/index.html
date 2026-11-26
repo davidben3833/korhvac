@@ -93,6 +93,7 @@ async function boot(){
   if(error||!data){if(EMBED){document.getElementById('app').innerHTML='<p style="padding:20px">You don’t have access to rebate projects.</p>';return}location.replace('/app/');return}
   ME=data;await loadAll();route();
 }
+const isAdm=()=>ME&&(ME.base==='Admin'||(ME.perms||[]).includes('*'));
 async function loadAll(){
   [D.projects,D.suppliers,D.customers]=await Promise.all([
     q(sb.from('rebates').select('*').order('created_at',{ascending:false})),
@@ -118,9 +119,9 @@ window.onhashchange=()=>ME&&route();
 /* ───────── projects ───────── */
 function projectsView(){
   const f=V.f||'', st=V.st||'';
-  const list=D.projects.filter(p=>(!st||p.stage===st)&&(!f||[p.number,p.title,p.site,p.company,p.program].join(' ').toLowerCase().includes(f.toLowerCase())));
+  const list=D.projects.filter(p=>(st==='__del'?!!p.deleted_at:!p.deleted_at)&&(!st||st==='__del'||p.stage===st)&&(!f||[p.number,p.title,p.site,p.company,p.program].join(' ').toLowerCase().includes(f.toLowerCase())));
   shell(`<div class="row" style="margin-bottom:12px"><h2 style="margin:0">Projects</h2><span class="sp"></span><button class="pri" id="np">+ New project</button></div>
-  <div class="card"><div class="row" style="margin-bottom:10px"><input id="f" placeholder="Search…" value="${esc(f)}" style="max-width:280px"><select id="st" style="max-width:200px"><option value="">All stages</option>${STAGES.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select></div>
+  <div class="card"><div class="row" style="margin-bottom:10px"><input id="f" placeholder="Search…" value="${esc(f)}" style="max-width:280px"><select id="st" style="max-width:200px"><option value="">All stages</option>${STAGES.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}${isAdm()&&D.projects.some(p=>p.deleted_at)?`<option value="__del" ${st==='__del'?'selected':''}>🗑 Deleted (${D.projects.filter(p=>p.deleted_at).length})</option>`:''}</select></div>
   <table><tr><th>#</th><th>Project</th><th>Site</th><th>Program / company</th><th>Stage</th><th>Survey</th></tr>
   ${list.map(p=>`<tr class="click" data-id="${p.id}"><td>${esc(p.number)}</td><td><b>${esc(p.title||'(untitled)')}</b></td><td>${esc(p.site||'')}</td><td>${esc([p.program,p.company].filter(Boolean).join(' · '))}</td><td><span class="b ${esc(p.stage)}">${esc(p.stage)}</span></td><td>${esc(p.survey_date||'')}</td></tr>`).join('')||'<tr><td colspan=6 class="mut">No projects yet.</td></tr>'}</table></div>`);
   $('#f').oninput=e=>{V.f=e.target.value;clearTimeout(V.t);V.t=setTimeout(()=>{projectsView();$('#f').focus();$('#f').setSelectionRange(99,99)},250)};
@@ -173,12 +174,15 @@ function drawProject(){
   const drafts=reqs.filter(r=>r.status==='Draft').length;
   shell(`<div class="row" style="margin-bottom:6px"><a href="#" id="bk">← Projects</a></div>
   <div class="card"><div class="row"><div><div class="mut small">${esc(p.number||'')}</div><h2 style="margin:2px 0">${esc(p.title||'')}</h2><div class="mut">${esc(p.site||'')}${cust?' · '+esc(cust.company||cust.name):''}</div>
-  <div class="small mut">${esc([p.program,p.company,p.app_no&&('App # '+p.app_no)].filter(Boolean).join(' · '))}</div></div><span class="sp"></span><button class="sm" id="ed">Edit</button></div>
+  <div class="small mut">${esc([p.program,p.company,p.app_no&&('App # '+p.app_no)].filter(Boolean).join(' · '))}</div></div><span class="sp"></span>${p.deleted_at?'<span class="badge" style="background:#fde8e8;color:#c0392b">Deleted</span> <button class="sm" id="rst">Restore</button>':''}<button class="sm" id="ed">Edit</button>${isAdm()&&!p.deleted_at?' <button class="sm red" id="del">Delete</button>':''}</div>
   <div class="stage" style="margin-top:10px">${STAGES.map(s=>`<span class="${s===p.stage?'on':''}" data-stage="${s}" style="cursor:pointer">${s}</span>`).join('')}</div></div>
   <div class="tabs">${[['survey',`Survey (${units.length})`],['table','Unit table'],['options',`Options (${(P.opts||[]).length})${optIssues()?' ⚠️':''}`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['files',`Files (${files.length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
   <div id="tb"></div>`);
   $('#bk').onclick=e=>{e.preventDefault();location.hash=''};
   $('#ed').onclick=()=>editProject(p);
+  if($('#del'))$('#del').onclick=async()=>{const typed=prompt(`Delete ${p.number} — ${p.title||''}?\n\nThe partner will no longer see it. You can restore it later from Projects → 🗑 Deleted.\n\nType ${p.number} to confirm:`);if(typed===null)return;if(typed.trim().toUpperCase()!==String(p.number).toUpperCase()){toast('Not deleted — the number didn’t match');return}
+    await q(sb.from('rebates').update({deleted_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',p.id));await event(p.id,'Project deleted');p.deleted_at=new Date().toISOString();toast(p.number+' deleted');location.hash=''};
+  if($('#rst'))$('#rst').onclick=async()=>{await q(sb.from('rebates').update({deleted_at:null}).eq('id',p.id));await event(p.id,'Project restored');p.deleted_at=null;toast('Restored');route()};
   document.querySelectorAll('[data-stage]').forEach(s=>s.onclick=async()=>{if(s.dataset.stage===p.stage)return;await q(sb.from('rebates').update({stage:s.dataset.stage,updated_at:new Date().toISOString()}).eq('id',p.id));await event(p.id,'Stage → '+s.dataset.stage);await loadAll();projectView()});
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{V.tab=b.dataset.tab;drawProject()});
   ({survey:surveyTab,table:tableTab,options:optionsTab,pricing:pricingTab,files:filesTab,activity:activityTab})[tab]();
