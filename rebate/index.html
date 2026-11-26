@@ -401,20 +401,54 @@ function editReq(r){
 }
 
 /* files */
+/* ===== Site photos, grouped by unit: select, move, hide from client, delete, AI sort ===== */
+let PH={sel:new Set(),open:{}};
+function photosHTML(){const ph=P.files.filter(f=>f.kind==='Photo');if(!ph.length)return '';
+  const by={};ph.forEach(f=>{(by[f.unit_id||'none']=by[f.unit_id||'none']||[]).push(f)});
+  const ord=(a,b)=>((a.ai&&a.ai.shows==='nameplate')?0:1)-((b.ai&&b.ai.shows==='nameplate')?0:1)||String(a.taken_at||a.name).localeCompare(String(b.taken_at||b.name));
+  const groups=[...P.units.filter(u=>by[u.id]).map(u=>({id:u.id,name:`${u.tag||u.equipment_type||'Unit'}`,sub:[u.make,u.model].filter(Boolean).join(' '),list:by[u.id].sort(ord)})),...(by.none?[{id:'none',name:'Not assigned to a unit',sub:'overview, route, or not sorted yet',list:by.none.sort(ord)}]:[])];
+  const hid=ph.filter(f=>f.hidden).length, n=PH.sel.size;
+  return `<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px"><b>📷 Site photos (${ph.length})</b>${hid?`<span class="badge">${hid} hidden from client</span>`:''}<span class="sp"></span><button class="sm pri" id="aimap">🤖 Sort photos into units</button></div>
+   <div class="small mut" id="aimapst" style="margin:4px 0 8px">AI reads nameplates, where each photo was taken and what it shows (ductwork, curb, piping, electrical, access) and files it under its unit. Tick photos to move, hide or delete them.</div>
+   ${n?`<div class="row" style="gap:6px;flex-wrap:wrap;position:sticky;top:0;background:#fff;padding:6px 0;z-index:2;border-bottom:1px solid var(--line)"><b>${n} selected</b>
+     <select id="phmv" style="max-width:220px"><option value="">Move to unit…</option>${P.units.map(u=>`<option value="${u.id}">${esc(u.tag||u.equipment_type||'Unit')}</option>`).join('')}<option value="none">— Not assigned</option></select>
+     <button class="sm" id="phhide">🙈 Hide from client</button><button class="sm" id="phshow">👁 Show to client</button><button class="sm red" id="phdel">🗑 Delete</button><button class="sm" id="phclr">Clear</button></div>`:''}
+   ${groups.map(g=>{const open=PH.open[g.id]||g.list.length<=12;const show=open?g.list:g.list.slice(0,12);return `<div style="margin-top:12px"><div class="row" style="gap:8px"><b>${esc(g.name)}</b><span class="small mut">${esc(g.sub)} · ${g.list.length} photo${g.list.length===1?'':'s'}</span><span class="sp"></span><label class="small" style="text-transform:none;letter-spacing:0;margin:0;cursor:pointer"><input type="checkbox" data-gsel="${g.id}" style="width:auto"> select all</label></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-top:6px">${show.map(f=>`<div style="position:relative${f.hidden?';opacity:.4':''}">
+      <a href="#" data-f="${esc(f.path)}" title="${esc([f.ai&&f.ai.where,f.ai&&f.ai.shows,f.assign_why].filter(Boolean).join(' · '))}"><img data-th="${esc(f.path)}" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#eef1f6;${PH.sel.has(f.id)?'outline:3px solid #2563eb':''}"></a>
+      <input type="checkbox" data-psel="${f.id}" ${PH.sel.has(f.id)?'checked':''} style="position:absolute;top:4px;left:4px;width:18px;height:18px">
+      ${f.ai&&f.ai.shows==='nameplate'?'<span style="position:absolute;bottom:4px;left:4px;background:#111;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px">nameplate</span>':''}
+      ${f.hidden?'<span style="position:absolute;top:4px;right:4px;background:#c0392b;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px">hidden</span>':f.assign_by==='ai'&&f.assign_conf==='low'?'<span title="AI not sure" style="position:absolute;top:4px;right:4px;background:#f39c12;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px">check</span>':''}
+     </div>`).join('')}</div>${!open?`<button class="sm" data-gopen="${g.id}" style="margin-top:6px">Show all ${g.list.length}</button>`:''}</div>`}).join('')}</div>`}
+async function phRebuild(){const{data:{session}}=await sb.auth.getSession();await fetch(SB_URL+'/functions/v1/rebate-photomap',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({rebateId:P.p.id,action:'rebuild'})})}
+function photosWire(){
+  document.querySelectorAll('[data-psel]').forEach(c=>c.onchange=()=>{c.checked?PH.sel.add(c.dataset.psel):PH.sel.delete(c.dataset.psel);filesTab()});
+  document.querySelectorAll('[data-gsel]').forEach(c=>c.onchange=()=>{const g=c.dataset.gsel;P.files.filter(f=>f.kind==='Photo'&&(f.unit_id||'none')===g).forEach(f=>c.checked?PH.sel.add(f.id):PH.sel.delete(f.id));filesTab()});
+  document.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>{PH.open[b.dataset.gopen]=1;filesTab()});
+  const ids=()=>[...PH.sel];
+  if($('#phclr'))$('#phclr').onclick=()=>{PH.sel.clear();filesTab()};
+  const setHidden=async v=>{await q(sb.from('rebate_files').update({hidden:v}).in('id',ids()));P.files.forEach(f=>{if(PH.sel.has(f.id))f.hidden=v});await event(P.p.id,`${v?'Hid':'Showed'} ${PH.sel.size} photo(s) ${v?'from':'to'} the client`);toast(v?'Hidden from client':'Visible to client');PH.sel.clear();filesTab()};
+  if($('#phhide'))$('#phhide').onclick=()=>setHidden(true);
+  if($('#phshow'))$('#phshow').onclick=()=>setHidden(false);
+  if($('#phmv'))$('#phmv').onchange=async e=>{const v=e.target.value;if(!v)return;const uid=v==='none'?null:v;
+    await q(sb.from('rebate_files').update({unit_id:uid,assign_by:uid?'manual':'manual',assign_conf:null}).in('id',ids()));P.files.forEach(f=>{if(PH.sel.has(f.id)){f.unit_id=uid;f.assign_by='manual'}});await phRebuild();toast('Moved');PH.sel.clear();projectView()};
+  if($('#phdel'))$('#phdel').onclick=async()=>{const fs=P.files.filter(f=>PH.sel.has(f.id));if(!confirm(`Delete ${fs.length} photo(s)? They are removed for good from the portal (the original stays in SharePoint).`))return;
+    await sb.storage.from('rebate-files').remove(fs.map(f=>f.path));await q(sb.from('rebate_files').delete().in('id',fs.map(f=>f.id)));await phRebuild();await event(P.p.id,`Deleted ${fs.length} photo(s)`);toast('Deleted');PH.sel.clear();projectView()};
+  if($('#aimap'))$('#aimap').onclick=async()=>{const b=$('#aimap');b.disabled=true;const st=$('#aimapst');
+    try{const{data:{session}}=await sb.auth.getSession();const call=body=>fetch(SB_URL+'/functions/v1/rebate-photomap',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({rebateId:P.p.id,...body})}).then(x=>x.json());
+      while(true){const r=await call({action:'describe',batch:12});if(r.error)throw new Error(r.error);if(r.done)break;st.textContent=`Step 1 of 2 — looking at each photo… ${r.total-r.left} of ${r.total}`}
+      let win=0,placed=0;while(true){st.textContent=`Step 2 of 2 — matching photos to units… ${win}`;const r=await call({action:'assign',win});if(r.error)throw new Error(r.error);placed+=r.placed||0;if(r.done)break;win=r.next}
+      await event(P.p.id,`AI sorted ${placed} photo(s) into units`);toast(`Done — ${placed} photos filed under units`);projectView()}catch(e){toast(e.message);b.disabled=false}};
+}
 function filesTab(){
   const{p,files}=P;
   $('#tb').innerHTML=`<div class="card"><b>📁 Unit folders</b>${P.units.map(u=>`<div class="small" style="padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer" data-uf="${u.id}">📁 ${esc(u.tag||u.equipment_type||'Unit')} <span class="mut">— 📷 ${(u.photos||[]).length}${(u.docs||[]).length?' · 📄 '+(u.docs||[]).length:''}</span></div>`).join('')||'<div class="mut small">No units yet.</div>'}</div>
   <div class="row" style="margin-bottom:12px"><b>Project files</b><span class="sp"></span><button class="pri" id="up">Upload files</button><input type="file" id="ff" multiple hidden><select id="k" style="max-width:180px"><option>Quote</option><option>Submittal</option><option>Application</option><option>Pre-approval</option><option>Invoice</option><option>Photo</option><option>Other</option></select></div>
-  ${(ph=>ph.length?`<div class="card"><div class="row"><b>📷 Site photos (${ph.length})</b><span class="sp"></span><button class="sm pri" id="aimap">🤖 Sort photos into units</button></div><div class="small mut" id="aimapst">AI reads the nameplates and files each photo under its unit (RTU-1, CU-2…). Click a photo to open it full size.</div><div id="ogal" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:8px">${ph.slice(0,P.allPh?9999:48).map(f=>`<a href="#" data-f="${esc(f.path)}"><img data-th="${esc(f.path)}" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#eef1f6"></a>`).join('')}</div>${!P.allPh&&ph.length>48?`<button class="sm" id="allph" style="margin-top:8px">Show all ${ph.length}</button>`:''}</div>`:'')(files.filter(f=>f.kind==='Photo'))}
+  ${photosHTML()}
   <div class="card"><table><tr><th>File</th><th>Type</th><th>From</th><th>Added</th><th></th></tr>${files.filter(f=>f.kind!=='Photo').map(f=>`<tr><td><a href="#" data-f="${esc(f.path)}">${esc(f.name)}</a></td><td>${esc(f.kind||'')}</td><td class="small">${esc(f.email_from||'upload')}</td><td class="small">${when(f.created_at)}</td><td><button class="sm red" data-x="${f.id}">✕</button></td></tr>`).join('')||'<tr><td colspan=5 class="mut">No files yet.</td></tr>'}</table></div>`;
   document.querySelectorAll('[data-uf]').forEach(d=>d.onclick=()=>editUnit(P.units.find(u=>u.id===d.dataset.uf)));
-  if($('#allph'))$('#allph').onclick=()=>{P.allPh=1;filesTab()};
-  if($('#aimap'))$('#aimap').onclick=async()=>{const b=$('#aimap');b.disabled=true;let start=0,carry=null,placed=0,total=0;
-    try{const{data:{session}}=await sb.auth.getSession();while(true){$('#aimapst').textContent=`Sorting photos ${start+1}–${Math.min(start+16,total||start+16)}${total?' of '+total:''}… (${placed} filed so far)`;
-      const r=await fetch(SB_URL+'/functions/v1/rebate-photomap',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({rebateId:P.p.id,start,batch:16,carry})}).then(x=>x.json());
-      if(r.error)throw new Error(r.error);placed+=r.placed||0;total=r.total||total;if(r.carry)carry=r.carry;if(r.done)break;start=r.next}
-      await event(P.p.id,`AI sorted ${placed} photo(s) into units`);toast(`Done — ${placed} photos filed under units`);projectView()}catch(e){toast(e.message);b.disabled=false}};
-  (async()=>{const ims=[...document.querySelectorAll('[data-th]')];for(let i=0;i<ims.length;i+=100){const ch=ims.slice(i,i+100);const{data}=await sb.storage.from('rebate-files').createSignedUrls(ch.map(e=>e.dataset.th),3600);(data||[]).forEach((d,j)=>{if(d.signedUrl)ch[j].src=d.signedUrl})}})();
+  photosWire();
+  (async()=>{window.THC=window.THC||{};const ims=[...document.querySelectorAll('[data-th]')];ims.forEach(e=>{if(THC[e.dataset.th])e.src=THC[e.dataset.th]});const need=ims.filter(e=>!THC[e.dataset.th]);for(let i=0;i<need.length;i+=100){const ch=need.slice(i,i+100);const{data}=await sb.storage.from('rebate-files').createSignedUrls(ch.map(e=>e.dataset.th),3600);(data||[]).forEach((d,j)=>{if(d.signedUrl){THC[ch[j].dataset.th]=d.signedUrl;ch[j].src=d.signedUrl}})}})();
   $('#up').onclick=()=>$('#ff').click();
   $('#ff').onchange=async e=>{for(const f of e.target.files){try{const path=`${p.id}/files/${Date.now()}-${f.name.replace(/[^\w.\- ]+/g,'_')}`;const{error}=await sb.storage.from('rebate-files').upload(path,f,{contentType:f.type});if(error)throw error;await q(sb.from('rebate_files').insert({rebate_id:p.id,name:f.name,path,mime:f.type,size:f.size,kind:$('#k').value}))}catch(err){toast(err.message)}}await event(p.id,`Uploaded ${e.target.files.length} file(s)`);projectView()};
   document.querySelectorAll('[data-f]').forEach(a=>a.onclick=async e=>{e.preventDefault();const u=await signed(a.dataset.f);if(u)window.open(u)});
