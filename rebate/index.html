@@ -247,18 +247,32 @@ function drawProject(){
 }
 
 /* ===== UNIT TABLE — one row per unit, everything a supplier needs to price it ===== */
-const SPEC=[['tag','Tag','col'],['equipment_type','Type','col'],['qty','Qty','col'],['make','Make','col'],['model','Model','col'],['tonnage','Tons','col'],['voltage','Voltage','col'],['fuel','Fuel','col'],
+const UTYPES=['RTU','Condensing unit','Air handler','Furnace','Heat pump','Mini split','VRF','PTAC','Fan coil','DOAS / ERV','Boiler','Water heater','Storage tank','Pump','Fan / fan motor','Exhaust fan','Unit heater','Chiller','Cooling tower','Compressor','Expansion tank','Controls','Other'];
+const SPEC=[['tag','Tag','col'],['equipment_type','Type','type'],['qty','Qty','col'],['make','Make','col'],['model','Model','col'],['serial','Serial','col'],['tonnage','Tons','col'],['voltage','Voltage','col'],['fuel','Fuel','col'],['refrigerant','Refrig.','col'],['mfg_year','Year','col'],['efficiency','Efficiency','col'],
  ['heat_in','Heat input (MBH)','spec'],['heat_out','Heat output (MBH)','spec'],['economizer','Economizer','yn'],['co2','CO₂ sensor','yn'],['enthalpy','Enthalpy sensor','yn'],['smoke','Smoke detector','yn'],['curb','Curb adapter','yn'],['spec_notes','Notes for supplier','spec']];
-const uval=(u,[k,,t])=>t==='col'?(u[k]??''):((u.specs||{})[k]??'');
+const uval=(u,[k,,t])=>(t==='col'||t==='type')?(u[k]??''):((u.specs||{})[k]??'');
+const aiCell=(u,k)=>((u.specs||{}).ai_fields||[]).includes(k)?'background:#f3edff':'';
 function tableTab(){const{units}=P;
-  $('#tb').innerHTML=`<div class="row" style="margin-bottom:10px"><span class="mut small">Everything the supplier needs to price each unit. Changes save as you type. This table is what goes out with pricing requests.</span><span class="sp"></span><button class="sm" id="csv">⬇ Export CSV</button></div>
-  <div style="overflow-x:auto"><table class="small" style="min-width:1400px"><tr>${SPEC.map(c=>`<th>${c[1]}</th>`).join('')}</tr>
-  ${units.map(u=>`<tr>${SPEC.map(c=>c[2]==='yn'?`<td><select data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" style="min-width:70px"><option value=""></option>${['Yes','No','Existing'].map(x=>`<option ${uval(u,c)===x?'selected':''}>${x}</option>`).join('')}</select></td>`
-   :`<td><input data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" value="${esc(uval(u,c))}" style="min-width:${c[0]==='spec_notes'?220:c[0]==='model'?150:80}px"></td>`).join('')}</tr>`).join('')}</table></div>
+  const types=[...new Set(units.map(u=>u.equipment_type).filter(Boolean))];
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap"><span class="mut small">Everything the supplier needs to price each unit. Changes save as you type. <span style="background:#f3edff;padding:1px 6px;border-radius:4px">Purple</span> = filled by AI, please check.</span><span class="sp"></span>
+   <select id="tf" style="max-width:170px"><option value="">All types (${units.length})</option>${UTYPES.filter(t=>units.some(u=>u.equipment_type===t)).map(t=>`<option ${V.tf===t?'selected':''}>${t} (${units.filter(u=>u.equipment_type===t).length})</option>`).join('')}</select>
+   <label class="small" style="text-transform:none;letter-spacing:0;margin:0;display:flex;gap:4px;align-items:center"><input type="checkbox" id="aiow" style="width:auto"> overwrite</label><button class="sm pri" id="aifill">🤖 Fill with AI</button><button class="sm" id="csv">⬇ Export CSV</button></div>
+  <div class="small mut" id="aifst" style="margin-bottom:6px"></div>
+  <div style="overflow-x:auto"><table class="small" style="min-width:1700px"><tr>${SPEC.map(c=>`<th>${c[1]}</th>`).join('')}</tr>
+  ${units.filter(u=>!V.tf||u.equipment_type===V.tf).map(u=>`<tr title="${esc((u.specs||{}).ai_why?('AI: '+(u.specs.ai_why)+' ('+(u.specs.ai_conf||'')+')'):'')}">${SPEC.map(c=>c[2]==='yn'?`<td><select data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" style="min-width:70px;${aiCell(u,c[0])}"><option value=""></option>${['Yes','No','Existing'].map(x=>`<option ${uval(u,c)===x?'selected':''}>${x}</option>`).join('')}</select></td>`
+   :c[2]==='type'?`<td><select data-u="${u.id}" data-k="${c[0]}" data-t="col" style="min-width:130px;${aiCell(u,c[0])}"><option value=""></option>${[...UTYPES,...(u.equipment_type&&!UTYPES.includes(u.equipment_type)?[u.equipment_type]:[])].map(x=>`<option ${uval(u,c)===x?'selected':''}>${esc(x)}</option>`).join('')}</select></td>`
+   :`<td><input data-u="${u.id}" data-k="${c[0]}" data-t="${c[2]}" value="${esc(uval(u,c))}" style="min-width:${c[0]==='spec_notes'?220:c[0]==='model'||c[0]==='serial'?140:70}px;${aiCell(u,c[0])}"></td>`).join('')}</tr>`).join('')}</table></div>
   ${units.length?'':'<p class="mut">No units yet — add them in the Survey tab.</p>'}`;
   document.querySelectorAll('#tb [data-u]').forEach(e=>e.onchange=async()=>{const u=P.units.find(x=>x.id===e.dataset.u),k=e.dataset.k,v=e.value.trim();let up;
-    if(e.dataset.t==='col'){up={[k]:k==='qty'?(parseInt(v)||1):k==='tonnage'?(parseFloat(v)||null):v||null};Object.assign(u,up)}else{u.specs={...(u.specs||{}),[k]:v};up={specs:u.specs}}
+    const sp={...(u.specs||{})};sp.ai_fields=(sp.ai_fields||[]).filter(x=>x!==k);
+    if(e.dataset.t==='col'){up={[k]:k==='qty'?(parseInt(v)||1):k==='tonnage'?(parseFloat(v)||null):k==='mfg_year'?(parseInt(v)||null):v||null,specs:sp};Object.assign(u,up)}else{sp[k]=v;u.specs=sp;up={specs:sp}}e.style.background='';
     try{await q(sb.from('rebate_units').update({...up,updated_at:new Date().toISOString()}).eq('id',u.id));e.style.background='#eefaf3';setTimeout(()=>e.style.background='',700)}catch(err){toast(err.message)}});
+  $('#tf').onchange=e=>{V.tf=e.target.value.replace(/ \(\d+\)$/,'');tableTab()};
+  $('#aifill').onclick=async()=>{const btn=$('#aifill');btn.disabled=true;const st=$('#aifst');let off=0,n=0;
+    try{const{data:{session}}=await sb.auth.getSession();while(true){st.textContent=`🤖 Reading units ${off+1}–${Math.min(off+6,P.units.length)} of ${P.units.length}…`;
+      const r=await fetch(SB_URL+'/functions/v1/rebate-photomap',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({rebateId:P.p.id,action:'classify',offset:off,force:$('#aiow').checked})}).then(x=>x.json());
+      if(r.error)throw new Error(r.error);n+=r.filled||0;if(r.done)break;off=r.next}
+      await event(P.p.id,`AI filled unit details for ${n} unit(s)`);P.units=await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at'));toast(`Done — ${n} units updated`);tableTab()}catch(e){toast(e.message);btn.disabled=false;st.textContent=''}};
   $('#csv').onclick=()=>{const rows=[SPEC.map(c=>c[1]),...P.units.map(u=>SPEC.map(c=>uval(u,c)))];const csv=rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`${P.p.number||'units'} unit table.csv`;a.click()}}
 
