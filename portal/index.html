@@ -211,6 +211,7 @@ function supabaseApi(){
     async unitDel(rid,uid){await rpc('client_rebate_unit_delete',{p_rebate:rid,p_unit:uid})},
     async reqPricing(rid){await rpc('client_rebate_request_pricing',{p_rebate:rid})},
     async rebNote(rid,t){await rpc('client_rebate_note',{p_rebate:rid,p_text:t})},
+    async addSite(cid,n,a,c,ph){return await rpc('client_add_site',{p_customer:cid||null,p_name:n,p_address:a,p_contact:c,p_phone:ph})},
     async chooseOpt(rid,oid){await rpc('client_rebate_choose_option',{p_rebate:rid,p_option:oid})},
     async upload(path,blob){const{error}=await sb.storage.from('rebate-files').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(error)throw new Error(error.message)},
     async signed(paths){if(!paths.length)return{};const{data}=await sb.storage.from('rebate-files').createSignedUrls(paths,3600);const o={};(data||[]).forEach(x=>{if(x.signedUrl)o[x.path]=x.signedUrl});return o},
@@ -321,7 +322,7 @@ function vHome(){
   ${est.length?`<div class="card" style="border-color:#cfcfcf"><h2>📝 Proposal ready for your review</h2>${est.map(e=>`<div class="row"><div><b>${esc(e.title)}</b><div class="mut small">${esc(e.number)} · ${fdate(e.date)}${multi()?' · '+esc(locName(e.customerId)):''}</div></div><span class="sp"></span><button class="pri sm" onclick="openEst('${e.id}')">Review</button></div>`).join('<hr style="border:none;border-top:1px solid var(--line)">')}</div>`:''}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
    <div class="card"><h2>Most recent service</h2>${last?`<b>${esc(last.type)}</b> · ${fdate(last.date)}<p class="small" style="margin:8px 0">${esc(last.notes||last.description||'')}</p><a href="#history" class="small">See full history →</a>`:'<div class="empty">No completed service yet</div>'}</div>
-   ${(ss=>ss.length?`<div class="card"><h2>📍 Your service addresses (${ss.length})</h2><table class="small">${ss.map(x=>`<tr><td><b>${esc(x.name&&x.name!=='Main'?x.name:(x.c.company||x.c.name||''))}</b><div class="mut">${esc(x.address)}</div></td></tr>`).join('')}</table><p class="small mut" style="margin-bottom:0">Missing an address? Call or email us and we’ll add it.</p></div>`:'')(D.customers.filter(c=>loc==='all'||c.id===loc).flatMap(c=>(c.sites||[]).map(x=>({...x,c}))))}
+   ${(ss=>`<div class="card"><h2>📍 Your service addresses (${ss.length})</h2>${ss.length?`<table class="small">${ss.map(x=>`<tr><td><b>${esc(x.name&&x.name!=='Main'?x.name:(x.c.company||x.c.name||''))}</b><div class="mut">${esc(x.address)}</div></td></tr>`).join('')}</table>`:'<p class="small mut">No addresses yet.</p>'}<button class="sm pri" style="margin-top:8px" onclick="siteForm()">+ Add a location</button></div>`)(D.customers.filter(c=>loc==='all'||c.id===loc).flatMap(c=>(c.sites||[]).map(x=>({...x,c}))))}
    ${smsCard()}
    <div class="card"><h2>Need service?</h2><p class="small mut">Submit a request any time — our office will confirm a time with you.</p><a class="btn pri" href="#request">Request service</a>${CFG.phone?`<p class="small" style="margin-bottom:0">Emergency? Call <b>${esc(CFG.phone)}</b></p>`:''}</div>
   </div>`;
@@ -492,6 +493,15 @@ function rbOptions(r){const os=r.options||[];if(!os.length)return `<h3 style="ma
       :'<div style="color:#c0392b">Not included in this option</div>'}</div>`).join('')}</div>
     ${chosen?`<p class="small" style="color:#1f9d55;margin-top:8px">You chose this option on ${fdate(r.chosenAt)}.</p>`:`<button class="${r.chosenOption?'':'pri'}" style="width:100%;margin-top:10px" onclick="rbChoose('${r.id}','${o.id}','${esc(o.name).replace(/'/g,'')}')">Choose ${esc(o.name)}</button>`}</div>`}).join('')}</div>`}
 async function rbChoose(rid,oid,name){if(!confirm(`Choose ${name}? KOR HVAC will be notified and prepare the paperwork for this option.`))return;try{await api.chooseOpt(rid,oid);await refresh();openRb(rid);toast('Sent — KOR HVAC has your choice')}catch(e){toast(e.message)}}
+function siteForm(){const cs=D.customers||[];const cur=(typeof loc!=='undefined'&&loc!=='all')?loc:(cs[0]||{}).id;modal(`<h2><span>Add a location</span><button class="sm" onclick="closeM()">✕</button></h2>
+  ${cs.length>1?`<label>Account</label><select id="st_c">${cs.map(c=>`<option value="${c.id}" ${c.id===cur?'selected':''}>${esc(c.company||c.name)}</option>`).join('')}</select>`:''}
+  <label>Location name</label><input id="st_n" placeholder="e.g. Sunrise Nursing Home, Main building">
+  <label>Address *</label><input id="st_a" placeholder="Street, city, state, ZIP">
+  <label>On-site contact (optional)</label><input id="st_ct" placeholder="Name">
+  <label>Contact phone (optional)</label><input id="st_p" type="tel" placeholder="(555) 555-5555">
+  <div class="row" style="margin-top:14px"><span class="sp"></span><button class="pri" id="st_b" onclick="siteSave()">Save location</button></div>`)}
+async function siteSave(){const a=$('#st_a').value.trim();if(!a){toast('Enter the address');return}$('#st_b').disabled=true;
+  try{await api.addSite(($('#st_c')||{}).value||(D.customers[0]||{}).id,$('#st_n').value.trim(),a,$('#st_ct').value.trim(),$('#st_p').value.trim());closeM();await refresh();toast('Location added')}catch(e){toast(e.message);$('#st_b').disabled=false}}
 async function rbMsg(id){const t=$('#rb_msg').value.trim();if(!t)return;try{await api.rebNote(id,t);await refresh();openRb(id);toast('Sent to KOR HVAC')}catch(e){toast(e.message)}}
 /* ---- bulk: all site photos at once → AI sorts them into units ---- */
 let RB=null;
