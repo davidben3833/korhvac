@@ -204,7 +204,7 @@ function supabaseApi(){
     async load(){const me=await rpc('client_me');const[jobs,invoices,estimates,equipment,agreements,requests]=await Promise.all(['client_jobs','client_invoices','client_estimates','client_equipment','client_agreements','client_requests'].map(f=>rpc(f)));
       const sms=await rpc('client_sms_status').catch(()=>({optIn:false,phone:''}));
       const[rebates,promos,partner]=await Promise.all([rpc('client_rebates').catch(()=>[]),rpc('client_promos').catch(()=>[]),rpc('client_partner').catch(()=>false)]);
-      return{me,customers:me.customers||[],jobs:J(jobs),invoices:J(invoices),estimates:J(estimates),equipment:J(equipment),agreements:J(agreements),requests:J(requests),sms:sms||{optIn:false,phone:''},rebates:J(rebates),promos:J(promos),partner:!!partner}},
+      return{me,customers:me.customers||[],jobs:J(jobs),invoices:J(invoices),estimates:J(estimates),equipment:J(equipment),agreements:J(agreements),requests:J(requests),sms:sms||{optIn:false,phone:''},rebates:J(rebates).map(r=>{const all=r.units||[];const vis=all.filter(u=>!(u.specs&&u.specs.hide===true));return{...r,allUnits:all,units:vis}}),promos:J(promos),partner:!!partner}},
     async setSms(optIn,phone){await rpc('client_set_sms',{p_opt_in:optIn,p_phone:phone})},
     async rebNew(t,site,notes,cust){return rpc('client_rebate_new',{p_title:t,p_site:site,p_notes:notes,p_customer:cust||null})},
     async unitSave(rid,u){return rpc('client_rebate_unit_save',{p_rebate:rid,p_unit:u})},
@@ -528,7 +528,8 @@ async function rbOpenFile(path,name){const o=await api.signed([path]).catch(()=>
 async function rbPricing(id){try{await api.reqPricing(id);await refresh();openRb(id);toast('Sent — we’ll get pricing from our suppliers')}catch(e){toast(e.message)}}
 /* ---- options side by side: our price, program check per unit, submittal + AHRI per unit (no supplier prices) ---- */
 const RBRATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];
-function rbOptCheck(r,o){const req=r.requirements||{};let ok=0,cov=0,docs=0;const rows=r.units.map(u=>{const it=o.items.find(i=>i.unitId===u.id);if(!it||!(it.model||it.make))return{u,it:null};cov++;
+function rbOptUnits(r){const all=r.allUnits||r.units;const used=u=>(r.options||[]).some(o=>(o.items||[]).some(i=>i.unitId===u.id));return all.some(u=>u.specs&&u.specs.hide===true&&used(u))?all.filter(used):r.units}
+function rbOptCheck(r,o){const req=r.requirements||{};let ok=0,cov=0,docs=0;const rows=rbOptUnits(r).map(u=>{const it=o.items.find(i=>i.unitId===u.id);if(!it||!(it.model||it.make))return{u,it:null};cov++;
   const rt=it.ratings||{};const fails=RBRATE.filter(([k])=>+req[k]&&+rt[k]&&+rt[k]<+req[k]).map(([k,l])=>`${l} ${rt[k]} < ${req[k]}`);const unknown=RBRATE.filter(([k])=>+req[k]&&!(+rt[k])&&rt[k]!==0).length;
   const pass=!fails.length&&!unknown;if(pass)ok++;if(it.submittal&&it.ahri)docs++;return{u,it,fails,pass,unknown}});return{rows,ok,cov,docs,hasReq:Object.values(req).some(v=>+v)}}
 function rbOptions(r){const os=r.options||[];if(!os.length)return `<h3 style="margin-top:18px">Equipment options</h3><p class="mut small">${r.pricingRequested?'Once supplier quotes are in, the equipment options will show here side by side.':'Equipment options appear here after pricing.'}</p>`;

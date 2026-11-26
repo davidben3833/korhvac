@@ -210,6 +210,9 @@ function editProject(p={}){
 }
 
 /* ───────── project ───────── */
+const isVis=u=>!(u.specs&&u.specs.hide===true);
+function setUnits(list){P.all=list;P.units=list.filter(isVis)}
+function optUnits(){const all=P.all||P.units;const used=u=>(P.items||[]).some(i=>i.unit_id===u.id);return all.some(u=>!isVis(u)&&used(u))?all.filter(used):all.filter(isVis)}
 async function projectView(){
   const p=D.projects.find(x=>x.id===V.pid);if(!p){location.hash='';return}
   const [units,reqs,files,events]=await Promise.all([
@@ -219,7 +222,7 @@ async function projectView(){
     q(sb.from('rebate_events').select('*').eq('rebate_id',p.id).order('at',{ascending:false}).limit(200))]);
   const opts=await q(sb.from('rebate_options').select('*').eq('rebate_id',p.id).order('sort')).catch(()=>[]);
   const items=opts.length?await q(sb.from('rebate_option_items').select('*').in('option_id',opts.map(o=>o.id))).catch(()=>[]):[];
-  P={p,units,reqs,files,events,opts,items};
+  P={p,all:units,units:units.filter(isVis),reqs,files,events,opts,items};
   if(chan)sb.removeChannel(chan);
   chan=sb.channel('rb-'+p.id).on('postgres_changes',{event:'*',schema:'public',table:'supplier_requests',filter:'rebate_id=eq.'+p.id},()=>refresh())
     .on('postgres_changes',{event:'*',schema:'public',table:'rebate_files',filter:'rebate_id=eq.'+p.id},()=>refresh()).subscribe();
@@ -302,7 +305,7 @@ function tableTab(){const{units}=P;
     try{const{data:{session}}=await sb.auth.getSession();while(true){st.textContent=`🤖 Researching units ${off+1}–${Math.min(off+2,P.units.length)} of ${P.units.length} (nameplate → brand → serial year)…`;
       const r=await fetch(SB_URL+'/functions/v1/rebate-photomap',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({rebateId:P.p.id,action:'classify',offset:off,force:$('#aiow').checked})}).then(x=>x.json());
       if(r.error)throw new Error(r.error);n+=r.filled||0;if(r.done)break;off=r.next}
-      await event(P.p.id,`AI filled unit details for ${n} unit(s)`);P.units=await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at'));toast(`Done — ${n} units updated`);tableTab()}catch(e){toast(e.message);btn.disabled=false;st.textContent=''}};
+      await event(P.p.id,`AI filled unit details for ${n} unit(s)`);setUnits(await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at')));toast(`Done — ${n} units updated`);tableTab()}catch(e){toast(e.message);btn.disabled=false;st.textContent=''}};
   $('#csv').onclick=()=>{const all=[];[...HEADC,...Object.values(GCOLS).flat(),...GDEF,...TAILC].forEach(c=>{if(!all.some(x=>x[0]===c[0]))all.push(c)});const rows=[all.map(c=>c[1]),...P.units.map(u=>all.map(c=>uval(u,c)))];const csv=rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`${P.p.number||'units'} unit table.csv`;a.click()}}
 
@@ -310,12 +313,12 @@ function tableTab(){const{units}=P;
 const RATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];
 function itemOf(oid,uid){return (P.items||[]).find(i=>i.option_id===oid&&i.unit_id===uid)}
 function optCheck(o){const req=P.p.requirements||{},out={missing:[],low:[],nodocs:[],total:0,covered:0};
-  P.units.forEach(u=>{const it=itemOf(o.id,u.id);const name=u.tag||u.equipment_type||'Unit';
+  optUnits().forEach(u=>{const it=itemOf(o.id,u.id);const name=u.tag||u.equipment_type||'Unit';
     if(!it||!(it.model||'').trim()){out.missing.push(name);return}out.covered++;out.total+=(+it.price||0)*(u.qty||1);
     RATE.forEach(([k,l])=>{const need=+req[k],have=+((it.ratings||{})[k]);if(need&&have&&have<need)out.low.push(`${name}: ${l} ${have} < ${need}`);if(need&&!have)out.low.push(`${name}: ${l} not entered (program needs ${need})`)});
     const miss=[!it.submittal&&'submittal',!it.ahri&&'AHRI',!it.quote&&'quote'].filter(Boolean);if(miss.length)out.nodocs.push(`${name}: ${miss.join(', ')}`)});return out}
 function optIssues(){return (P.opts||[]).reduce((n,o)=>{const c=optCheck(o);return n+c.missing.length+c.low.length},0)}
-function optionsTab(){const{units,opts}=P;const req=P.p.requirements||{};
+function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements||{};
   $('#tb').innerHTML=`<div class="card" style="padding:12px"><b>Program requirements</b> <span class="mut small">— minimum ratings for this rebate program. Every option is checked against them.</span>
    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">${RATE.map(([k,l])=>`<label class="small" style="display:flex;gap:4px;align-items:center">${l} ≥ <input data-req="${k}" value="${esc(req[k]??'')}" style="width:70px"></label>`).join('')}</div></div>
   <div class="row" style="margin:12px 0"><button class="pri" id="nopt">+ New option</button>${opts.length?`<button class="sm" id="copt">⧉ Copy option ${opts.length}</button>`:''}<span class="sp"></span><span class="mut small">${units.length} units in the survey</span></div>
@@ -386,7 +389,7 @@ function surveyTab(){
   document.querySelectorAll('[data-u]').forEach(c=>c.onclick=()=>editUnit(units.find(u=>u.id===c.dataset.u)));
   $('#add').onclick=()=>editUnit({},true);
 }
-async function refreshUnits(){P.units=await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at'));if(V.tab==='survey'&&!document.querySelector('.modal'))surveyTab()}
+async function refreshUnits(){setUnits(await q(sb.from('rebate_units').select('*').eq('rebate_id',P.p.id).order('created_at')));if(V.tab==='survey'&&!document.querySelector('.modal'))surveyTab()}
 function aiRead(uid,paths){return fn('ai-assist',{action:'nameplate',paths,unit_id:uid})}
 function editUnit(u,openCam){
   const isNew=!u.id, uid=u.id||crypto.randomUUID();
