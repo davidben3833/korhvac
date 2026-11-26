@@ -395,7 +395,7 @@ function openAgrP(id,keep){const a=(D.agreements||[]).find(x=>x.id===id);if(!a)r
      ${(u.tasks||[]).map(x=>`<tr><td>${esc(x[0])}</td>${show.map(t=>`<td style="text-align:center;${sel(t)?'background:#f1f1f1;':''}">${x[1]<=t?'✓':'<span class="mut">—</span>'}</td>`).join('')}</tr>`).join('')}</table></div>`).join('')}</details>`:'';
   modal(`<style>.cmp td,.cmp th{border:1px solid #e3e7ef;padding:9px 10px}</style><h2><span>Maintenance Contract ${esc(a.number)}</span><button class="sm" onclick="closeM()">✕</button></h2>
   <div class="row small mut" style="margin-bottom:10px"><span>${esc(a.freq||'')} visits</span><span>${fdate(a.start)} – ${fdate(a.end)}</span>${a.site?`<span>${esc(a.site)}</span>`:''}${badge(open?'Awaiting approval':a.status)}</div>
-  ${a.pdf?`<p><a class="btn" href="${esc(a.pdf)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">📄 View full contract (PDF)</a></p>`:''}
+  ${a.pdf?`<p><a class="btn" href="#" onclick="pdfView('${esc(a.pdf)}','Contract.pdf');return false" style="display:inline-block;text-decoration:none">📄 View full contract (PDF)</a></p>`:''}
   ${open?`<p class="small" style="margin:10px 0 6px"><b>Compare and choose your service level</b> — tap a column to select it. We quoted ${TIER_N[+a.tier||2]}.</p>`:''}
   ${grid}${units}
   ${open?`<div class="card" style="background:#fafbfd;margin-top:12px"><label style="margin-top:0">Your name</label><input id="apn" value="${esc(D.me&&D.me.name||'')}" placeholder="Full name">
@@ -412,7 +412,7 @@ function openEst(id,keep){const e=D.estimates.find(x=>x.id===id);if(!e)return;co
   const exp=e.date&&e.valid?addDays(e.date,+e.valid):'';
   modal(`<h2><span>${esc(e.title)}</span><button class="sm" onclick="closeM()">✕</button></h2>
   <div class="row small mut" style="margin-bottom:10px"><span>${esc(e.number)}</span><span>Issued ${fdate(e.date)}</span>${exp?`<span>Valid until ${fdate(exp)}</span>`:''}${multi()?`<span>${esc(locName(e.customerId))}</span>`:''}${badge(open?'Awaiting approval':e.status)}</div>
-  ${e.pdf?`<p><a class="btn" href="${esc(e.pdf)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">📄 View full proposal (PDF)</a></p>`:''}
+  ${e.pdf?`<p><a class="btn" href="#" onclick="pdfView('${esc(e.pdf)}','Proposal.pdf');return false" style="display:inline-block;text-decoration:none">📄 View full proposal (PDF)</a></p>`:''}
   ${e.notes?`<p class="small">${esc(e.notes)}</p>`:''}
   ${(e.options||[]).map((o,n)=>`<div class="opt ${pick===n?'sel':''}" onclick="${open?`pick=${n};openEst('${e.id}',1)`:''}"><div class="row"><b style="font-size:17px">${esc(o.name)}</b>${!open&&e.selected===n?'<span class="badge b-Approved">Selected</span>':''}<span class="sp"></span><span class="price">${money(sub(o.items))}</span></div>
    ${o.desc?`<div class="small mut">${esc(o.desc)}</div>`:''}<ul class="small" style="margin:8px 0 0;padding-left:18px">${(o.items||[]).map(x=>`<li>${esc(x.desc)}${+x.qty!==1?' (×'+esc(x.qty)+')':''}</li>`).join('')}</ul></div>`).join('')}
@@ -462,7 +462,7 @@ async function openRb(id){const r=(D.rebates||[]).find(x=>x.id===id);if(!r)retur
   ${rbOptions(r)}
   <h3 style="margin-top:18px">Documents — submittals, revisions & approvals</h3>
   ${rbGallery(r)}
-  ${r.files.filter(f=>f.kind!=='Photo').length?`<table>${r.files.filter(f=>f.kind!=='Photo').map(f=>`<tr><td>${f.kind==='Submittal'?'📐':f.kind==='Application'?'📝':f.kind==='Pre-approval'?'✅':f.kind==='Photo'?'📷':'📄'} <a href="#" onclick="rbOpenFile('${esc(f.path)}');return false">${esc(f.name)}</a></td><td>${badge(f.kind)}</td><td class="small mut">${fdate(f.at)}</td></tr>`).join('')}</table>`:'<p class="mut small">No documents yet.</p>'}
+  ${r.files.filter(f=>f.kind!=='Photo').length?`<table>${r.files.filter(f=>f.kind!=='Photo').map(f=>`<tr><td>${f.kind==='Submittal'?'📐':f.kind==='Application'?'📝':f.kind==='Pre-approval'?'✅':f.kind==='Photo'?'📷':'📄'} <a href="#" onclick="rbOpenFile('${esc(f.path)}','${esc(f.name).replace(/'/g,'')}');return false">${esc(f.name)}</a></td><td>${badge(f.kind)}</td><td class="small mut">${fdate(f.at)}</td></tr>`).join('')}</table>`:'<p class="mut small">No documents yet.</p>'}
   <h3 style="margin-top:18px">Proposals from KOR HVAC</h3>
   ${r.proposals.length?r.proposals.map(x=>`<div class="row" style="padding:6px 0"><b>${esc(x.number)}</b> <span class="mut small">${esc(x.title||'')}</span><span class="sp"></span>${badge(x.status)} <a class="btn sm" href="#estimates" onclick="closeM()">Open</a></div>`).join(''):'<p class="mut small">The proposal will appear here once pricing is ready.</p>'}
   <h3 style="margin-top:18px">Activity</h3>
@@ -520,7 +520,11 @@ const LB=(()=>{let st=null;
 async function rbUrl(pth){if(!RBURL[pth])Object.assign(RBURL,await api.signed([pth]).catch(()=>({})));return RBURL[pth]}
 function rbLB(paths,i,title){LB.open(paths.map(pth=>({path:pth,title:esc(title||'')})),i,{resolve:rbUrl})}
 async function rbThumbs(){const els=[...document.querySelectorAll('.rbth[data-p]')].filter(e=>e.dataset.p);const need=[...new Set(els.map(e=>e.dataset.p))].filter(p=>!RBURL[p]);if(need.length)Object.assign(RBURL,await api.signed(need).catch(()=>({})));els.forEach(e=>{const u=RBURL[e.dataset.p];if(u){if(e.tagName==='IMG')e.src=u;else e.style.backgroundImage=`url("${u}")`}})}
-async function rbOpenFile(path){const w=window.open('','_blank');const o=await api.signed([path]).catch(()=>({}));if(o[path]){if(w)w.location=o[path];else location.href=o[path]}else{if(w)w.close();toast('Could not open the file')}}
+function pdfView(u,name){const m=document.createElement('div');m.style.cssText='position:fixed;inset:0;background:rgba(10,12,16,.92);z-index:9998;display:flex;flex-direction:column';
+  m.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;color:#fff"><b style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name||'Document')}</b><button class="sm" id="pvd">⤓ Download</button><button class="sm" id="pvx">✕ Close</button></div><div style="flex:1;background:#fff">${/\.(png|jpe?g|webp|gif)(\?|$)/i.test(u)?`<img src="${u}" style="max-width:100%;max-height:100%;display:block;margin:auto">`:`<iframe src="${u}#view=FitH" style="width:100%;height:100%;border:0"></iframe>`}</div>`;
+  document.body.appendChild(m);const close=()=>{m.remove();document.removeEventListener('keydown',k)};const k=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',k);
+  m.querySelector('#pvx').onclick=close;m.querySelector('#pvd').onclick=async()=>{try{const b=await fetch(u).then(r=>r.blob());const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name||'document.pdf';document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),1000)}catch(e){location.href=u}}}
+async function rbOpenFile(path,name){const o=await api.signed([path]).catch(()=>({}));if(o[path])pdfView(o[path],name||path.split('/').pop().replace(/^[0-9a-f]{8}-/,''));else toast('Could not open the file')}
 async function rbPricing(id){try{await api.reqPricing(id);await refresh();openRb(id);toast('Sent — we’ll get pricing from our suppliers')}catch(e){toast(e.message)}}
 /* ---- options side by side: our price, program check per unit, submittal + AHRI per unit (no supplier prices) ---- */
 const RBRATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];

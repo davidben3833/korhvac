@@ -125,7 +125,7 @@ function lbOffice(items,i){LB.open(items,i,{resolve:thumb,onClose:()=>{if(PH.dir
     s.onchange=async()=>{if(!it.id||!s.value)return;const uid=s.value==='none'?null:s.value;await q(sb.from('rebate_files').update({unit_id:uid,assign_by:'manual',assign_conf:null}).eq('id',it.id));const f=fileByPath(it.path);if(f){f.unit_id=uid;f.assign_by='manual'}await phRebuild();PH.dirty=1;const u=uid&&P.units.find(x=>x.id===uid);it.title=esc(u?(u.tag||'Unit'):'Not assigned');toast('Moved');LB.refresh()};return s}},
   {render:it=>{const b=document.createElement('button');b.textContent=it.hidden?'👁 Show to client':'🙈 Hide from client';b.onclick=async()=>{if(!it.id)return;it.hidden=!it.hidden;await q(sb.from('rebate_files').update({hidden:it.hidden}).eq('id',it.id));const f=fileByPath(it.path);if(f)f.hidden=it.hidden;PH.dirty=1;toast(it.hidden?'Hidden from client':'Visible to client');LB.refresh()};return b}},
   {render:it=>{const b=document.createElement('button');b.textContent='🗑';b.title='Delete photo';b.onclick=async()=>{if(!it.id||!confirm('Delete this photo from the portal? (The original stays in SharePoint.)'))return;await sb.storage.from('rebate-files').remove([it.path]);await q(sb.from('rebate_files').delete().eq('id',it.id));P.files=P.files.filter(f=>f.id!==it.id);await phRebuild();PH.dirty=1;toast('Deleted');LB.remove(LB.index())};return b}},
-  {render:it=>{const b=document.createElement('button');b.textContent='⤓';b.title='Open original';b.onclick=async()=>{const u=await signed(it.path);if(u)window.open(u,'_blank')};return b}}]})}
+  {render:it=>{const b=document.createElement('button');b.textContent='⤓';b.title='Download original';b.onclick=async()=>{const u=await signed(it.path);if(u)dlFile(u,it.path.split('/').pop().replace(/^[0-9a-f]{8}-/,''))};return b}}]})}
 
 async function loadThumbs(root=document){const ims=[...root.querySelectorAll('img[data-th]')].filter(e=>e.dataset.th);ims.forEach(e=>{if(urlCache[e.dataset.th])e.src=urlCache[e.dataset.th]});const need=[...new Set(ims.filter(e=>!urlCache[e.dataset.th]).map(e=>e.dataset.th))];
   for(let i=0;i<need.length;i+=100){const{data}=await sb.storage.from('rebate-files').createSignedUrls(need.slice(i,i+100),3600);(data||[]).forEach(d=>{if(d.signedUrl)urlCache[d.path]=d.signedUrl})}ims.forEach(e=>{if(!e.src&&urlCache[e.dataset.th])e.src=urlCache[e.dataset.th]})}
@@ -316,7 +316,7 @@ function optionsTab(){const{units,opts}=P;const req=P.p.requirements||{};
       optionsTab()}catch(err){toast(err.message)}});
   document.querySelectorAll('[data-up]').forEach(e=>e.onchange=async()=>{const[oid,uid,d]=e.dataset.up.split('|');const f=e.files[0];if(!f)return;
     try{const up=await upload(P.p.id,f,`options/${oid}`);await save(oid,uid,{[d]:{path:up.path,name:f.name}});await q(sb.from('rebate_files').insert({rebate_id:P.p.id,name:f.name,path:up.path,mime:up.mime,size:up.size,kind:d==='quote'?'Quote':d==='submittal'?'Submittal':'AHRI'}));toast('Uploaded');optionsTab()}catch(err){toast(err.message)}});
-  document.querySelectorAll('[data-open]').forEach(a=>a.onclick=async ev=>{ev.preventDefault();const u=await signed(a.dataset.open);if(u)window.open(u,'_blank')});}
+  document.querySelectorAll('[data-open]').forEach(a=>a.onclick=ev=>{ev.preventDefault();const pth=a.dataset.open;const f=fileByPath(pth)||{path:pth,name:pth.split('/').pop()};docView(f)});}
 
 /* survey — every unit is its own folder: rebate-files/<project>/units/<unit id>/ (photos + docs) */
 const unitDir=(uid)=>`units/${uid}`;
@@ -368,7 +368,7 @@ function editUnit(u,openCam){
     photos.forEach(async(p,i)=>{const im=t.querySelector(`[data-i="${i}"]`);im.src=await thumb(p.path);im.onclick=()=>LB.open(photos.map(x=>lbItem(x.path,u.id?u:null)),i,{resolve:thumb})});
     t.querySelectorAll('[data-rm]').forEach(x=>x.onclick=async()=>{if(!confirm('Remove this photo?'))return;const[p]=photos.splice(+x.dataset.rm,1);dirty=true;sb.storage.from('rebate-files').remove([p.path]);drawTh()});
     m.querySelector('#docs').innerHTML=docs.map((d,i)=>`<div>📄 <a href="#" data-d="${i}">${esc(d.name)}</a> <a href="#" data-dx="${i}" class="red">✕</a></div>`).join('');
-    m.querySelectorAll('[data-d]').forEach(a=>a.onclick=async e=>{e.preventDefault();const url=await signed(docs[+a.dataset.d].path);if(url)window.open(url)});
+    m.querySelectorAll('[data-d]').forEach(a=>a.onclick=e=>{e.preventDefault();const d=docs[+a.dataset.d];docView({path:d.path,name:d.name||d.path.split('/').pop(),mime:d.mime})});
     m.querySelectorAll('[data-dx]').forEach(a=>a.onclick=e=>{e.preventDefault();const[d]=docs.splice(+a.dataset.dx,1);dirty=true;sb.storage.from('rebate-files').remove([d.path]);drawTh()});
   };drawTh();
   const addFiles=async(files,asDoc)=>{for(const f of files){try{
@@ -511,11 +511,12 @@ function photosWire(){
       let win=0,placed=0;while(true){st.textContent=`Step 2 of 2 — matching photos to units… ${win}`;const r=await call({action:'assign',win});if(r.error)throw new Error(r.error);placed+=r.placed||0;if(r.done)break;win=r.next}
       await event(P.p.id,`AI sorted ${placed} photo(s) into units`);toast(`Done — ${placed} photos filed under units`);projectView()}catch(e){toast(e.message);b.disabled=false}};
 }
+async function dlFile(u,name){try{const b=await fetch(u).then(r=>r.blob());const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name||'file';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}catch(e){toast('Download failed')}}
 const DOCK=[['Proposal','📝 Proposals'],['Submittal','📐 Submittals'],['AHRI','🏷 AHRI certificates'],['Application','📋 Applications'],['Pre-approval','✅ Pre-approvals'],['Quote','💲 Supplier quotes & pricing (internal — never shown to the client)'],['Invoice','🧾 Invoices (internal)'],['Other','📄 Other']];
 function docView(f){const m=document.createElement('div');m.style.cssText='position:fixed;inset:0;background:rgba(10,12,16,.92);z-index:9998;display:flex;flex-direction:column';
   m.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;color:#fff"><b style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</b><button class="sm" id="dvo">⤓ Download</button><button class="sm" id="dvx">✕ Close</button></div><div style="flex:1;background:#fff"><div class="mut" style="padding:20px">Loading…</div></div>`;
   document.body.appendChild(m);const close=()=>{m.remove();document.removeEventListener('keydown',k)};const k=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',k);
-  m.querySelector('#dvx').onclick=close;signed(f.path).then(u=>{if(!u)return;m.querySelector('#dvo').onclick=()=>window.open(u,'_blank');
+  m.querySelector('#dvx').onclick=close;signed(f.path).then(u=>{if(!u)return;m.querySelector('#dvo').onclick=()=>dlFile(u,f.name);
     const box=m.lastElementChild;if(/pdf/i.test(f.mime||f.name))box.innerHTML=`<iframe src="${u}#view=FitH" style="width:100%;height:100%;border:0"></iframe>`;else if(/^image\//.test(f.mime||''))box.innerHTML=`<img src="${u}" style="max-width:100%;max-height:100%;display:block;margin:auto">`;else box.innerHTML=`<div style="padding:24px">This file type can't be previewed here. <a href="${u}" target="_blank">Download it</a>.</div>`})}
 function filesTab(){
   const{p}=P;const docs=P.files.filter(f=>f.kind!=='Photo');const kinds=DOCK.map(k=>k[0]);
