@@ -127,6 +127,8 @@ function lbOffice(items,i){LB.open(items,i,{resolve:thumb,onClose:()=>{if(PH.dir
   {render:it=>{const b=document.createElement('button');b.textContent='🗑';b.title='Delete photo';b.onclick=async()=>{if(!it.id||!confirm('Delete this photo from the portal? (The original stays in SharePoint.)'))return;await sb.storage.from('rebate-files').remove([it.path]);await q(sb.from('rebate_files').delete().eq('id',it.id));P.files=P.files.filter(f=>f.id!==it.id);await phRebuild();PH.dirty=1;toast('Deleted');LB.remove(LB.index())};return b}},
   {render:it=>{const b=document.createElement('button');b.textContent='⤓';b.title='Open original';b.onclick=async()=>{const u=await signed(it.path);if(u)window.open(u,'_blank')};return b}}]})}
 
+async function loadThumbs(root=document){const ims=[...root.querySelectorAll('img[data-th]')].filter(e=>e.dataset.th);ims.forEach(e=>{if(urlCache[e.dataset.th])e.src=urlCache[e.dataset.th]});const need=[...new Set(ims.filter(e=>!urlCache[e.dataset.th]).map(e=>e.dataset.th))];
+  for(let i=0;i<need.length;i+=100){const{data}=await sb.storage.from('rebate-files').createSignedUrls(need.slice(i,i+100),3600);(data||[]).forEach(d=>{if(d.signedUrl)urlCache[d.path]=d.signedUrl})}ims.forEach(e=>{if(!e.src&&urlCache[e.dataset.th])e.src=urlCache[e.dataset.th]})}
 const urlCache={};async function thumb(path){if(!urlCache[path])urlCache[path]=await signed(path);return urlCache[path]}
 async function shrink(file,max=1600){if(!file.type.startsWith('image/'))return file;const img=await createImageBitmap(file).catch(()=>null);if(!img)return file;const k=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(b=>r(b),'image/jpeg',.85))}
 async function upload(rid,file,folder){const blob=await shrink(file);const ext=blob.type==='image/jpeg'?'jpg':(file.name.split('.').pop()||'bin');const path=`${rid}/${folder}/${crypto.randomUUID()}.${ext}`;const{error}=await sb.storage.from('rebate-files').upload(path,blob,{contentType:blob.type||file.type});if(error)throw new Error(error.message);return{path,size:blob.size,mime:blob.type||file.type,name:file.name}}
@@ -232,7 +234,7 @@ function drawProject(){
   <div class="card"><div class="row"><div><div class="mut small">${esc(p.number||'')}</div><h2 style="margin:2px 0">${esc(p.title||'')}</h2><div class="mut">${esc(p.site||'')}${cust?' · '+esc(cust.company||cust.name):''}</div>
   <div class="small mut">${esc([p.program,p.company,p.app_no&&('App # '+p.app_no)].filter(Boolean).join(' · '))}</div></div><span class="sp"></span>${p.deleted_at?'<span class="badge" style="background:#fde8e8;color:#c0392b">Deleted</span> <button class="sm" id="rst">Restore</button>':''}<button class="sm" id="ed">Edit</button>${isAdm()&&!p.deleted_at?' <button class="sm red" id="del">Delete</button>':''}</div>
   <div class="stage" style="margin-top:10px">${STAGES.map(s=>`<span class="${s===p.stage?'on':''}" data-stage="${s}" style="cursor:pointer">${s}</span>`).join('')}</div></div>
-  <div class="tabs">${[['survey',`Survey (${units.length})`],['table','Unit table'],['options',`Options (${(P.opts||[]).length})${optIssues()?' ⚠️':''}`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['files',`Files (${files.length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
+  <div class="tabs">${[['survey',`Survey (${units.length}) · 📷 ${files.filter(f=>f.kind==='Photo').length}`],['table','Unit table'],['options',`Options (${(P.opts||[]).length})${optIssues()?' ⚠️':''}`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['files',`Files (${files.filter(f=>f.kind!=='Photo').length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
   <div id="tb"></div>`);
   $('#bk').onclick=e=>{e.preventDefault();location.hash=''};
   $('#ed').onclick=()=>editProject(p);
@@ -323,20 +325,20 @@ function surveyTab(){
   const paths=u=>(u.photos||[]).map(x=>x&&x.path||x).filter(Boolean).filter(pth=>{const f=fileByPath(pth);return !f||f.kind==='Photo'||!f.kind});
   const tot=units.reduce((a,u)=>a+paths(u).length,0);
   $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px"><button class="pri" id="add">📷 New unit</button>
-    <div class="seg" style="display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden"><button class="sm" data-sv="cards" style="border:0;border-radius:0;${mode==='cards'?'background:#111;color:#fff':''}">▦ Cards</button><button class="sm" data-sv="wall" style="border:0;border-radius:0;${mode==='wall'?'background:#111;color:#fff':''}">🖼 Photo wall</button></div>
+    <div class="seg" style="display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden"><button class="sm" data-sv="cards" style="border:0;border-radius:0;${mode==='cards'?'background:#111;color:#fff':''}">▦ Cards</button><button class="sm" data-sv="wall" style="border:0;border-radius:0;${mode==='wall'?'background:#111;color:#fff':''}">🖼 All photos</button></div>
     <span class="sp"></span><span class="mut small">${units.reduce((a,u)=>a+(u.qty||1),0)} units · ${tot} photos</span></div>
-  ${mode==='wall'?`<div>${units.map(u=>{const ps=paths(u);return `<div class="card" style="padding:12px;margin-bottom:12px"><div class="row" style="gap:8px;cursor:pointer" data-u="${u.id}"><b>${esc(u.tag||u.equipment_type||'Unit')}</b><span class="small mut">${esc([u.equipment_type,u.make,u.model,u.tonnage&&(u.tonnage+' T'),u.location].filter(Boolean).join(' · '))}</span><span class="sp"></span><span class="small mut">${ps.length} photo${ps.length===1?'':'s'} · edit ›</span></div>
-     ${ps.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px">${ps.map((pth,k)=>`<img data-th="${esc(pth)}" data-ulb="${u.id}|${k}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;background:#eef1f6;cursor:zoom-in;${(fileByPath(pth)||{}).hidden?'opacity:.4':''}">`).join('')}</div>`:'<div class="small mut" style="margin-top:6px">No photos yet.</div>'}</div>`}).join('')}</div>`
-  :`<div class="units">${units.map(u=>{const ps=paths(u);const more=ps.length-5;return `<div class="unit" data-u="${u.id}" style="padding:0;overflow:hidden">
+  ${mode==='wall'?photosHTML(true)
+  :`${(n=>n?`<div class="card" style="padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;background:#fffaf0;border-color:#f6d58e">📷 <b>${n} photo${n>1?'s':''} not assigned to a unit</b><span class="small mut">overview, route, or not sorted yet</span><span class="sp"></span><button class="sm" data-sv="wall">Review</button></div>`:'')(P.files.filter(f=>f.kind==='Photo'&&!f.unit_id).length)}<div class="units">${units.map(u=>{const ps=paths(u);const more=ps.length-5;return `<div class="unit" data-u="${u.id}" style="padding:0;overflow:hidden">
     ${ps.length?`<div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:62px 62px;gap:2px;background:#eef1f6">${ps.slice(0,5).map((pth,k)=>`<div style="position:relative;${k===0?'grid-row:1 / span 2':''}"><img data-th="${esc(pth)}" data-ulb="${u.id}|${k}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:0;cursor:zoom-in;display:block">${k===4&&more>0?`<span data-ulb="${u.id}|4" style="position:absolute;inset:0;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;cursor:zoom-in">+${more}</span>`:''}</div>`).join('')}</div>`:`<div style="height:60px;background:#f6f8fb;display:flex;align-items:center;justify-content:center" class="small mut">📷 No photos yet</div>`}
     <div style="padding:10px 12px"><div class="row"><b>${esc(u.tag||u.equipment_type||'Unit')}</b> ${u.qty>1?`<span class="b">×${u.qty}</span>`:''}<span class="sp"></span>${u.difficulty?`<b class="small" style="color:${u.difficulty==='Hard'?'var(--bad)':u.difficulty==='Moderate'?'var(--warn)':'var(--ok)'}">${esc(u.difficulty)}</b>`:''}</div>
      <div class="small">${esc([u.make,u.model].filter(Boolean).join(' '))||'<span class="mut">no model yet</span>'}</div>
      <div class="small mut">${esc([u.equipment_type,u.tonnage&&(u.tonnage+' ton'),u.mounting,u.mfg_year,u.location].filter(Boolean).join(' · '))}</div>
      <div class="small mut">📷 ${ps.length}${(u.docs||[]).length?` · 📄 ${(u.docs||[]).length}`:''}</div>
      ${u.ai_status==='reading'?'<div class="small" style="color:#5b2fb0">AI reading…</div>':''}</div></div>`}).join('')||'<div class="mut">No units yet. Tap “New unit” for each unit on site.</div>'}</div>`}`;
-  document.querySelectorAll('img[data-th]').forEach(async i=>{if(i.dataset.th)i.src=await thumb(i.dataset.th)});
+  loadThumbs();
   document.querySelectorAll('[data-ulb]').forEach(t=>t.onclick=e=>{e.stopPropagation();const[uid,k]=t.dataset.ulb.split('|');const u=units.find(x=>x.id===uid);lbOffice(paths(u).map(pth=>lbItem(pth,u)),+k)});
   document.querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>{V.sv=b.dataset.sv;surveyTab()});
+  if(mode==='wall')photosWire();
   document.querySelectorAll('[data-u]').forEach(c=>c.onclick=()=>editUnit(units.find(u=>u.id===c.dataset.u)));
   $('#add').onclick=()=>editUnit({},true);
 }
@@ -469,7 +471,8 @@ function editReq(r){
 /* files */
 /* ===== Site photos, grouped by unit: select, move, hide from client, delete, AI sort ===== */
 let PH={sel:new Set(),open:{}};
-function photosHTML(){const ph=P.files.filter(f=>f.kind==='Photo');if(!ph.length)return '';
+const phRender=()=>surveyTab();
+function photosHTML(big){const ph=P.files.filter(f=>f.kind==='Photo');if(!ph.length)return '';
   const by={};ph.forEach(f=>{(by[f.unit_id||'none']=by[f.unit_id||'none']||[]).push(f)});
   const ord=(a,b)=>((a.ai&&a.ai.shows==='nameplate')?0:1)-((b.ai&&b.ai.shows==='nameplate')?0:1)||String(a.taken_at||a.name).localeCompare(String(b.taken_at||b.name));
   const groups=[...P.units.filter(u=>by[u.id]).map(u=>({id:u.id,name:`${u.tag||u.equipment_type||'Unit'}`,sub:[u.make,u.model].filter(Boolean).join(' '),list:by[u.id].sort(ord)})),...(by.none?[{id:'none',name:'Not assigned to a unit',sub:'overview, route, or not sorted yet',list:by.none.sort(ord)}]:[])];
@@ -481,7 +484,7 @@ function photosHTML(){const ph=P.files.filter(f=>f.kind==='Photo');if(!ph.length
      <select id="phmv" style="max-width:220px"><option value="">Move to unit…</option>${P.units.map(u=>`<option value="${u.id}">${esc(u.tag||u.equipment_type||'Unit')}</option>`).join('')}<option value="none">— Not assigned</option></select>
      <button class="sm" id="phhide">🙈 Hide from client</button><button class="sm" id="phshow">👁 Show to client</button><button class="sm red" id="phdel">🗑 Delete</button><button class="sm" id="phclr">Clear</button></div>`:''}
    ${groups.map(g=>{const open=PH.open[g.id]||g.list.length<=12;const show=open?g.list:g.list.slice(0,12);return `<div style="margin-top:12px"><div class="row" style="gap:8px"><b>${esc(g.name)}</b><span class="small mut">${esc(g.sub)} · ${g.list.length} photo${g.list.length===1?'':'s'}</span><span class="sp"></span><label class="small" style="text-transform:none;letter-spacing:0;margin:0;cursor:pointer"><input type="checkbox" data-gsel="${g.id}" style="width:auto"> select all</label></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-top:6px">${show.map((f,fi)=>`<div style="position:relative${f.hidden?';opacity:.4':''}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(${big?150:104}px,1fr));gap:6px;margin-top:6px">${show.map((f,fi)=>`<div style="position:relative${f.hidden?';opacity:.4':''}">
       <a href="#" data-lb="${g.id}|${fi}" title="${esc([f.ai&&f.ai.where,f.ai&&f.ai.shows,f.assign_why].filter(Boolean).join(' · '))}"><img data-th="${esc(f.path)}" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#eef1f6;${PH.sel.has(f.id)?'outline:3px solid #2563eb':''}"></a>
       <input type="checkbox" data-psel="${f.id}" ${PH.sel.has(f.id)?'checked':''} style="position:absolute;top:4px;left:4px;width:18px;height:18px">
       ${f.ai&&f.ai.shows==='nameplate'?'<span style="position:absolute;bottom:4px;left:4px;background:#111;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px">nameplate</span>':''}
@@ -489,13 +492,13 @@ function photosHTML(){const ph=P.files.filter(f=>f.kind==='Photo');if(!ph.length
      </div>`).join('')}</div>${!open?`<button class="sm" data-gopen="${g.id}" style="margin-top:6px">Show all ${g.list.length}</button>`:''}</div>`}).join('')}</div>`}
 async function phRebuild(){const{data:{session}}=await sb.auth.getSession();await fetch(SB_URL+'/functions/v1/rebate-photomap',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({rebateId:P.p.id,action:'rebuild'})})}
 function photosWire(){
-  document.querySelectorAll('[data-psel]').forEach(c=>c.onchange=()=>{c.checked?PH.sel.add(c.dataset.psel):PH.sel.delete(c.dataset.psel);filesTab()});
-  document.querySelectorAll('[data-gsel]').forEach(c=>c.onchange=()=>{const g=c.dataset.gsel;P.files.filter(f=>f.kind==='Photo'&&(f.unit_id||'none')===g).forEach(f=>c.checked?PH.sel.add(f.id):PH.sel.delete(f.id));filesTab()});
-  document.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>{PH.open[b.dataset.gopen]=1;filesTab()});
+  document.querySelectorAll('[data-psel]').forEach(c=>c.onchange=()=>{c.checked?PH.sel.add(c.dataset.psel):PH.sel.delete(c.dataset.psel);phRender()});
+  document.querySelectorAll('[data-gsel]').forEach(c=>c.onchange=()=>{const g=c.dataset.gsel;P.files.filter(f=>f.kind==='Photo'&&(f.unit_id||'none')===g).forEach(f=>c.checked?PH.sel.add(f.id):PH.sel.delete(f.id));phRender()});
+  document.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>{PH.open[b.dataset.gopen]=1;phRender()});
   document.querySelectorAll('[data-lb]').forEach(a=>a.onclick=e=>{e.preventDefault();const[g,i]=a.dataset.lb.split('|');const list=PH.groups[g]||[];lbOffice(list.map(f=>lbItem(f.path)),+i)});
   const ids=()=>[...PH.sel];
-  if($('#phclr'))$('#phclr').onclick=()=>{PH.sel.clear();filesTab()};
-  const setHidden=async v=>{await q(sb.from('rebate_files').update({hidden:v}).in('id',ids()));P.files.forEach(f=>{if(PH.sel.has(f.id))f.hidden=v});await event(P.p.id,`${v?'Hid':'Showed'} ${PH.sel.size} photo(s) ${v?'from':'to'} the client`);toast(v?'Hidden from client':'Visible to client');PH.sel.clear();filesTab()};
+  if($('#phclr'))$('#phclr').onclick=()=>{PH.sel.clear();phRender()};
+  const setHidden=async v=>{await q(sb.from('rebate_files').update({hidden:v}).in('id',ids()));P.files.forEach(f=>{if(PH.sel.has(f.id))f.hidden=v});await event(P.p.id,`${v?'Hid':'Showed'} ${PH.sel.size} photo(s) ${v?'from':'to'} the client`);toast(v?'Hidden from client':'Visible to client');PH.sel.clear();phRender()};
   if($('#phhide'))$('#phhide').onclick=()=>setHidden(true);
   if($('#phshow'))$('#phshow').onclick=()=>setHidden(false);
   if($('#phmv'))$('#phmv').onchange=async e=>{const v=e.target.value;if(!v)return;const uid=v==='none'?null:v;
@@ -508,19 +511,24 @@ function photosWire(){
       let win=0,placed=0;while(true){st.textContent=`Step 2 of 2 — matching photos to units… ${win}`;const r=await call({action:'assign',win});if(r.error)throw new Error(r.error);placed+=r.placed||0;if(r.done)break;win=r.next}
       await event(P.p.id,`AI sorted ${placed} photo(s) into units`);toast(`Done — ${placed} photos filed under units`);projectView()}catch(e){toast(e.message);b.disabled=false}};
 }
+const DOCK=[['Proposal','📝 Proposals'],['Submittal','📐 Submittals'],['AHRI','🏷 AHRI certificates'],['Application','📋 Applications'],['Pre-approval','✅ Pre-approvals'],['Quote','💲 Supplier quotes & pricing (internal — never shown to the client)'],['Invoice','🧾 Invoices (internal)'],['Other','📄 Other']];
+function docView(f){const m=document.createElement('div');m.style.cssText='position:fixed;inset:0;background:rgba(10,12,16,.92);z-index:9998;display:flex;flex-direction:column';
+  m.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;color:#fff"><b style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</b><button class="sm" id="dvo">⤓ Download</button><button class="sm" id="dvx">✕ Close</button></div><div style="flex:1;background:#fff"><div class="mut" style="padding:20px">Loading…</div></div>`;
+  document.body.appendChild(m);const close=()=>{m.remove();document.removeEventListener('keydown',k)};const k=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',k);
+  m.querySelector('#dvx').onclick=close;signed(f.path).then(u=>{if(!u)return;m.querySelector('#dvo').onclick=()=>window.open(u,'_blank');
+    const box=m.lastElementChild;if(/pdf/i.test(f.mime||f.name))box.innerHTML=`<iframe src="${u}#view=FitH" style="width:100%;height:100%;border:0"></iframe>`;else if(/^image\//.test(f.mime||''))box.innerHTML=`<img src="${u}" style="max-width:100%;max-height:100%;display:block;margin:auto">`;else box.innerHTML=`<div style="padding:24px">This file type can't be previewed here. <a href="${u}" target="_blank">Download it</a>.</div>`})}
 function filesTab(){
-  const{p,files}=P;
-  $('#tb').innerHTML=`<div class="card"><b>📁 Unit folders</b>${P.units.map(u=>`<div class="small" style="padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer" data-uf="${u.id}">📁 ${esc(u.tag||u.equipment_type||'Unit')} <span class="mut">— 📷 ${(u.photos||[]).length}${(u.docs||[]).length?' · 📄 '+(u.docs||[]).length:''}</span></div>`).join('')||'<div class="mut small">No units yet.</div>'}</div>
-  <div class="row" style="margin-bottom:12px"><b>Project files</b><span class="sp"></span><button class="pri" id="up">Upload files</button><input type="file" id="ff" multiple hidden><select id="k" style="max-width:180px"><option>Quote</option><option>Submittal</option><option>Application</option><option>Pre-approval</option><option>Invoice</option><option>Photo</option><option>Other</option></select></div>
-  ${photosHTML()}
-  <div class="card"><table><tr><th>File</th><th>Type</th><th>From</th><th>Added</th><th></th></tr>${files.filter(f=>f.kind!=='Photo').map(f=>`<tr><td><a href="#" data-f="${esc(f.path)}">${esc(f.name)}</a></td><td>${esc(f.kind||'')}</td><td class="small">${esc(f.email_from||'upload')}</td><td class="small">${when(f.created_at)}</td><td><button class="sm red" data-x="${f.id}">✕</button></td></tr>`).join('')||'<tr><td colspan=5 class="mut">No files yet.</td></tr>'}</table></div>`;
-  document.querySelectorAll('[data-uf]').forEach(d=>d.onclick=()=>editUnit(P.units.find(u=>u.id===d.dataset.uf)));
-  photosWire();
-  (async()=>{window.THC=window.THC||{};const ims=[...document.querySelectorAll('[data-th]')];ims.forEach(e=>{if(THC[e.dataset.th])e.src=THC[e.dataset.th]});const need=ims.filter(e=>!THC[e.dataset.th]);for(let i=0;i<need.length;i+=100){const ch=need.slice(i,i+100);const{data}=await sb.storage.from('rebate-files').createSignedUrls(ch.map(e=>e.dataset.th),3600);(data||[]).forEach((d,j)=>{if(d.signedUrl){THC[ch[j].dataset.th]=d.signedUrl;ch[j].src=d.signedUrl}})}})();
+  const{p}=P;const docs=P.files.filter(f=>f.kind!=='Photo');const kinds=DOCK.map(k=>k[0]);
+  const grp=DOCK.map(([k,l])=>({k,l,list:docs.filter(f=>(kinds.includes(f.kind)?f.kind:'Other')===k)})).filter(g=>g.list.length);
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px;gap:8px;flex-wrap:wrap"><b>Documents (${docs.length})</b><span class="small mut">Photos are in the Survey tab.</span><span class="sp"></span><select id="k" style="max-width:180px">${DOCK.map(([k])=>`<option ${k==='Submittal'?'selected':''}>${k}</option>`).join('')}</select><button class="pri" id="up">⬆ Upload documents</button><input type="file" id="ff" multiple hidden></div>
+  ${grp.map(g=>`<div class="card" style="padding:12px;margin-bottom:12px"><div class="row"><b>${g.l}</b><span class="sp"></span><span class="small mut">${g.list.length}</span></div>
+    ${g.list.map(f=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line);gap:10px"><span style="font-size:20px">${/pdf/i.test(f.mime||f.name)?'📄':/sheet|xls/i.test(f.mime||f.name)?'📊':/^image/.test(f.mime||'')?'🖼':'📎'}</span><a href="#" data-dv="${f.id}" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</a>${f.hidden?'<span class="badge">hidden</span>':''}<span class="small mut" style="white-space:nowrap">${f.size?Math.max(1,Math.round(f.size/1024))+' KB · ':''}${when(f.created_at)}</span>
+      <select data-dk="${f.id}" class="sm" style="max-width:130px">${DOCK.map(([k])=>`<option ${(kinds.includes(f.kind)?f.kind:'Other')===k?'selected':''}>${k}</option>`).join('')}</select><button class="sm red" data-x="${f.id}" title="Delete">🗑</button></div>`).join('')}</div>`).join('')||'<div class="card mut">No documents yet.</div>'}`;
+  document.querySelectorAll('[data-dv]').forEach(a=>a.onclick=e=>{e.preventDefault();docView(P.files.find(f=>f.id===a.dataset.dv))});
+  document.querySelectorAll('[data-dk]').forEach(sel=>sel.onchange=async()=>{await q(sb.from('rebate_files').update({kind:sel.value}).eq('id',sel.dataset.dk));P.files.find(f=>f.id===sel.dataset.dk).kind=sel.value;toast('Moved to '+sel.value);filesTab()});
   $('#up').onclick=()=>$('#ff').click();
-  $('#ff').onchange=async e=>{for(const f of e.target.files){try{const path=`${p.id}/files/${Date.now()}-${f.name.replace(/[^\w.\- ]+/g,'_')}`;const{error}=await sb.storage.from('rebate-files').upload(path,f,{contentType:f.type});if(error)throw error;await q(sb.from('rebate_files').insert({rebate_id:p.id,name:f.name,path,mime:f.type,size:f.size,kind:$('#k').value}))}catch(err){toast(err.message)}}await event(p.id,`Uploaded ${e.target.files.length} file(s)`);projectView()};
-  document.querySelectorAll('[data-f]').forEach(a=>a.onclick=async e=>{e.preventDefault();const u=await signed(a.dataset.f);if(u)window.open(u)});
-  document.querySelectorAll('[data-x]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this file?'))return;const f=files.find(x=>x.id===b.dataset.x);await sb.storage.from('rebate-files').remove([f.path]);await q(sb.from('rebate_files').delete().eq('id',f.id));projectView()});
+  $('#ff').onchange=async e=>{for(const f of e.target.files){try{const path=`${p.id}/files/${Date.now()}-${f.name.replace(/[^\w.\- ]+/g,'_')}`;const{error}=await sb.storage.from('rebate-files').upload(path,f,{contentType:f.type});if(error)throw error;await q(sb.from('rebate_files').insert({rebate_id:p.id,name:f.name,path,mime:f.type,size:f.size,kind:/^image\//.test(f.type)&&!/pric|quote/i.test(f.name)?'Photo':$('#k').value}))}catch(err){toast(err.message)}}await event(p.id,`Uploaded ${e.target.files.length} file(s)`);projectView()};
+  document.querySelectorAll('[data-x]').forEach(b=>b.onclick=async()=>{const f=P.files.find(x=>x.id===b.dataset.x);if(!confirm(`Delete ${f.name}?`))return;await sb.storage.from('rebate-files').remove([f.path]);await q(sb.from('rebate_files').delete().eq('id',f.id));projectView()});
 }
 function activityTab(){
   $('#tb').innerHTML=`<div class="card"><div class="row"><input id="nt" placeholder="Add a note…"><button class="pri" id="an">Add</button></div></div>
