@@ -2357,7 +2357,7 @@ function drawInv(){const i=edit.obj,isNew=!byId('invoices',i.id);
    <div><label>Due date</label><input type="date" id="f_due" value="${esc(i.due)}"></div>
    <div><label>Tax rate %</label><input id="f_taxRate" value="${esc(i.taxRate)}" oninput="document.getElementById('items')._tot()"></div>
    <div><label>Customer PO #</label><input id="f_po" value="${esc(i.po)}"></div>
-   <div class="span2"><label>Online payment link (Stripe / QuickBooks / Square — optional)</label><input id="f_payLink" value="${esc(i.payLink||company().payLink||'')}" placeholder="https://…"></div>
+   <div class="span2"><label>Online payment link (card / bank) ${sb&&!isNew?`<button class="sm" type="button" onclick="makePayLink()" style="margin-left:6px">💳 Create Stripe pay link</button>`:''}</label><input id="f_payLink" value="${esc(i.payLink||company().payLink||'')}" placeholder="https://…"></div>
    <div class="span3"><label>Description / notes on invoice</label><textarea id="f_notes">${esc(i.notes)}</textarea></div></div>
   <div class="sec">Line Items</div><div id="items"></div>
   <div class="sec">Payments</div>
@@ -2372,9 +2372,31 @@ function addPay(){if(deny('payments'))return;syncInv();const a=+v('p_amt');if(!a
 async function saveInv(){if(deny('invoices'))return;syncInv();const i=edit.obj;i.items=i.items.filter(x=>x.desc||+x.price);if(!i.customerId){toast('Pick a customer');return}if(invStatus(i)==='Paid'&&!i.paidDate)i.paidDate=(i.payments.slice(-1)[0]||{}).date||today();try{await save('invoices',i);toast('Invoice saved');uploadInvPdf(JSON.parse(JSON.stringify(i)));edit.obj=JSON.parse(JSON.stringify(byId('invoices',i.id)||i));invView()}catch(e){}}
 function invText(i){const c=byId('customers',i.customerId)||{},co=company(),t=calc(i.items,i.taxRate);
   return `Hello ${c.name||''},\n\nPlease find invoice ${i.number} from ${co.name||'us'} below.\n\nInvoice: ${i.number}\nDate: ${fdate(i.date)}\nDue: ${fdate(i.due)}${i.po?'\nPO: '+i.po:''}${i.jobNumber?'\nJob: '+i.jobNumber:''}${i.site?'\nService address: '+i.site:''}${(()=>{const sv=jobService(i.jobId);return sv&&sv.rows.length?`\nService date: ${fdate(sv.j.date||sv.start.slice(0,10))}\nStarted: ${ftm(sv.start)} · Finished: ${sv.finish?ftm(sv.finish):'in progress'}\nTotal time on site: ${fdur(sv.hrs)} (labor billed ${sv.billed.toFixed(2)} h)`:''})()}\n\n${i.notes?i.notes+'\n\n':''}${(i.items||[]).map(x=>`• ${x.desc} — ${x.qty} x ${money(x.price)} = ${money(x.qty*x.price)}`).join('\n')}\n\nSubtotal: ${money(t.sub)}${+i.taxRate?`\nTax (${i.taxRate}%): ${money(t.tax)}`:''}\nTotal: ${money(t.total)}${invPaid(i)?`\nPaid: ${money(invPaid(i))}`:''}\nBALANCE DUE: ${money(invBal(i))}\n\n${i.payLink?'Pay online: '+i.payLink+'\n\n':''}${co.remit?'Remit to: '+co.remit+'\n\n':''}${co.invoiceFooter||'Thank you for your business!'}\n\n${co.name||''}\n${co.phone||''}`}
+/* ---- Stripe pay links + QuickBooks / Stripe status (Settings → Payments & accounting) ---- */
+let PAY_INFO=null;
+async function stripeLink(i){const{data,error}=await sb.functions.invoke('stripe-pay',{body:{action:'link',invoice_id:i.id}});if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch(_){}throw new Error(m)}
+  i.payLink=data.url;i.pay_token=new URL(data.url).searchParams.get('t');const st=byId('invoices',i.id);if(st){st.payLink=i.payLink;st.pay_token=i.pay_token}return data.url}
+async function ensurePayLink(i){try{if(i.payLink&&!/korhvac\.com\/pay\//.test(i.payLink))return;if(!PAY_INFO)await loadPayInfo();if(!(PAY_INFO&&PAY_INFO.stripe&&PAY_INFO.stripe.connected))return;await stripeLink(i)}catch(e){}}
+async function makePayLink(){syncInv();try{const u=await stripeLink(edit.obj);const f=$('#f_payLink');if(f)f.value=u;try{await navigator.clipboard.writeText(u)}catch(_){}toast('💳 Pay link ready (copied) — it goes out with the invoice email')}catch(e){toast(e.message)}}
+async function loadPayInfo(){const g=async(fn)=>{try{const{data}=await sb.functions.invoke(fn,{body:{action:'status'}});return data||{}}catch(e){return{error:true}}};PAY_INFO={stripe:await g('stripe-pay'),qb:await g('qb-sync')};const b=$('#paycard');if(b)b.outerHTML=paySettingsCard()}
+function paySettingsCard(){if(!sb||!can('settings'))return '';if(!PAY_INFO){setTimeout(loadPayInfo,0);return '<div class="card" id="paycard" style="max-width:800px;margin-top:14px"><h3>💳 Payments & accounting</h3><p class="mut small">Checking Stripe and QuickBooks…</p></div>'}
+  const s=PAY_INFO.stripe||{},q=PAY_INFO.qb||{};
+  return `<div class="card" id="paycard" style="max-width:800px;margin-top:14px"><h3>💳 Payments & accounting</h3>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+   <div><b>Stripe</b> ${s.connected?`<span class="badge" style="background:#e7f6ee;color:#1f9d55">connected${s.livemode?'':' · TEST mode'}</span>`:'<span class="badge">not connected</span>'}
+    <p class="small mut">${s.connected?`${esc(s.name||'')}. Every invoice email gets a “Pay online” link — customers pay by card or bank (ACH) and the payment is recorded on the invoice automatically.${s.livemode?'':' Test mode: use card 4242 4242 4242 4242 to try it. Switch to the live key when Stripe activates the account.'}`:'Add your Stripe secret key in Supabase → Edge Functions → Secrets as <code>STRIPE_SECRET_KEY</code> (test key sk_test_… first, live key sk_live_… once Stripe activates the account).'}</p></div>
+   <div><b>QuickBooks</b> ${q.connected?`<span class="badge" style="background:#e7f6ee;color:#1f9d55">connected · ${esc(q.company||'')}</span>`:'<span class="badge">not connected</span>'}
+    <p class="small mut">${q.connected?`Invoices, customers and payments go to QuickBooks automatically every 10 minutes. ${q.pending||0} waiting · ${q.done||0} synced${q.errors?` · <b style="color:var(--bad)">${q.errors} failed</b>`:''}`:q.keys?'Keys are in — click Connect and sign in to QuickBooks.':'Needs your Intuit app keys in Supabase secrets: <code>QBO_CLIENT_ID</code> and <code>QBO_CLIENT_SECRET</code>. In the Intuit app, add this redirect URL: <code>'+esc(q.redirect||'')+'</code>'}</p>
+    ${(q.recent_errors||[]).length?`<div class="small" style="color:var(--bad)">${q.recent_errors.map(e=>esc(e.kind+': '+e.error)).join('<br>')}</div>`:''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${q.keys?`<button class="sm ${q.connected?'':'pri'}" onclick="qbConnect()">${q.connected?'Reconnect':'Connect QuickBooks'}</button>`:''}${q.connected?`<button class="sm" onclick="qbRun()">Sync now</button><button class="sm" onclick="qbBackfill()">Send existing invoices</button>`:''}</div></div></div>
+   <div style="margin-top:8px"><button class="sm" onclick="PAY_INFO=null;loadPayInfo()">↻ Refresh</button></div></div>`}
+async function qbCall(action){const{data,error}=await sb.functions.invoke('qb-sync',{body:{action}});if(error){let m=error.message;try{m=(await error.context.json()).error||m}catch(_){}throw new Error(m)}return data}
+async function qbConnect(){try{const d=await qbCall('connect');window.open(d.url,'_blank')}catch(e){toast(e.message)}}
+async function qbRun(){try{const d=await qbCall('run');toast(`QuickBooks: ${d.done} synced${d.failed?', '+d.failed+' failed':''}`);PAY_INFO=null;loadPayInfo()}catch(e){toast(e.message)}}
+async function qbBackfill(){if(!confirm('Send every existing (non-draft) invoice and its payments to QuickBooks? Invoices already in QuickBooks with the same number are updated, not duplicated.'))return;try{const d=await qbCall('backfill');toast(`${d.queued} invoices queued — syncing`);await qbRun()}catch(e){toast(e.message)}}
 function emailInv(){if(deny('send_invoices'))return;if($('#modal').querySelector('#f_customerId'))syncInv();const i=edit.obj,c=byId('customers',i.customerId)||{};
   if(sb){if(!byId('invoices',i.id)){toast('Save the invoice first');return}if(!(c.billEmail||c.email)){toast('No email on file for this customer');return}
-    toast('Preparing invoice PDF…');uploadInvPdf(i).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'invoice',p_id:i.id});toast(error?sbErr(error):'✉️ Sending invoice to '+(c.billEmail||c.email)+' from billing@')});return}
+    toast('Preparing invoice PDF…');ensurePayLink(i).then(()=>uploadInvPdf(i)).then(async()=>{const{error}=await sb.rpc('email_now',{p_kind:'invoice',p_id:i.id});toast(error?sbErr(error):'✉️ Sending invoice to '+(c.billEmail||c.email)+' from billing@')});return}
 sendEmail(c.billEmail||c.email,`Invoice ${i.number} from ${company().name||''} – ${money(invBal(i))} due ${fdate(i.due)}`,invText(i),{kind:'invoice',ref:i.number,attachments:()=>invPdfB64(i)}).then(async ok=>{if(ok){i.sentAt=today();try{await save('invoices',i)}catch(e){}}})}
 
 
@@ -2768,6 +2790,7 @@ function vSettings(){const c=company();
   <div class="mfoot"><span class="sp"></span><button class="pri" onclick="saveSettings()">Save Settings</button></div></div>
   ${smsSettingsCard()}
   ${aiSettingsCard()}
+  ${paySettingsCard()}
   ${emailSettingsCard()}
   <div class="card" style="max-width:800px;margin-top:14px"><h3>Connections</h3>
   <p class="small"><b>Email:</b> ${mcp?'Customer emails send from your Microsoft 365 / Outlook account (you approve the first one).':'Email sending isn’t available in this view — emails open as a draft to copy.'}<br>
