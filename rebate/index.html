@@ -71,6 +71,62 @@ async function q(p){const{data,error}=await p;if(error)throw new Error(error.mes
 function modal(html){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="mb">${html}</div>`;m.addEventListener('mousedown',e=>{if(e.target===m)m.remove()});document.body.appendChild(m);return m}
 async function fn(name,body){const{data:{session}}=await sb.auth.getSession();const r=await fetch(`${SB_URL}/functions/v1/${name}`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token,apikey:SB_KEY},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Error '+r.status));return d}
 async function signed(path){const{data}=await sb.storage.from('rebate-files').createSignedUrl(path,3600);return data?.signedUrl}
+/* ===== Photo viewer: same page, ← → / swipe, zoom (wheel, pinch, double-click, + −), drag to pan, thumbnails ===== */
+const LB=(()=>{let st=null;
+  const css=`#lb{position:fixed;inset:0;background:rgba(10,12,16,.96);z-index:9999;display:flex;flex-direction:column;color:#fff;font:14px system-ui,sans-serif;user-select:none}
+  #lb .lbtop{display:flex;align-items:center;gap:10px;padding:10px 14px}#lb .lbtop .sp{flex:1}#lb button{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:8px;padding:8px 12px;font-size:15px;cursor:pointer}#lb button:hover{background:rgba(255,255,255,.22)}
+  #lb .lbstage{flex:1;position:relative;overflow:hidden;touch-action:none;cursor:grab}#lb .lbstage.drag{cursor:grabbing}#lb .lbstage img{position:absolute;left:50%;top:50%;max-width:100%;max-height:100%;transform-origin:center;will-change:transform}
+  #lb .lbnav{position:absolute;top:50%;transform:translateY(-50%);font-size:28px;width:52px;height:72px;border-radius:12px;z-index:2}#lb .lbprev{left:10px}#lb .lbnext{right:10px}
+  #lb .lbcap{padding:6px 14px;min-height:20px;font-size:13px;opacity:.85}#lb .lbstrip{display:flex;gap:6px;overflow-x:auto;padding:8px 14px 12px}#lb .lbstrip img{height:56px;width:56px;object-fit:cover;border-radius:6px;opacity:.55;cursor:pointer;flex:0 0 auto;background:#222}#lb .lbstrip img.on{opacity:1;outline:2px solid #fff}
+  #lb select{background:#222;color:#fff;border:1px solid #444;border-radius:8px;padding:7px}#lb .lbtag{background:#c0392b;border-radius:6px;padding:2px 6px;font-size:12px}
+  @media(max-width:640px){#lb .lbnav{display:none}#lb .lbtop{flex-wrap:wrap}}`;
+  function el(h){const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild}
+  async function url(it){if(it.url)return it.url;it.url=await st.resolve(it.path);return it.url}
+  function apply(){const i=st.img;if(!i)return;i.style.transform=`translate(calc(-50% + ${st.x}px),calc(-50% + ${st.y}px)) scale(${st.z})`;st.root.querySelector('.lbz').textContent=Math.round(st.z*100)+'%'}
+  function zoom(f,cx,cy){const r=st.stage.getBoundingClientRect();cx=cx??r.width/2;cy=cy??r.height/2;const nz=Math.min(8,Math.max(1,st.z*f));const k=nz/st.z;
+    st.x=(st.x-(cx-r.width/2))*k+(cx-r.width/2);st.y=(st.y-(cy-r.height/2))*k+(cy-r.height/2);st.z=nz;if(nz===1){st.x=0;st.y=0}apply()}
+  async function show(i){const n=st.items.length;st.i=(i+n)%n;const it=st.items[st.i];st.z=1;st.x=0;st.y=0;
+    const img=new Image();img.draggable=false;img.alt='';st.stage.querySelectorAll('img').forEach(x=>x.remove());st.stage.appendChild(img);st.img=img;apply();img.src=await url(it);
+    st.root.querySelector('.lbn').textContent=`${st.i+1} / ${n}`;st.root.querySelector('.lbcap').innerHTML=(it.title?`<b>${it.title}</b> `:'')+(it.hidden?'<span class="lbtag">hidden from client</span> ':'')+(it.caption||'');
+    st.root.querySelectorAll('.lbstrip img').forEach((t,k)=>{t.classList.toggle('on',k===st.i);if(k===st.i)t.scrollIntoView({block:'nearest',inline:'center'})});
+    const act=st.root.querySelector('.lbact');act.innerHTML='';(st.actions||[]).forEach(a=>{const b=a.render?a.render(it):el(`<button>${a.label}</button>`);if(!a.render)b.onclick=()=>a.run(it,st.i);act.appendChild(b)});
+    [st.i+1,st.i-1].forEach(k=>{const nx=st.items[(k+n)%n];if(nx&&!nx.url)url(nx)});
+    const strip=st.root.querySelectorAll('.lbstrip img');[st.i-6,st.i+6].forEach(()=>{});strip.forEach(async(t,k)=>{if(Math.abs(k-st.i)<12&&!t.src)t.src=await url(st.items[k])})}
+  function close(){if(!st)return;document.removeEventListener('keydown',st.key);st.root.remove();document.body.style.overflow=st.ov;const cb=st.onClose;st=null;cb&&cb()}
+  function open(items,i,opt={}){if(!items||!items.length)return;close();
+    if(!document.getElementById('lbcss')){const s=document.createElement('style');s.id='lbcss';s.textContent=css;document.head.appendChild(s)}
+    const root=el(`<div id="lb"><div class="lbtop"><b class="lbn"></b><span class="sp"></span><span class="lbact" style="display:flex;gap:6px;flex-wrap:wrap"></span><button class="lbzo" title="Zoom out">−</button><span class="lbz" style="min-width:44px;text-align:center"></span><button class="lbzi" title="Zoom in">+</button><button class="lbx" title="Close (Esc)">✕</button></div>
+      <div class="lbstage"><button class="lbnav lbprev" title="Previous (←)">‹</button><button class="lbnav lbnext" title="Next (→)">›</button></div><div class="lbcap"></div><div class="lbstrip">${items.map(()=>'<img alt="">').join('')}</div></div>`);
+    document.body.appendChild(root);st={items,i,root,stage:root.querySelector('.lbstage'),resolve:opt.resolve,actions:opt.actions,onClose:opt.onClose,z:1,x:0,y:0,ov:document.body.style.overflow};document.body.style.overflow='hidden';
+    root.querySelector('.lbx').onclick=close;root.querySelector('.lbprev').onclick=()=>show(st.i-1);root.querySelector('.lbnext').onclick=()=>show(st.i+1);
+    root.querySelector('.lbzi').onclick=()=>zoom(1.5);root.querySelector('.lbzo').onclick=()=>zoom(1/1.5);
+    root.querySelectorAll('.lbstrip img').forEach((t,k)=>t.onclick=()=>show(k));
+    st.key=e=>{if(e.target.tagName==='SELECT'||e.target.tagName==='INPUT')return;if(e.key==='Escape')close();else if(e.key==='ArrowLeft')show(st.i-1);else if(e.key==='ArrowRight')show(st.i+1);else if(e.key==='+'||e.key==='=')zoom(1.5);else if(e.key==='-')zoom(1/1.5);else if(e.key==='0'){st.z=1;st.x=0;st.y=0;apply()}};document.addEventListener('keydown',st.key);
+    const sg=st.stage;sg.addEventListener('wheel',e=>{e.preventDefault();const r=sg.getBoundingClientRect();zoom(e.deltaY<0?1.2:1/1.2,e.clientX-r.left,e.clientY-r.top)},{passive:false});
+    sg.addEventListener('dblclick',e=>{const r=sg.getBoundingClientRect();if(st.z>1){st.z=1;st.x=0;st.y=0;apply()}else zoom(2.5,e.clientX-r.left,e.clientY-r.top)});
+    const pts=new Map();let start=null;
+    sg.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;sg.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});start={x:e.clientX,y:e.clientY,sx:st.x,sy:st.y,t:Date.now(),d:null,z:st.z};if(pts.size===2){const [a,b]=[...pts.values()];start.d=Math.hypot(a.x-b.x,a.y-b.y)}sg.classList.add('drag')});
+    sg.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(pts.size===2&&start.d){const [a,b]=[...pts.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);const r=sg.getBoundingClientRect();const f=(start.z*d/start.d)/st.z;zoom(f,(a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top)}
+      else if(st.z>1){st.x=start.sx+(e.clientX-start.x);st.y=start.sy+(e.clientY-start.y);apply()}});
+    const up=e=>{if(!pts.has(e.pointerId))return;pts.delete(e.pointerId);sg.classList.remove('drag');if(pts.size===0&&start&&st.z===1&&!start.d){const dx=e.clientX-start.x;if(Math.abs(dx)>50&&Date.now()-start.t<600)show(st.i+(dx<0?1:-1))}if(pts.size<2&&start)start.d=null};
+    sg.addEventListener('pointerup',up);sg.addEventListener('pointercancel',up);
+    show(i||0)}
+  return{open,close,refresh:()=>st&&show(st.i),items:()=>st&&st.items,index:()=>st&&st.i,remove:(k)=>{if(!st)return;st.items.splice(k,1);if(!st.items.length)return close();st.root.querySelector('.lbstrip').children[k]?.remove();show(Math.min(k,st.items.length-1))}};
+})();
+
+
+const fileByPath=p=>P&&P.files&&P.files.find(f=>f.path===p);
+function lbItem(path,unit){const f=fileByPath(path)||{};const a=f.ai||{};const u=unit||(f.unit_id&&P.units.find(x=>x.id===f.unit_id));
+  return{path,id:f.id,hidden:!!f.hidden,title:esc(u?(u.tag||u.equipment_type||'Unit'):'Not assigned'),
+    caption:esc([a.where,a.shows,a.plate&&[a.plate.make,a.plate.model,a.plate.serial].filter(Boolean).join(' '),f.taken_at&&new Date(f.taken_at).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}),f.assign_why&&('AI: '+f.assign_why)].filter(Boolean).join(' · '))}}
+function lbOffice(items,i){LB.open(items,i,{resolve:thumb,onClose:()=>{if(PH.dirty){PH.dirty=0;projectView()}},actions:[
+  {render:it=>{const s=document.createElement('select');s.innerHTML=`<option value="">Move to unit…</option>${P.units.map(u=>`<option value="${u.id}">${esc(u.tag||u.equipment_type||'Unit')}</option>`).join('')}<option value="none">— Not assigned</option>`;
+    s.onchange=async()=>{if(!it.id||!s.value)return;const uid=s.value==='none'?null:s.value;await q(sb.from('rebate_files').update({unit_id:uid,assign_by:'manual',assign_conf:null}).eq('id',it.id));const f=fileByPath(it.path);if(f){f.unit_id=uid;f.assign_by='manual'}await phRebuild();PH.dirty=1;const u=uid&&P.units.find(x=>x.id===uid);it.title=esc(u?(u.tag||'Unit'):'Not assigned');toast('Moved');LB.refresh()};return s}},
+  {render:it=>{const b=document.createElement('button');b.textContent=it.hidden?'👁 Show to client':'🙈 Hide from client';b.onclick=async()=>{if(!it.id)return;it.hidden=!it.hidden;await q(sb.from('rebate_files').update({hidden:it.hidden}).eq('id',it.id));const f=fileByPath(it.path);if(f)f.hidden=it.hidden;PH.dirty=1;toast(it.hidden?'Hidden from client':'Visible to client');LB.refresh()};return b}},
+  {render:it=>{const b=document.createElement('button');b.textContent='🗑';b.title='Delete photo';b.onclick=async()=>{if(!it.id||!confirm('Delete this photo from the portal? (The original stays in SharePoint.)'))return;await sb.storage.from('rebate-files').remove([it.path]);await q(sb.from('rebate_files').delete().eq('id',it.id));P.files=P.files.filter(f=>f.id!==it.id);await phRebuild();PH.dirty=1;toast('Deleted');LB.remove(LB.index())};return b}},
+  {render:it=>{const b=document.createElement('button');b.textContent='⤓';b.title='Open original';b.onclick=async()=>{const u=await signed(it.path);if(u)window.open(u,'_blank')};return b}}]})}
+
 const urlCache={};async function thumb(path){if(!urlCache[path])urlCache[path]=await signed(path);return urlCache[path]}
 async function shrink(file,max=1600){if(!file.type.startsWith('image/'))return file;const img=await createImageBitmap(file).catch(()=>null);if(!img)return file;const k=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(b=>r(b),'image/jpeg',.85))}
 async function upload(rid,file,folder){const blob=await shrink(file);const ext=blob.type==='image/jpeg'?'jpg':(file.name.split('.').pop()||'bin');const path=`${rid}/${folder}/${crypto.randomUUID()}.${ext}`;const{error}=await sb.storage.from('rebate-files').upload(path,blob,{contentType:blob.type||file.type});if(error)throw new Error(error.message);return{path,size:blob.size,mime:blob.type||file.type,name:file.name}}
@@ -263,14 +319,24 @@ function optionsTab(){const{units,opts}=P;const req=P.p.requirements||{};
 /* survey — every unit is its own folder: rebate-files/<project>/units/<unit id>/ (photos + docs) */
 const unitDir=(uid)=>`units/${uid}`;
 function surveyTab(){
-  const{units}=P;
-  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px"><button class="pri" id="add">📷 New unit</button><span class="mut small">Take all the photos you need — nameplate, the unit, how it's installed, access. The AI reads them all.</span><span class="sp"></span><span class="mut small">${units.reduce((a,u)=>a+(u.qty||1),0)} units</span></div>
-  <div class="units">${units.map(u=>`<div class="unit" data-u="${u.id}"><div class="row" style="align-items:flex-start"><img data-th="${esc((u.photos||[])[0]?.path||'')}" alt=""><div style="flex:1;min-width:0">
-   <b>📁 ${esc(u.tag||u.equipment_type||'Unit')}</b> ${u.qty>1?`<span class="b">×${u.qty}</span>`:''}<div class="small">${esc([u.make,u.model].filter(Boolean).join(' '))||'<span class="mut">no model yet</span>'}</div>
-   <div class="small mut">${esc([u.equipment_type,u.tonnage&&(u.tonnage+' ton'),u.orientation,u.mounting,u.mfg_year].filter(Boolean).join(' · '))}</div>
-   <div class="small mut">📷 ${(u.photos||[]).length}${(u.docs||[]).length?` · 📄 ${(u.docs||[]).length}`:''}${u.location?' · '+esc(u.location):''}${u.difficulty?` · <b style="color:${u.difficulty==='Hard'?'var(--bad)':u.difficulty==='Moderate'?'var(--warn)':'var(--ok)'}">${esc(u.difficulty)}</b>`:''}</div>
-   ${u.ai_status==='reading'?'<div class="small" style="color:#5b2fb0">AI reading…</div>':''}</div></div></div>`).join('')||'<div class="mut">No units yet. Tap “New unit” for each unit on site.</div>'}</div>`;
+  const{units}=P;const mode=V.sv||'cards';
+  const paths=u=>(u.photos||[]).map(x=>x&&x.path||x).filter(Boolean).filter(pth=>{const f=fileByPath(pth);return !f||f.kind==='Photo'||!f.kind});
+  const tot=units.reduce((a,u)=>a+paths(u).length,0);
+  $('#tb').innerHTML=`<div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px"><button class="pri" id="add">📷 New unit</button>
+    <div class="seg" style="display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden"><button class="sm" data-sv="cards" style="border:0;border-radius:0;${mode==='cards'?'background:#111;color:#fff':''}">▦ Cards</button><button class="sm" data-sv="wall" style="border:0;border-radius:0;${mode==='wall'?'background:#111;color:#fff':''}">🖼 Photo wall</button></div>
+    <span class="sp"></span><span class="mut small">${units.reduce((a,u)=>a+(u.qty||1),0)} units · ${tot} photos</span></div>
+  ${mode==='wall'?`<div>${units.map(u=>{const ps=paths(u);return `<div class="card" style="padding:12px;margin-bottom:12px"><div class="row" style="gap:8px;cursor:pointer" data-u="${u.id}"><b>${esc(u.tag||u.equipment_type||'Unit')}</b><span class="small mut">${esc([u.equipment_type,u.make,u.model,u.tonnage&&(u.tonnage+' T'),u.location].filter(Boolean).join(' · '))}</span><span class="sp"></span><span class="small mut">${ps.length} photo${ps.length===1?'':'s'} · edit ›</span></div>
+     ${ps.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px">${ps.map((pth,k)=>`<img data-th="${esc(pth)}" data-ulb="${u.id}|${k}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;background:#eef1f6;cursor:zoom-in;${(fileByPath(pth)||{}).hidden?'opacity:.4':''}">`).join('')}</div>`:'<div class="small mut" style="margin-top:6px">No photos yet.</div>'}</div>`}).join('')}</div>`
+  :`<div class="units">${units.map(u=>{const ps=paths(u);const more=ps.length-5;return `<div class="unit" data-u="${u.id}" style="padding:0;overflow:hidden">
+    ${ps.length?`<div style="display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:62px 62px;gap:2px;background:#eef1f6">${ps.slice(0,5).map((pth,k)=>`<div style="position:relative;${k===0?'grid-row:1 / span 2':''}"><img data-th="${esc(pth)}" data-ulb="${u.id}|${k}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:0;cursor:zoom-in;display:block">${k===4&&more>0?`<span data-ulb="${u.id}|4" style="position:absolute;inset:0;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;cursor:zoom-in">+${more}</span>`:''}</div>`).join('')}</div>`:`<div style="height:60px;background:#f6f8fb;display:flex;align-items:center;justify-content:center" class="small mut">📷 No photos yet</div>`}
+    <div style="padding:10px 12px"><div class="row"><b>${esc(u.tag||u.equipment_type||'Unit')}</b> ${u.qty>1?`<span class="b">×${u.qty}</span>`:''}<span class="sp"></span>${u.difficulty?`<b class="small" style="color:${u.difficulty==='Hard'?'var(--bad)':u.difficulty==='Moderate'?'var(--warn)':'var(--ok)'}">${esc(u.difficulty)}</b>`:''}</div>
+     <div class="small">${esc([u.make,u.model].filter(Boolean).join(' '))||'<span class="mut">no model yet</span>'}</div>
+     <div class="small mut">${esc([u.equipment_type,u.tonnage&&(u.tonnage+' ton'),u.mounting,u.mfg_year,u.location].filter(Boolean).join(' · '))}</div>
+     <div class="small mut">📷 ${ps.length}${(u.docs||[]).length?` · 📄 ${(u.docs||[]).length}`:''}</div>
+     ${u.ai_status==='reading'?'<div class="small" style="color:#5b2fb0">AI reading…</div>':''}</div></div>`}).join('')||'<div class="mut">No units yet. Tap “New unit” for each unit on site.</div>'}</div>`}`;
   document.querySelectorAll('img[data-th]').forEach(async i=>{if(i.dataset.th)i.src=await thumb(i.dataset.th)});
+  document.querySelectorAll('[data-ulb]').forEach(t=>t.onclick=e=>{e.stopPropagation();const[uid,k]=t.dataset.ulb.split('|');const u=units.find(x=>x.id===uid);lbOffice(paths(u).map(pth=>lbItem(pth,u)),+k)});
+  document.querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>{V.sv=b.dataset.sv;surveyTab()});
   document.querySelectorAll('[data-u]').forEach(c=>c.onclick=()=>editUnit(units.find(u=>u.id===c.dataset.u)));
   $('#add').onclick=()=>editUnit({},true);
 }
@@ -297,7 +363,7 @@ function editUnit(u,openCam){
   const showAi=()=>{m.querySelector('#aibox').innerHTML=ai?`<div class="ai" style="margin-top:8px">AI (${esc(ai.confidence||'')} confidence)${ai.install_notes?' — '+esc(ai.install_notes):''}${ai.notes?'<br>'+esc(ai.notes):''}</div>`:''};showAi();
   const drawTh=()=>{const t=m.querySelector('#th');m.querySelector('#pcount').textContent=photos.length?`${photos.length} photo${photos.length>1?'s':''} in this unit's folder`:'No photos yet';
     t.innerHTML=photos.map((p,i)=>`<span style="position:relative"><img data-i="${i}"><b data-rm="${i}" style="position:absolute;top:2px;right:4px;color:#fff;text-shadow:0 0 3px #000;cursor:pointer">✕</b></span>`).join('');
-    photos.forEach(async(p,i)=>{const im=t.querySelector(`[data-i="${i}"]`);im.src=await thumb(p.path);im.onclick=()=>window.open(im.src)});
+    photos.forEach(async(p,i)=>{const im=t.querySelector(`[data-i="${i}"]`);im.src=await thumb(p.path);im.onclick=()=>LB.open(photos.map(x=>lbItem(x.path,u.id?u:null)),i,{resolve:thumb})});
     t.querySelectorAll('[data-rm]').forEach(x=>x.onclick=async()=>{if(!confirm('Remove this photo?'))return;const[p]=photos.splice(+x.dataset.rm,1);dirty=true;sb.storage.from('rebate-files').remove([p.path]);drawTh()});
     m.querySelector('#docs').innerHTML=docs.map((d,i)=>`<div>📄 <a href="#" data-d="${i}">${esc(d.name)}</a> <a href="#" data-dx="${i}" class="red">✕</a></div>`).join('');
     m.querySelectorAll('[data-d]').forEach(a=>a.onclick=async e=>{e.preventDefault();const url=await signed(docs[+a.dataset.d].path);if(url)window.open(url)});
@@ -407,6 +473,7 @@ function photosHTML(){const ph=P.files.filter(f=>f.kind==='Photo');if(!ph.length
   const by={};ph.forEach(f=>{(by[f.unit_id||'none']=by[f.unit_id||'none']||[]).push(f)});
   const ord=(a,b)=>((a.ai&&a.ai.shows==='nameplate')?0:1)-((b.ai&&b.ai.shows==='nameplate')?0:1)||String(a.taken_at||a.name).localeCompare(String(b.taken_at||b.name));
   const groups=[...P.units.filter(u=>by[u.id]).map(u=>({id:u.id,name:`${u.tag||u.equipment_type||'Unit'}`,sub:[u.make,u.model].filter(Boolean).join(' '),list:by[u.id].sort(ord)})),...(by.none?[{id:'none',name:'Not assigned to a unit',sub:'overview, route, or not sorted yet',list:by.none.sort(ord)}]:[])];
+  PH.groups={};groups.forEach(g=>PH.groups[g.id]=g.list);
   const hid=ph.filter(f=>f.hidden).length, n=PH.sel.size;
   return `<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px"><b>📷 Site photos (${ph.length})</b>${hid?`<span class="badge">${hid} hidden from client</span>`:''}<span class="sp"></span><button class="sm pri" id="aimap">🤖 Sort photos into units</button></div>
    <div class="small mut" id="aimapst" style="margin:4px 0 8px">AI reads nameplates, where each photo was taken and what it shows (ductwork, curb, piping, electrical, access) and files it under its unit. Tick photos to move, hide or delete them.</div>
@@ -414,8 +481,8 @@ function photosHTML(){const ph=P.files.filter(f=>f.kind==='Photo');if(!ph.length
      <select id="phmv" style="max-width:220px"><option value="">Move to unit…</option>${P.units.map(u=>`<option value="${u.id}">${esc(u.tag||u.equipment_type||'Unit')}</option>`).join('')}<option value="none">— Not assigned</option></select>
      <button class="sm" id="phhide">🙈 Hide from client</button><button class="sm" id="phshow">👁 Show to client</button><button class="sm red" id="phdel">🗑 Delete</button><button class="sm" id="phclr">Clear</button></div>`:''}
    ${groups.map(g=>{const open=PH.open[g.id]||g.list.length<=12;const show=open?g.list:g.list.slice(0,12);return `<div style="margin-top:12px"><div class="row" style="gap:8px"><b>${esc(g.name)}</b><span class="small mut">${esc(g.sub)} · ${g.list.length} photo${g.list.length===1?'':'s'}</span><span class="sp"></span><label class="small" style="text-transform:none;letter-spacing:0;margin:0;cursor:pointer"><input type="checkbox" data-gsel="${g.id}" style="width:auto"> select all</label></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-top:6px">${show.map(f=>`<div style="position:relative${f.hidden?';opacity:.4':''}">
-      <a href="#" data-f="${esc(f.path)}" title="${esc([f.ai&&f.ai.where,f.ai&&f.ai.shows,f.assign_why].filter(Boolean).join(' · '))}"><img data-th="${esc(f.path)}" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#eef1f6;${PH.sel.has(f.id)?'outline:3px solid #2563eb':''}"></a>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-top:6px">${show.map((f,fi)=>`<div style="position:relative${f.hidden?';opacity:.4':''}">
+      <a href="#" data-lb="${g.id}|${fi}" title="${esc([f.ai&&f.ai.where,f.ai&&f.ai.shows,f.assign_why].filter(Boolean).join(' · '))}"><img data-th="${esc(f.path)}" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#eef1f6;${PH.sel.has(f.id)?'outline:3px solid #2563eb':''}"></a>
       <input type="checkbox" data-psel="${f.id}" ${PH.sel.has(f.id)?'checked':''} style="position:absolute;top:4px;left:4px;width:18px;height:18px">
       ${f.ai&&f.ai.shows==='nameplate'?'<span style="position:absolute;bottom:4px;left:4px;background:#111;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px">nameplate</span>':''}
       ${f.hidden?'<span style="position:absolute;top:4px;right:4px;background:#c0392b;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px">hidden</span>':f.assign_by==='ai'&&f.assign_conf==='low'?'<span title="AI not sure" style="position:absolute;top:4px;right:4px;background:#f39c12;color:#fff;font-size:10px;padding:1px 4px;border-radius:4px">check</span>':''}
@@ -425,6 +492,7 @@ function photosWire(){
   document.querySelectorAll('[data-psel]').forEach(c=>c.onchange=()=>{c.checked?PH.sel.add(c.dataset.psel):PH.sel.delete(c.dataset.psel);filesTab()});
   document.querySelectorAll('[data-gsel]').forEach(c=>c.onchange=()=>{const g=c.dataset.gsel;P.files.filter(f=>f.kind==='Photo'&&(f.unit_id||'none')===g).forEach(f=>c.checked?PH.sel.add(f.id):PH.sel.delete(f.id));filesTab()});
   document.querySelectorAll('[data-gopen]').forEach(b=>b.onclick=()=>{PH.open[b.dataset.gopen]=1;filesTab()});
+  document.querySelectorAll('[data-lb]').forEach(a=>a.onclick=e=>{e.preventDefault();const[g,i]=a.dataset.lb.split('|');const list=PH.groups[g]||[];lbOffice(list.map(f=>lbItem(f.path)),+i)});
   const ids=()=>[...PH.sel];
   if($('#phclr'))$('#phclr').onclick=()=>{PH.sel.clear();filesTab()};
   const setHidden=async v=>{await q(sb.from('rebate_files').update({hidden:v}).in('id',ids()));P.files.forEach(f=>{if(PH.sel.has(f.id))f.hidden=v});await event(P.p.id,`${v?'Hid':'Showed'} ${PH.sel.size} photo(s) ${v?'from':'to'} the client`);toast(v?'Hidden from client':'Visible to client');PH.sel.clear();filesTab()};
