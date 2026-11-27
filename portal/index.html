@@ -449,49 +449,82 @@ async function rbCreate(){const s=$('#rn_s').value.trim();if(!s){toast('Enter th
   try{const id=await api.rebNew($('#rn_t').value.trim(),s,$('#rn_n').value.trim(),($('#rn_c')||{}).value);await refresh();openRb(id);toast('Project created — now add the units')}catch(e){toast(e.message);$('#rn_b').disabled=false}}
 let RBT={};
 const RB_CSS=`<style>
-.rbh{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
-.rbtabs{display:flex;gap:4px;overflow-x:auto;position:sticky;top:-1px;background:#fff;z-index:2;padding:8px 0;margin:10px 0 12px;border-bottom:1px solid #e6eaf1}
-.rbtabs button{border:0;background:#f1f4f9;border-radius:999px;padding:8px 14px;font-weight:600;white-space:nowrap;cursor:pointer;color:#334}
-.rbtabs button.on{background:#111;color:#fff}
-.rbtabs .n{opacity:.7;font-weight:500;margin-left:4px}
-.rbk{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
-.rbk>div{background:#f7f9fc;border-radius:12px;padding:10px 12px}.rbk .l{font-size:12px;color:#6b7686}.rbk .v{font-weight:800;font-size:16px;margin-top:2px}
-.rbnext{background:#111;color:#fff;border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:12px 0}
-.rbnext button{background:#fff;color:#111;border:0}
-.rbgrp{border:1px solid #e6eaf1;border-radius:12px;margin-bottom:8px;overflow:hidden}
-.rbgrp>summary{list-style:none;cursor:pointer;padding:10px 12px;display:flex;align-items:center;gap:8px;font-weight:700;background:#f7f9fc}
-.rbgrp>summary::-webkit-details-marker{display:none}.rbgrp>summary:after{content:'▾';margin-left:auto;color:#889}.rbgrp:not([open])>summary:after{content:'▸'}
-.rbu{display:flex;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid #eef1f6}
-.rbchip{display:inline-flex;gap:4px;align-items:center;background:#eef2f8;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;margin:0 4px 4px 0}
+#ov.rbfull{padding:0!important;align-items:stretch!important;background:#f3f5f8!important}
+#ov.rbfull #modal{max-width:none!important;width:100%;min-height:100%;border-radius:0;padding:0;background:#f3f5f8;box-shadow:none;margin:0}
+.rbw{max-width:1080px;margin:0 auto;padding:0 18px 60px}
+.rbtop{position:sticky;top:0;z-index:5;background:rgba(243,245,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid #e3e7ee}
+.rbtop .in{max-width:1080px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:10px}
+.rbback{border:0;background:#fff;border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.rbhero{background:linear-gradient(135deg,#0f1115 0%,#1d2430 100%);color:#fff;border-radius:20px;padding:22px 24px;margin:18px 0 14px;box-shadow:0 10px 30px rgba(15,17,21,.18)}
+.rbhero h1{color:#fff;margin:4px 0 4px;font-size:26px;line-height:1.2}
+.rbhero .sub{color:#aab3c2;margin:0}
+.rbpill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;background:rgba(255,255,255,.12);color:#fff}
+.rbsteps{display:flex;margin:20px 0 6px;gap:0}
+.rbsteps .s{flex:1;position:relative;text-align:center;font-size:11px;color:#7f8a9c}
+.rbsteps .s:before{content:'';position:absolute;top:9px;left:-50%;right:50%;height:2px;background:#39414f}
+.rbsteps .s:first-child:before{display:none}
+.rbsteps .d{width:20px;height:20px;border-radius:50%;background:#2a313d;border:2px solid #39414f;margin:0 auto 6px;position:relative;z-index:1;display:flex;align-items:center;justify-content:center;font-size:11px}
+.rbsteps .s.done{color:#cfd6e2}.rbsteps .s.done .d{background:#22c55e;border-color:#22c55e;color:#fff}.rbsteps .s.done:before{background:#22c55e}
+.rbsteps .s.cur{color:#fff;font-weight:700}.rbsteps .s.cur .d{background:#fff;border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.18)}.rbsteps .s.cur:before{background:#22c55e}
+.rbstats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.rbstats>div{background:rgba(255,255,255,.07);border-radius:14px;padding:12px 14px}.rbstats .l{font-size:12px;color:#9aa4b5}.rbstats .v{font-size:20px;font-weight:800;margin-top:2px;color:#fff}
+.rbcta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;color:#111;border-radius:14px;padding:12px 14px;margin-top:16px}
+.rbcta b{font-size:15px}.rbcta button{background:#111;color:#fff;border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer}
+.rbtabs{display:flex;gap:4px;background:#fff;border-radius:14px;padding:5px;box-shadow:0 1px 2px rgba(0,0,0,.05);overflow-x:auto;position:sticky;top:58px;z-index:4;margin-bottom:14px}
+.rbtabs button{flex:1;border:0;background:none;border-radius:10px;padding:10px 12px;font-weight:600;white-space:nowrap;cursor:pointer;color:#5b6575}
+.rbtabs button.on{background:#111;color:#fff}.rbtabs .n{display:inline-block;margin-left:6px;font-size:11px;background:#eef1f6;color:#334;border-radius:999px;padding:1px 7px}.rbtabs button.on .n{background:rgba(255,255,255,.2);color:#fff}
+.rbcard{background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.05);margin-bottom:12px}
+.rbcard h3{margin:0 0 10px;font-size:16px}
+.rbtypes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.rbtype{background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:pointer;border:2px solid transparent;transition:.15s}
+.rbtype:hover{border-color:#d7dde7}.rbtype.on{border-color:#111}
+.rbtype .ic{font-size:22px}.rbtype .n{font-size:28px;font-weight:800;line-height:1;margin:6px 0 2px}.rbtype .t{font-weight:700}.rbtype .z{font-size:12px;color:#6b7686;margin-top:6px}
+.rbtbl{width:100%;border-collapse:collapse}.rbtbl th{text-align:left;font-size:12px;color:#6b7686;font-weight:600;padding:8px 10px;border-bottom:1px solid #e9edf3}
+.rbtbl td{padding:10px;border-bottom:1px solid #f0f2f6;font-size:14px}.rbtbl tr.cl{cursor:pointer}.rbtbl tr.cl:hover td{background:#f8fafc}
+.rbtag{font-weight:700}.rbsz{display:inline-block;background:#eef2f8;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:600}
+.rbdoc{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0f2f6}.rbdoc:last-child{border:0}
+.rbdoc .ic{width:40px;height:40px;border-radius:10px;background:#f1f4f9;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.rbprop{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.rbprop .big{width:56px;height:56px;border-radius:14px;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px}
+.rbprop button{background:#111;color:#fff;border:0;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer}
+@media(max-width:700px){.rbstats{grid-template-columns:repeat(2,1fr)}.rbhero{border-radius:0;margin:0 -18px 14px;padding:18px}.rbsteps .s span{display:none}.rbtabs{top:54px}.rbtbl .hm{display:none}}
 </style>`;
-function openRb(id,tab){const r=(D.rebates||[]).find(x=>x.id===id);if(!r)return;if(tab)RBT[id]=tab;const t=RBT[id]||'overview';const edit=['Survey','Pricing requested'].includes(r.stage);
-  const docs=r.files.filter(f=>f.kind!=='Photo');const os=r.options||[];
-  const byType={};r.units.forEach(u=>{const k=u.type||'Other';(byType[k]=byType[k]||[]).push(u)});
-  const qty=u=>+u.qty||1,total=r.units.reduce((a,u)=>a+qty(u),0);
-  const TABS=[['overview','Overview',''],['units','Units',total],['options','Options',os.length||''],['docs','Documents',docs.length||''],['proposal','Proposal',r.proposals.length||''],['activity','Activity','']];
-  const next=r.proposals.length?['Your proposal is ready','View proposal',`openRb('${r.id}','proposal')`]:os.length&&!r.chosenOption?[`${os.length} equipment option${os.length>1?'s':''} ready to review`,'Compare options',`openRb('${r.id}','options')`]
-    :edit&&!r.pricingRequested&&r.units.length?['Survey done? Send it to us for pricing','Get pricing',`rbPricing('${r.id}')`]:edit&&!r.units.length?['Start the survey — add the first unit','Add unit',`rbUnit('${r.id}')`]:null;
-  const unitRow=u=>`<div class="rbu" ${edit?`style="cursor:pointer" onclick="rbUnit('${r.id}','${u.id}')"`:''}>${(u.photos||[]).length?`<div class="rbth" data-p="${esc(u.photos[0])}" onclick="event.stopPropagation();rbUnitLB('${r.id}','${u.id}',0)" style="width:52px;height:52px;border-radius:10px;background:#eef1f6 center/cover;cursor:zoom-in;flex-shrink:0;position:relative">${u.photos.length>1?`<span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;font-size:10px;padding:0 4px">${u.photos.length}</span>`:''}</div>`:`<div style="width:52px;height:52px;border-radius:10px;background:#eef1f6;flex-shrink:0;display:flex;align-items:center;justify-content:center">📷</div>`}
-    <div style="flex:1;min-width:0"><b>${esc(u.tag||u.type||'Unit')}</b>${qty(u)>1?` <span class="rbchip">×${qty(u)}</span>`:''}${u.tonnage?` <span class="rbchip">${+u.tonnage} T</span>`:''}<div class="small mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc([u.make,u.model,u.year,u.location].filter(Boolean).join(' · '))||'Details pending'}</div></div>${u.ai==='read'?'<span class="small" style="color:#1f9d55" title="Read by AI">✨</span>':''}</div>`;
+const RB_IC={'Condensing unit':'🌀','Air handler':'💨','Mini split':'❄️','Boiler':'🔥','Water heater':'🚿','Fan coil':'🌬️','RTU':'🏢','Heat pump':'♨️','Furnace':'🔥','Other':'⚙️'};
+function openRb(id,tab,type){const r=(D.rebates||[]).find(x=>x.id===id);if(!r)return;if(tab)RBT[id]=tab;const t=RBT[id]||'overview';if(type!==undefined)RBT[id+':type']=type;const selType=RBT[id+':type']||'';
+  const edit=['Survey','Pricing requested'].includes(r.stage);const docs=r.files.filter(f=>f.kind!=='Photo');const os=r.options||[];
+  const qty=u=>+u.qty||1,total=r.units.reduce((a,u)=>a+qty(u),0);const byType={};r.units.forEach(u=>{const k=u.type||'Other';(byType[k]=byType[k]||[]).push(u)});
+  const types=Object.entries(byType).sort((a,b)=>b[1].length-a[1].length);
+  const sizes=us=>{const m={};us.forEach(u=>{if(u.tonnage){const k=(+u.tonnage)+'T';m[k]=(m[k]||0)+qty(u)}});return Object.entries(m).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([k,n])=>`${k} ×${n}`).join(' · ')};
+  const si=Math.max(0,RB_STAGES.indexOf(r.stage));const prop=r.proposals[0];
+  const next=prop?[`Proposal ${prop.number} is ready for you`,'View proposal',`openRb('${r.id}','proposal')`]:os.length&&!r.chosenOption?[`${os.length} equipment option${os.length>1?'s':''} ready to compare`,'Compare options',`openRb('${r.id}','options')`]
+    :edit&&!r.pricingRequested&&r.units.length?['Survey finished? Send it to us for pricing','Get pricing',`rbPricing('${r.id}')`]:edit&&!r.units.length?['Start the survey — add the first unit','Add unit',`rbUnit('${r.id}')`]:null;
+  const TABS=[['overview','Overview',''],['units','Equipment',total],['options','Options',os.length||''],['proposal','Proposal',r.proposals.length||''],['docs','Documents',docs.length||''],['activity','Activity','']];
+  const docIc=k=>({Submittal:'📐',AHRI:'🏷',Application:'📝','Pre-approval':'✅',Proposal:'📄'})[k]||'📎';
+  const typeTiles=(link)=>`<div class="rbtypes">${types.map(([k,us])=>`<div class="rbtype ${selType===k&&!link?'on':''}" onclick="openRb('${r.id}','units','${link||selType!==k?esc(k):''}')"><div class="ic">${RB_IC[k]||'⚙️'}</div><div class="n">${us.reduce((a,u)=>a+qty(u),0)}</div><div class="t">${esc(k)}${us.length>1?'s':''}</div>${sizes(us)?`<div class="z">${sizes(us)}</div>`:''}</div>`).join('')}</div>`;
+  const list=(selType?byType[selType]||[]:r.units).slice().sort((a,b)=>String(a.tag||'').localeCompare(String(b.tag||''),undefined,{numeric:true}));
   const body={
-   overview:()=>`${next?`<div class="rbnext"><div><div class="small" style="opacity:.7">Next step</div><b style="font-size:16px">${next[0]}</b></div><button onclick="${next[2]}">${next[1]} →</button></div>`:''}
-    <div class="rbk">${[['Rebate status',badge(r.status||'Pre-approval')],['Program',esc(r.program||'—')],['Units',total],['Application #',esc(r.appNo||'—')],['Rebate amount',+r.amount?money(r.amount):'—'],['Submitted',fdate(r.submitted)||'—'],['Expected',fdate(r.expected)||'—'],['Paid',fdate(r.paidDate)||'—']].map(([k,v])=>`<div><div class="l">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
-    <h3 style="margin-top:16px">Equipment on site</h3><div>${Object.entries(byType).sort((a,b)=>b[1].length-a[1].length).map(([k,us])=>`<span class="rbchip" style="cursor:pointer" onclick="openRb('${r.id}','units')">${esc(k)} · ${us.reduce((a,u)=>a+qty(u),0)}</span>`).join('')||'<span class="mut small">No units yet</span>'}</div>
-    ${r.suppliers.length?`<h3 style="margin-top:16px">Pricing</h3>${r.suppliers.map(q=>`<div class="row small" style="padding:6px 0;border-bottom:1px solid #eef1f6"><b>${esc(q.company||'Supplier')}</b><span class="mut">&nbsp;${esc((q.brands||[]).join(', '))}</span><span class="sp"></span>${badge(q.repliedAt?'Quote received':q.sentAt?'Waiting for quote':q.status||'Pending')}</div>`).join('')}`:''}`,
-   units:()=>`<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px"><input id="rbq" placeholder="🔎 Search tag, make, model, location…" style="flex:1;min-width:180px" oninput="rbFilter()">${edit?`<label class="btn sm" style="margin:0;cursor:pointer">📸 Upload site photos<input type="file" accept="image/*" multiple hidden onchange="rbBulk('${r.id}',this.files);this.value=''"></label><button class="sm pri" onclick="rbUnit('${r.id}')">+ Add unit</button>`:''}</div>
-    ${r.units.length?Object.entries(byType).sort((a,b)=>b[1].length-a[1].length).map(([k,us])=>`<details class="rbgrp" ${Object.keys(byType).length<=3?'open':''}><summary>${esc(k)} <span class="rbchip">${us.reduce((a,u)=>a+qty(u),0)}</span></summary>${us.map(u=>`<div class="rbitem" data-q="${esc([u.tag,u.type,u.make,u.model,u.location,u.tonnage].join(' ').toLowerCase())}">${unitRow(u)}</div>`).join('')}</details>`).join('')
-      :`<p class="mut">No units yet. ${edit?'Tap <b>+ Add unit</b> and photograph the nameplate — AI fills in the details.':''}</p>`}
-    ${edit&&r.units.length?(r.pricingRequested?`<p class="small" style="color:#1f9d55">✓ Sent for pricing on ${fdate(r.pricingRequested)}. You can still add units.</p>`:`<button class="pri" style="width:100%;margin-top:6px" onclick="rbPricing('${r.id}')">✓ Survey complete — get pricing</button>`):''}`,
-   options:()=>rbOptions(r).replace(/^<h3[^>]*>[^<]*<\/h3>/,''),
-   docs:()=>`${rbGallery(r)}${docs.length?docs.map(f=>`<div class="row" style="padding:8px 0;border-bottom:1px solid #eef1f6;gap:8px"><span style="font-size:20px">${f.kind==='Submittal'?'📐':f.kind==='Application'?'📝':f.kind==='Pre-approval'?'✅':f.kind==='AHRI'?'🏷':'📄'}</span><div style="flex:1;min-width:0"><a href="#" onclick="rbOpenFile('${esc(f.path)}','${esc(f.name).replace(/'/g,'')}');return false">${esc(f.name)}</a><div class="small mut">${esc(f.kind)} · ${fdate(f.at)}</div></div></div>`).join(''):'<p class="mut small">No documents yet.</p>'}`,
-   proposal:()=>r.proposals.length?r.proposals.map(x=>`<div class="card" style="margin:0 0 8px;padding:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-size:26px">📄</div><div style="flex:1;min-width:0"><b style="font-size:16px">${esc(x.number)}</b><div class="small mut">${esc(x.title||'')}${x.date?' · '+fdate(x.date):''}</div></div>${badge(x.status)}<button class="pri" onclick="closeM();location.hash='estimates'">Open proposal</button></div>`).join(''):'<p class="mut">The proposal will appear here once pricing is ready.</p>',
-   activity:()=>`<div class="row" style="gap:6px;margin-bottom:10px"><input id="rb_msg" placeholder="Send a note to KOR HVAC…" style="flex:1"><button class="sm pri" onclick="rbMsg('${r.id}')">Send</button></div>${r.events.map(e=>`<div class="small" style="padding:8px 0;border-bottom:1px solid #eef1f6"><span class="mut">${fdate(e.at)}</span><div>${esc(e.text)}</div></div>`).join('')||'<p class="mut small">No activity yet.</p>'}`};
-  modal(`${RB_CSS}<div class="rbh"><div style="min-width:0"><div class="small mut">${esc(r.number||'')}</div><h2 style="margin:2px 0;display:block">${esc(r.title||r.site||'Project')}</h2><div class="small mut">📍 ${esc(r.site||'')}</div></div><button class="sm" onclick="closeM()">✕</button></div>
-   ${rbStageBar(r.stage)}
-   <div class="rbtabs">${TABS.map(([k,l,n])=>`<button class="${k===t?'on':''}" onclick="openRb('${r.id}','${k}')">${l}${n!==''?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>
-   <div id="rbBody">${body[t]()}</div>`);
-  $('#modal').style.maxWidth='900px';rbThumbs()}
-function rbFilter(){const q=($('#rbq').value||'').toLowerCase().trim();document.querySelectorAll('.rbitem').forEach(e=>e.style.display=!q||e.dataset.q.includes(q)?'':'none');document.querySelectorAll('.rbgrp').forEach(g=>{if(q)g.open=true;const vis=[...g.querySelectorAll('.rbitem')].some(e=>e.style.display!=='none');g.style.display=vis?'':'none'})}
+   overview:()=>`<div class="rbcard"><h3>Equipment on site</h3>${types.length?typeTiles(1):'<p class="mut">No units yet.</p>'}</div>
+     ${prop?`<div class="rbcard"><h3>Proposal</h3><div class="rbprop"><div class="big">📄</div><div style="flex:1;min-width:180px"><b style="font-size:17px">${esc(prop.number)}</b><div class="mut small">${esc(prop.title||'')}</div></div>${badge(prop.status)}<button onclick="closeM();location.hash='estimates'">Open proposal →</button></div></div>`:''}
+     ${r.suppliers.length?`<div class="rbcard"><h3>Pricing</h3>${r.suppliers.map(q=>`<div class="rbdoc"><div class="ic">🏭</div><div style="flex:1"><b>${esc(q.company||'Supplier')}</b><div class="small mut">${esc((q.brands||[]).join(', '))}</div></div>${badge(q.repliedAt?'Quote received':q.sentAt?'Waiting for quote':q.status||'Pending')}</div>`).join('')}</div>`:''}
+     ${r.events.length?`<div class="rbcard"><h3>Latest</h3>${r.events.slice(0,4).map(e=>`<div class="rbdoc"><div class="ic">•</div><div style="flex:1">${esc(e.text)}<div class="small mut">${fdate(e.at)}</div></div></div>`).join('')}</div>`:''}`,
+   units:()=>`${typeTiles(0)}
+     <div class="rbcard" style="margin-top:12px"><div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:6px"><b style="font-size:16px">${selType?esc(selType)+'s':'All equipment'} <span class="mut">(${list.reduce((a,u)=>a+qty(u),0)})</span></b>${selType?`<button class="sm" onclick="openRb('${r.id}','units','')">Show all</button>`:''}<span class="sp"></span><input id="rbq" placeholder="🔎 Search tag, make, model…" style="max-width:260px" oninput="rbFilter()">${edit?`<label class="btn sm" style="margin:0;cursor:pointer">📸 Photos<input type="file" accept="image/*" multiple hidden onchange="rbBulk('${r.id}',this.files);this.value=''"></label><button class="sm pri" onclick="rbUnit('${r.id}')">+ Add unit</button>`:''}</div>
+     ${list.length?`<table class="rbtbl"><tr><th>Tag</th>${selType?'':'<th class="hm">Type</th>'}<th>Make / model</th><th>Size</th><th class="hm">Qty</th><th class="hm">Location</th></tr>${list.map(u=>`<tr class="rbitem${edit?' cl':''}" data-q="${esc([u.tag,u.type,u.make,u.model,u.location,u.tonnage].join(' ').toLowerCase())}" ${edit?`onclick="rbUnit('${r.id}','${u.id}')"`:''}><td><span class="rbtag">${esc(u.tag||'—')}</span>${(u.photos||[]).length?` <a href="#" onclick="event.stopPropagation();rbUnitLB('${r.id}','${u.id}',0);return false" title="Photos">📷</a>`:''}</td>${selType?'':`<td class="hm">${esc(u.type||'')}</td>`}<td>${esc([u.make,u.model].filter(x=>x&&!/^(unknown|no tag)$/i.test(x)).join(' · '))||'<span class="mut">—</span>'}</td><td>${u.tonnage?`<span class="rbsz">${+u.tonnage} T</span>`:'<span class="mut">—</span>'}</td><td class="hm">${qty(u)}</td><td class="hm small mut">${esc(u.location||'')}</td></tr>`).join('')}</table>`:'<p class="mut">No units.</p>'}
+     ${edit&&r.units.length?(r.pricingRequested?`<p class="small" style="color:#1f9d55">✓ Sent for pricing on ${fdate(r.pricingRequested)}.</p>`:`<button class="pri" style="width:100%;margin-top:10px" onclick="rbPricing('${r.id}')">✓ Survey complete — get pricing</button>`):''}</div>`,
+   options:()=>`<div class="rbcard">${rbOptions(r).replace(/^<h3[^>]*>[^<]*<\/h3>/,'')}</div>`,
+   proposal:()=>r.proposals.length?r.proposals.map(x=>`<div class="rbcard"><div class="rbprop"><div class="big">📄</div><div style="flex:1;min-width:180px"><b style="font-size:18px">${esc(x.number)}</b><div class="mut">${esc(x.title||'')}${x.date?' · '+fdate(x.date):''}</div></div>${badge(x.status)}<button onclick="closeM();location.hash='estimates'">Open proposal →</button></div></div>`).join(''):'<div class="rbcard"><p class="mut" style="margin:0">The proposal will appear here once pricing is ready.</p></div>',
+   docs:()=>`<div class="rbcard">${rbGallery(r)}${docs.length?Object.entries(docs.reduce((m,f)=>((m[f.kind]=m[f.kind]||[]).push(f),m),{})).map(([k,fs])=>`<h3 style="margin-top:6px">${docIc(k)} ${esc(k)} <span class="mut small">(${fs.length})</span></h3>${fs.map(f=>`<div class="rbdoc"><div class="ic">${docIc(f.kind)}</div><div style="flex:1;min-width:0"><a href="#" onclick="rbOpenFile('${esc(f.path)}','${esc(f.name).replace(/'/g,'')}');return false" style="font-weight:600">${esc(f.name)}</a><div class="small mut">${fdate(f.at)}</div></div></div>`).join('')}`).join(''):'<p class="mut">No documents yet.</p>'}</div>`,
+   activity:()=>`<div class="rbcard"><div class="row" style="gap:6px;margin-bottom:10px"><input id="rb_msg" placeholder="Send a note to KOR HVAC…" style="flex:1"><button class="pri" onclick="rbMsg('${r.id}')">Send</button></div>${r.events.map(e=>`<div class="rbdoc"><div class="ic">•</div><div style="flex:1">${esc(e.text)}<div class="small mut">${fdate(e.at)}</div></div></div>`).join('')||'<p class="mut small">No activity yet.</p>'}</div>`};
+  modal(`${RB_CSS}<div class="rbtop"><div class="in"><button class="rbback" onclick="closeM()">← Projects</button><span class="mut small">${esc(r.number||'')}</span><span class="sp"></span><button class="rbback" onclick="closeM()">✕</button></div></div>
+   <div class="rbw"><div class="rbhero"><div class="row" style="gap:8px;flex-wrap:wrap"><span class="rbpill">♻️ ${esc(r.number||'Rebate')}</span><span class="rbpill">${esc(r.status||'Pre-approval')}</span>${r.program?`<span class="rbpill">⚡ ${esc(r.program)}</span>`:''}</div>
+     <h1>${esc(r.title||r.site||'Project')}</h1><p class="sub">📍 ${esc(r.site||'')}</p>
+     <div class="rbsteps">${RB_STAGES.map((x,k)=>`<div class="s ${k<si?'done':k===si?'cur':''}"><div class="d">${k<si?'✓':''}</div><span>${esc(x)}</span></div>`).join('')}</div>
+     <div class="rbstats">${[['Units',total],['Equipment types',types.length],['Rebate',+r.amount?money(r.amount):'—'],['Proposal',prop?esc(prop.status):'—']].map(([l,v])=>`<div><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')}</div>
+     ${next?`<div class="rbcta"><div><div class="small mut">Next step</div><b>${next[0]}</b></div><button onclick="${next[2]}">${next[1]} →</button></div>`:''}</div>
+    <div class="rbtabs">${TABS.map(([k,l,n])=>`<button class="${k===t?'on':''}" onclick="openRb('${r.id}','${k}')">${l}${n!==''?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>
+    ${body[t]()}</div>`);
+  $('#ov').classList.add('rbfull');rbThumbs()}
+function rbFilter(){const q=($('#rbq').value||'').toLowerCase().trim();document.querySelectorAll('.rbitem').forEach(e=>e.style.display=!q||e.dataset.q.includes(q)?'':'none')}
 function rbUnitLB(rid,uid,i){const r=D.rebates.find(x=>x.id===rid);const u=r.units.find(x=>x.id===uid);rbLB(u.photos||[],i,u.tag||u.type||'Unit')}
 function rbGalOpen(rid,i){const r=D.rebates.find(x=>x.id===rid);rbLB(r.files.filter(f=>f.kind==='Photo').map(f=>f.path),i,'Site photos')}
 function rbGallery(r,all){const ph=r.files.filter(f=>f.kind==='Photo');if(!ph.length)return '';const show=all?ph:ph.slice(0,24);
@@ -681,8 +714,8 @@ function smsCard(){const s=D.sms||{optIn:false,phone:''};
    <button class="pri" style="margin-top:10px" onclick="setSms(true)">Turn on text updates</button>`}</div>`}
 async function setSms(on){try{if(on){const ph=$('#sms_ph').value.trim();if(!$('#sms_ok').checked){toast('Please check the box to agree to texts');return}await api.setSms(true,ph)}else await api.setSms(false,'');await refresh();toast(on?'Text updates are on':'Text updates are off')}catch(e){toast(e.message||'Could not save')}}
 /* ---------- modal ---------- */
-function modal(h){$('#modal').style.maxWidth='';$('#modal').innerHTML=h;$('#ov').classList.add('show')}
-function closeM(){$('#ov').classList.remove('show')}
+function modal(h){$('#modal').style.maxWidth='';$('#ov').classList.remove('rbfull');$('#modal').innerHTML=h;$('#ov').classList.add('show')}
+function closeM(){$('#ov').classList.remove('show');$('#ov').classList.remove('rbfull')}
 $('#ov').addEventListener('mousedown',e=>{if(e.target.id==='ov')closeM()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
 boot();
