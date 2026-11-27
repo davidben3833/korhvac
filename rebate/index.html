@@ -311,7 +311,7 @@ function tableTab(){const{units}=P;
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`${P.p.number||'units'} unit table.csv`;a.click()}}
 
 /* ===== OPTIONS — each option assigns every unit to a supplier/model; quote, submittal and AHRI live on each unit inside the option ===== */
-const RATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];
+const RATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['seer','SEER'],['eer','EER'],['hspf','HSPF'],['cop','COP'],['iplv','IPLV'],['afue','AFUE'],['thermal_eff','Thermal eff %'],['uef','UEF']];
 function itemOf(oid,uid){return (P.items||[]).find(i=>i.option_id===oid&&i.unit_id===uid)}
 const itQty=(it,u)=>it&&it.qty!=null&&it.qty!==''?+it.qty:(+u.qty||1);
 function optCheck(o){const req=P.p.requirements||{},out={missing:[],low:[],nodocs:[],total:0,covered:0};
@@ -335,7 +335,7 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
     ${c.missing.length?`<div class="small" style="color:var(--bad);margin-top:6px">❌ Missing ${c.missing.length} unit${c.missing.length>1?'s':''}: ${c.missing.map(esc).join(', ')}</div>`:`<div class="small" style="color:var(--ok);margin-top:6px">✓ All ${units.length} units covered</div>`}
     ${c.low.length?`<div class="small" style="color:var(--bad)">⚠️ Doesn't meet the program: ${c.low.map(esc).join(' · ')}</div>`:''}
     ${c.nodocs.length?`<div class="small" style="color:var(--warn)">📄 Missing paperwork: ${c.nodocs.map(esc).join(' · ')}</div>`:''}
-    <div style="overflow-x:auto;margin-top:8px"><table class="small" style="min-width:1250px"><tr><th>Unit</th><th>Type</th><th>Tons</th><th>Qty</th><th>Supplier</th><th>Make</th><th>Model</th><th>AHRI #</th>${RATE.map(r=>`<th>${r[1]}</th>`).join('')}<th>Price ea.</th><th>Total</th><th>Lead</th><th>Docs</th></tr>
+    <div style="overflow-x:auto;margin-top:8px"><table class="small" style="min-width:1900px"><tr><th>Unit</th><th>Type</th><th>Tons</th><th>Qty</th><th>Supplier</th><th>Make</th><th>Model</th><th>AHRI #</th>${RATE.map(r=>`<th>${r[1]}</th>`).join('')}<th>Price ea.</th><th>Total</th><th>Lead</th><th>Docs</th></tr>
     ${units.map(u=>{const it=itemOf(o.id,u.id)||{};const rt=it.ratings||{};const bad=k=>{const need=+req[k],have=+rt[k];return need&&have&&have<need};
       return `<tr><td><input data-oi="${o.id}|${u.id}" data-f="unit_label" value="${esc(it.unit_label||u.tag||'')}" placeholder="${esc(u.tag||'Unit')}" style="width:110px;font-weight:700"><div class="mut" title="Surveyed unit">${esc([u.tag,u.equipment_type,u.tonnage&&u.tonnage+'T',u.make].filter(Boolean).join(' · '))}</div></td>
       <td><select data-oi="${o.id}|${u.id}" data-f="unit_type" style="min-width:120px">${[...new Set([it.unit_type||u.equipment_type||'',...UTYPES])].map(t=>`<option ${t===(it.unit_type||u.equipment_type||'')?'selected':''}>${esc(t)}</option>`).join('')}</select></td>

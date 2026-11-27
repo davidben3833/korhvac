@@ -527,7 +527,7 @@ function pdfView(u,name){const m=document.createElement('div');m.style.cssText='
 async function rbOpenFile(path,name){const o=await api.signed([path]).catch(()=>({}));if(o[path])pdfView(o[path],name||path.split('/').pop().replace(/^[0-9a-f]{8}-/,''));else toast('Could not open the file')}
 async function rbPricing(id){try{await api.reqPricing(id);await refresh();openRb(id);toast('Sent — we’ll get pricing from our suppliers')}catch(e){toast(e.message)}}
 /* ---- options side by side: our price, program check per unit, submittal + AHRI per unit (no supplier prices) ---- */
-const RBRATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];
+const RBRATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['seer','SEER'],['eer','EER'],['hspf','HSPF'],['cop','COP'],['iplv','IPLV'],['afue','AFUE'],['thermal_eff','Thermal eff %'],['uef','UEF']];
 function rbOptUnits(r){const all=r.allUnits||r.units;const used=u=>(r.options||[]).some(o=>(o.items||[]).some(i=>i.unitId===u.id));return all.some(u=>u.specs&&u.specs.hide===true&&used(u))?all.filter(used):r.units}
 function rbOptCheck(r,o){const req=r.requirements||{};let ok=0,cov=0,docs=0;const rows=rbOptUnits(r).map(u=>{const it=o.items.find(i=>i.unitId===u.id);if(!it||!(it.model||it.make))return{u,it:null};cov++;
   const rt=it.ratings||{};const fails=RBRATE.filter(([k])=>+req[k]&&+rt[k]&&+rt[k]<+req[k]).map(([k,l])=>`${l} ${rt[k]} < ${req[k]}`);const unknown=RBRATE.filter(([k])=>+req[k]&&!(+rt[k])&&rt[k]!==0).length;
