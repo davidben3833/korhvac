@@ -313,9 +313,10 @@ function tableTab(){const{units}=P;
 /* ===== OPTIONS — each option assigns every unit to a supplier/model; quote, submittal and AHRI live on each unit inside the option ===== */
 const RATE=[['seer2','SEER2'],['eer2','EER2'],['ieer','IEER'],['hspf2','HSPF2'],['afue','AFUE']];
 function itemOf(oid,uid){return (P.items||[]).find(i=>i.option_id===oid&&i.unit_id===uid)}
+const itQty=(it,u)=>it&&it.qty!=null&&it.qty!==''?+it.qty:(+u.qty||1);
 function optCheck(o){const req=P.p.requirements||{},out={missing:[],low:[],nodocs:[],total:0,covered:0};
   optUnits().forEach(u=>{const it=itemOf(o.id,u.id);const name=u.tag||u.equipment_type||'Unit';
-    if(!it||!(it.model||'').trim()){out.missing.push(name);return}out.covered++;out.total+=(+it.price||0)*(u.qty||1);
+    if(!it||!(it.model||'').trim()){out.missing.push(name);return}out.covered++;out.total+=(+it.price||0)*itQty(it,u);
     RATE.forEach(([k,l])=>{const need=+req[k],have=+((it.ratings||{})[k]);if(need&&have&&have<need)out.low.push(`${name}: ${l} ${have} < ${need}`);if(need&&!have)out.low.push(`${name}: ${l} not entered (program needs ${need})`)});
     const miss=[!it.submittal&&'submittal',!it.ahri&&'AHRI',!it.quote&&'quote'].filter(Boolean);if(miss.length)out.nodocs.push(`${name}: ${miss.join(', ')}`)});return out}
 function optIssues(){return (P.opts||[]).reduce((n,o)=>{const c=optCheck(o);return n+c.missing.length+c.low.length},0)}
@@ -334,19 +335,19 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
     ${c.missing.length?`<div class="small" style="color:var(--bad);margin-top:6px">❌ Missing ${c.missing.length} unit${c.missing.length>1?'s':''}: ${c.missing.map(esc).join(', ')}</div>`:`<div class="small" style="color:var(--ok);margin-top:6px">✓ All ${units.length} units covered</div>`}
     ${c.low.length?`<div class="small" style="color:var(--bad)">⚠️ Doesn't meet the program: ${c.low.map(esc).join(' · ')}</div>`:''}
     ${c.nodocs.length?`<div class="small" style="color:var(--warn)">📄 Missing paperwork: ${c.nodocs.map(esc).join(' · ')}</div>`:''}
-    <div style="overflow-x:auto;margin-top:8px"><table class="small" style="min-width:1250px"><tr><th>Unit</th><th>Supplier</th><th>Make</th><th>Model</th><th>AHRI #</th>${RATE.map(r=>`<th>${r[1]}</th>`).join('')}<th>Price ea.</th><th>Lead</th><th>Docs</th></tr>
+    <div style="overflow-x:auto;margin-top:8px"><table class="small" style="min-width:1250px"><tr><th>Unit</th><th>Supplier</th><th>Make</th><th>Model</th><th>AHRI #</th>${RATE.map(r=>`<th>${r[1]}</th>`).join('')}<th>Qty</th><th>Price ea.</th><th>Total</th><th>Lead</th><th>Docs</th></tr>
     ${units.map(u=>{const it=itemOf(o.id,u.id)||{};const rt=it.ratings||{};const bad=k=>{const need=+req[k],have=+rt[k];return need&&have&&have<need};
       return `<tr><td><b>${esc(u.tag||u.equipment_type||'Unit')}</b>${u.qty>1?' ×'+u.qty:''}<div class="mut">${esc([u.tonnage&&u.tonnage+'T',u.make].filter(Boolean).join(' · '))}</div></td>
       <td><select data-oi="${o.id}|${u.id}" data-f="supplier_id" style="min-width:120px"><option value=""></option>${D.suppliers.map(sp=>`<option value="${sp.id}" ${it.supplier_id===sp.id?'selected':''}>${esc(sp.company)}</option>`).join('')}</select></td>
       ${['make','model','ahri_no'].map(f=>`<td><input data-oi="${o.id}|${u.id}" data-f="${f}" value="${esc(it[f]||'')}" style="min-width:${f==='model'?150:90}px"></td>`).join('')}
       ${RATE.map(([k])=>`<td><input data-oi="${o.id}|${u.id}" data-r="${k}" value="${esc(rt[k]??'')}" style="width:58px;${bad(k)?'background:#fde8e8;color:var(--bad)':''}"></td>`).join('')}
-      <td><input data-oi="${o.id}|${u.id}" data-f="price" value="${esc(it.price??'')}" style="width:80px"></td><td><input data-oi="${o.id}|${u.id}" data-f="lead" value="${esc(it.lead||'')}" style="width:70px"></td>
+      <td><input data-oi="${o.id}|${u.id}" data-f="qty" value="${esc(itQty(it,u))}" style="width:46px"></td><td><input data-oi="${o.id}|${u.id}" data-f="price" value="${esc(it.price??'')}" style="width:80px"></td><td style="white-space:nowrap">${it.price!=null&&it.price!==''?((+it.price)*itQty(it,u)).toLocaleString('en-US',{style:'currency',currency:'USD'}):''}</td><td><input data-oi="${o.id}|${u.id}" data-f="lead" value="${esc(it.lead||'')}" style="width:70px"></td>
       <td style="white-space:nowrap"><a href="#" data-lib="${o.id}|${u.id}" title="Pick from the equipment library">📚</a> ${[['quote','💲'],['submittal','📐'],['ahri','🏷']].map(([d,ic])=>it[d]?`<a href="#" data-open="${esc(it[d].path)}" title="${d}">${ic}</a>`:`<label title="Upload ${d}" style="cursor:pointer;opacity:.35">${ic}<input type="file" hidden data-up="${o.id}|${u.id}|${d}"></label>`).join(' ')}</td></tr>`}).join('')}</table></div>
     <div class="small mut" style="margin-top:4px">📚 pick from the library · 💲 quote · 📐 submittal · 🏷 AHRI certificate — faded = missing, tap to upload.</div></div>`}).join('')||'<p class="mut">No options yet. Create one and assign a supplier and model to every unit — e.g. 7 Lennox, 2 York, 6 Trane.</p>'}`;
   document.querySelectorAll('[data-req]').forEach(e=>e.onchange=async()=>{const r={...(P.p.requirements||{})};const v=e.value.trim();if(v)r[e.dataset.req]=+v;else delete r[e.dataset.req];P.p.requirements=r;await q(sb.from('rebates').update({requirements:r}).eq('id',P.p.id));optionsTab()});
   $('#nopt').onclick=async()=>{const o=(await q(sb.from('rebate_options').insert({rebate_id:P.p.id,name:'Option '+(opts.length+1),sort:opts.length}).select()))[0];P.opts.push(o);await event(P.p.id,'Created '+o.name);optionsTab()};
   if($('#copt'))$('#copt').onclick=async()=>{const src=opts[opts.length-1];const o=(await q(sb.from('rebate_options').insert({rebate_id:P.p.id,name:'Option '+(opts.length+1),sort:opts.length}).select()))[0];
-    const its=P.items.filter(i=>i.option_id===src.id).map(i=>({option_id:o.id,unit_id:i.unit_id,supplier_id:i.supplier_id,make:i.make,model:i.model,ahri_no:i.ahri_no,ratings:i.ratings,price:i.price,lead:i.lead,submittal:i.submittal,ahri:i.ahri,quote:i.quote}));
+    const its=P.items.filter(i=>i.option_id===src.id).map(i=>({option_id:o.id,unit_id:i.unit_id,supplier_id:i.supplier_id,make:i.make,model:i.model,ahri_no:i.ahri_no,ratings:i.ratings,price:i.price,qty:i.qty,lead:i.lead,submittal:i.submittal,ahri:i.ahri,quote:i.quote}));
     if(its.length)P.items.push(...await q(sb.from('rebate_option_items').insert(its).select()));P.opts.push(o);optionsTab()};
   document.querySelectorAll('[data-oshare]').forEach(e=>e.onchange=async()=>{const id=e.dataset.oshare;const o=P.opts.find(x=>x.id===id);
     if(e.checked){const c=optCheck(o);if(c.missing.length&&!confirm(`${o.name} is missing ${c.missing.length} unit(s). Show it to the partner anyway?`)){e.checked=false;return}}
@@ -360,7 +361,7 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
     else{it=(await q(sb.from('rebate_option_items').insert({option_id:oid,unit_id:uid,...patch}).select()))[0];P.items.push(it)}};
   document.querySelectorAll('[data-oi]').forEach(e=>e.onchange=async()=>{const[oid,uid]=e.dataset.oi.split('|');const v=e.value.trim();
     try{if(e.dataset.r){const it=itemOf(oid,uid)||{};await save(oid,uid,{ratings:{...(it.ratings||{}),[e.dataset.r]:v===''?null:+v}})}
-      else{const f=e.dataset.f;await save(oid,uid,{[f]:f==='price'?(v===''?null:+v.replace(/[^\d.]/g,'')):(v||null)});if(f==='supplier_id'){const sp=D.suppliers.find(x=>x.id===v);const it=itemOf(oid,uid);if(sp&&!it.make&&(sp.brands||[]).length===1){await save(oid,uid,{make:sp.brands[0]})}}}
+      else{const f=e.dataset.f;await save(oid,uid,{[f]:(f==='price'||f==='qty')?(v===''?null:+v.replace(/[^\d.]/g,'')):(v||null)});if(f==='supplier_id'){const sp=D.suppliers.find(x=>x.id===v);const it=itemOf(oid,uid);if(sp&&!it.make&&(sp.brands||[]).length===1){await save(oid,uid,{make:sp.brands[0]})}}}
       optionsTab()}catch(err){toast(err.message)}});
   document.querySelectorAll('[data-up]').forEach(e=>e.onchange=async()=>{const[oid,uid,d]=e.dataset.up.split('|');const f=e.files[0];if(!f)return;
     try{const up=await upload(P.p.id,f,`options/${oid}`);await save(oid,uid,{[d]:{path:up.path,name:f.name}});await q(sb.from('rebate_files').insert({rebate_id:P.p.id,name:f.name,path:up.path,mime:up.mime,size:up.size,kind:d==='quote'?'Quote':d==='submittal'?'Submittal':'AHRI'}));toast('Uploaded');optionsTab()}catch(err){toast(err.message)}});
@@ -403,7 +404,7 @@ async function buildProposal({opt,labor,mk,tax,dep}){const{p}=P;const units=(P.a
   const hasCU=units.some(u=>/condens|heat pump|split/i.test(u.equipment_type||''));
   const isAH=u=>/air handler/i.test(u.equipment_type||'')&&hasCU;
   const groups=new Map(),need=new Map();
-  units.forEach(u=>{const it=opt?(P.items||[]).find(i=>i.option_id===opt&&i.unit_id===u.id):null;const q=+u.qty||1;
+  units.forEach(u=>{const it=opt?(P.items||[]).find(i=>i.option_id===opt&&i.unit_id===u.id):null;const q=itQty(it,u);
     if(it&&(it.model||it.price!=null)){if(isAH(u)&&!(+it.price))return; // AHU covered by its condensing unit's system price
       const k=[it.make||'',it.model||'',+it.price||0].join('|');const g=groups.get(k)||{make:it.make||'',model:it.model||'',price:it.price,qty:0,tags:[],ton:ton(u)};g.qty+=q;g.tags.push(tag(u));groups.set(k,g)}
     else{if(isAH(u))return;const k=(u.equipment_type||'Unit')+'|'+(u.tonnage||u.capacity||'');const g=need.get(k)||{type:u.equipment_type||'Unit',size:u.tonnage?(+u.tonnage)+' Ton':(u.capacity||''),qty:0,tags:[]};g.qty+=q;g.tags.push(tag(u));need.set(k,g)}});
