@@ -335,13 +335,16 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
     ${c.missing.length?`<div class="small" style="color:var(--bad);margin-top:6px">❌ Missing ${c.missing.length} unit${c.missing.length>1?'s':''}: ${c.missing.map(esc).join(', ')}</div>`:`<div class="small" style="color:var(--ok);margin-top:6px">✓ All ${units.length} units covered</div>`}
     ${c.low.length?`<div class="small" style="color:var(--bad)">⚠️ Doesn't meet the program: ${c.low.map(esc).join(' · ')}</div>`:''}
     ${c.nodocs.length?`<div class="small" style="color:var(--warn)">📄 Missing paperwork: ${c.nodocs.map(esc).join(' · ')}</div>`:''}
-    <div style="overflow-x:auto;margin-top:8px"><table class="small" style="min-width:1250px"><tr><th>Unit</th><th>Supplier</th><th>Make</th><th>Model</th><th>AHRI #</th>${RATE.map(r=>`<th>${r[1]}</th>`).join('')}<th>Qty</th><th>Price ea.</th><th>Total</th><th>Lead</th><th>Docs</th></tr>
+    <div style="overflow-x:auto;margin-top:8px"><table class="small" style="min-width:1250px"><tr><th>Unit</th><th>Type</th><th>Tons</th><th>Qty</th><th>Supplier</th><th>Make</th><th>Model</th><th>AHRI #</th>${RATE.map(r=>`<th>${r[1]}</th>`).join('')}<th>Price ea.</th><th>Total</th><th>Lead</th><th>Docs</th></tr>
     ${units.map(u=>{const it=itemOf(o.id,u.id)||{};const rt=it.ratings||{};const bad=k=>{const need=+req[k],have=+rt[k];return need&&have&&have<need};
-      return `<tr><td><b>${esc(u.tag||u.equipment_type||'Unit')}</b>${u.qty>1?' ×'+u.qty:''}<div class="mut">${esc([u.tonnage&&u.tonnage+'T',u.make].filter(Boolean).join(' · '))}</div></td>
+      return `<tr><td><input data-oi="${o.id}|${u.id}" data-f="unit_label" value="${esc(it.unit_label||u.tag||'')}" placeholder="${esc(u.tag||'Unit')}" style="width:110px;font-weight:700"><div class="mut" title="Surveyed unit">${esc([u.tag,u.equipment_type,u.tonnage&&u.tonnage+'T',u.make].filter(Boolean).join(' · '))}</div></td>
+      <td><select data-oi="${o.id}|${u.id}" data-f="unit_type" style="min-width:120px">${[...new Set([it.unit_type||u.equipment_type||'',...UTYPES])].map(t=>`<option ${t===(it.unit_type||u.equipment_type||'')?'selected':''}>${esc(t)}</option>`).join('')}</select></td>
+      <td><input data-oi="${o.id}|${u.id}" data-f="tons" value="${esc(it.tons??u.tonnage??'')}" style="width:50px"></td>
+      <td><input data-oi="${o.id}|${u.id}" data-f="qty" value="${esc(itQty(it,u))}" style="width:46px"></td>
       <td><select data-oi="${o.id}|${u.id}" data-f="supplier_id" style="min-width:120px"><option value=""></option>${D.suppliers.map(sp=>`<option value="${sp.id}" ${it.supplier_id===sp.id?'selected':''}>${esc(sp.company)}</option>`).join('')}</select></td>
       ${['make','model','ahri_no'].map(f=>`<td><input data-oi="${o.id}|${u.id}" data-f="${f}" value="${esc(it[f]||'')}" style="min-width:${f==='model'?150:90}px"></td>`).join('')}
       ${RATE.map(([k])=>`<td><input data-oi="${o.id}|${u.id}" data-r="${k}" value="${esc(rt[k]??'')}" style="width:58px;${bad(k)?'background:#fde8e8;color:var(--bad)':''}"></td>`).join('')}
-      <td><input data-oi="${o.id}|${u.id}" data-f="qty" value="${esc(itQty(it,u))}" style="width:46px"></td><td><input data-oi="${o.id}|${u.id}" data-f="price" value="${esc(it.price??'')}" style="width:80px"></td><td style="white-space:nowrap">${it.price!=null&&it.price!==''?((+it.price)*itQty(it,u)).toLocaleString('en-US',{style:'currency',currency:'USD'}):''}</td><td><input data-oi="${o.id}|${u.id}" data-f="lead" value="${esc(it.lead||'')}" style="width:70px"></td>
+      <td><input data-oi="${o.id}|${u.id}" data-f="price" value="${esc(it.price??'')}" style="width:80px"></td><td style="white-space:nowrap">${it.price!=null&&it.price!==''?((+it.price)*itQty(it,u)).toLocaleString('en-US',{style:'currency',currency:'USD'}):''}</td><td><input data-oi="${o.id}|${u.id}" data-f="lead" value="${esc(it.lead||'')}" style="width:70px"></td>
       <td style="white-space:nowrap">${rt._src?`<span title="Efficiency from: ${esc(rt._src)}" style="cursor:help">${/verify/.test(rt._src)?'🌐':'✓'}</span> `:''}<a href="#" data-lib="${o.id}|${u.id}" title="Pick from the equipment library">📚</a> ${[['quote','💲'],['submittal','📐'],['ahri','🏷']].map(([d,ic])=>it[d]?`<a href="#" data-open="${esc(it[d].path)}" title="${d}">${ic}</a>`:`<label title="Upload ${d}" style="cursor:pointer;opacity:.35">${ic}<input type="file" hidden data-up="${o.id}|${u.id}|${d}"></label>`).join(' ')}</td></tr>`}).join('')}</table></div>
     <div class="small mut" style="margin-top:4px">📚 pick from the library · 💲 quote · 📐 submittal · 🏷 AHRI certificate — faded = missing, tap to upload.</div></div>`}).join('')||'<p class="mut">No options yet. Create one and assign a supplier and model to every unit — e.g. 7 Lennox, 2 York, 6 Trane.</p>'}`;
   const reqFill=async(force)=>{const b=$('#reqAuto');if(b){b.disabled=true;b.textContent='🔎 Looking up…'}
@@ -351,7 +354,7 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
   document.querySelectorAll('[data-req]').forEach(e=>e.onchange=async()=>{const r={...(P.p.requirements||{})};const v=e.value.trim();if(v)r[e.dataset.req]=+v;else delete r[e.dataset.req];P.p.requirements=r;await q(sb.from('rebates').update({requirements:r}).eq('id',P.p.id));optionsTab()});
   $('#nopt').onclick=async()=>{const o=(await q(sb.from('rebate_options').insert({rebate_id:P.p.id,name:'Option '+(opts.length+1),sort:opts.length}).select()))[0];P.opts.push(o);await event(P.p.id,'Created '+o.name);optionsTab()};
   if($('#copt'))$('#copt').onclick=async()=>{const src=opts[opts.length-1];const o=(await q(sb.from('rebate_options').insert({rebate_id:P.p.id,name:'Option '+(opts.length+1),sort:opts.length}).select()))[0];
-    const its=P.items.filter(i=>i.option_id===src.id).map(i=>({option_id:o.id,unit_id:i.unit_id,supplier_id:i.supplier_id,make:i.make,model:i.model,ahri_no:i.ahri_no,ratings:i.ratings,price:i.price,qty:i.qty,lead:i.lead,submittal:i.submittal,ahri:i.ahri,quote:i.quote}));
+    const its=P.items.filter(i=>i.option_id===src.id).map(i=>({option_id:o.id,unit_id:i.unit_id,supplier_id:i.supplier_id,make:i.make,model:i.model,ahri_no:i.ahri_no,ratings:i.ratings,price:i.price,qty:i.qty,unit_label:i.unit_label,unit_type:i.unit_type,tons:i.tons,lead:i.lead,submittal:i.submittal,ahri:i.ahri,quote:i.quote}));
     if(its.length)P.items.push(...await q(sb.from('rebate_option_items').insert(its).select()));P.opts.push(o);optionsTab()};
   document.querySelectorAll('[data-oshare]').forEach(e=>e.onchange=async()=>{const id=e.dataset.oshare;const o=P.opts.find(x=>x.id===id);
     if(e.checked){const c=optCheck(o);if(c.missing.length&&!confirm(`${o.name} is missing ${c.missing.length} unit(s). Show it to the partner anyway?`)){e.checked=false;return}}
@@ -372,7 +375,7 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
     toast(`Filled ${n} of ${todo.length} line(s)`+(n<todo.length?' — the rest need the AHRI certificate':''));optionsTab()});
   document.querySelectorAll('[data-oi]').forEach(e=>e.onchange=async()=>{const[oid,uid]=e.dataset.oi.split('|');const v=e.value.trim();
     try{if(e.dataset.r){const it=itemOf(oid,uid)||{};await save(oid,uid,{ratings:{...(it.ratings||{}),[e.dataset.r]:v===''?null:+v}})}
-      else{const f=e.dataset.f;await save(oid,uid,{[f]:(f==='price'||f==='qty')?(v===''?null:+v.replace(/[^\d.]/g,'')):(v||null)});if(f==='supplier_id'){const sp=D.suppliers.find(x=>x.id===v);const it=itemOf(oid,uid);if(sp&&!it.make&&(sp.brands||[]).length===1){await save(oid,uid,{make:sp.brands[0]})}}
+      else{const f=e.dataset.f;await save(oid,uid,{[f]:(f==='price'||f==='qty'||f==='tons')?(v===''?null:+v.replace(/[^\d.]/g,'')):(v||null)});if(f==='supplier_id'){const sp=D.suppliers.find(x=>x.id===v);const it=itemOf(oid,uid);if(sp&&!it.make&&(sp.brands||[]).length===1){await save(oid,uid,{make:sp.brands[0]})}}
         if((f==='model'||f==='ahri_no')&&v&&noRt(itemOf(oid,uid)))await effFill(oid,uid)}
       optionsTab()}catch(err){toast(err.message)}});
   document.querySelectorAll('[data-up]').forEach(e=>e.onchange=async()=>{const[oid,uid,d]=e.dataset.up.split('|');const f=e.files[0];if(!f)return;
@@ -412,14 +415,16 @@ async function proposalTab(){const{p,opts}=P;
     catch(err){toast(err.message);b.disabled=false;b.textContent='Build proposal'}}}
 async function buildProposal({opt,labor,mk,tax,dep}){const{p}=P;const units=(P.all||P.units).filter(isVis);
   if(!p.customer_id)throw new Error('Pick the customer on this project first (Edit)');
-  const tag=u=>u.tag||u.equipment_type||'Unit',ton=u=>u.tonnage?(+u.tonnage)+'-Ton ':'';
-  const hasCU=units.some(u=>/condens|heat pump|split/i.test(u.equipment_type||''));
-  const isAH=u=>/air handler/i.test(u.equipment_type||'')&&hasCU;
+  const itm=u=>opt?(P.items||[]).find(i=>i.option_id===opt&&i.unit_id===u.id):null;
+  const V=u=>{const it=itm(u)||{};return{tag:it.unit_label||u.tag||u.equipment_type||'Unit',type:it.unit_type||u.equipment_type||'Unit',tons:it.tons??u.tonnage}};
+  const tag=u=>V(u).tag,ton=u=>V(u).tons?(+V(u).tons)+'-Ton ':'';
+  const hasCU=units.some(u=>/condens|heat pump|split/i.test(V(u).type));
+  const isAH=u=>/air handler/i.test(V(u).type)&&hasCU;
   const groups=new Map(),need=new Map();
-  units.forEach(u=>{const it=opt?(P.items||[]).find(i=>i.option_id===opt&&i.unit_id===u.id):null;const q=itQty(it,u);
-    if(it&&(it.model||it.price!=null)){if(isAH(u)&&!(+it.price))return; // AHU covered by its condensing unit's system price
+  units.forEach(u=>{const it=itm(u);const q=itQty(it,u);if(!q)return;
+    if(it&&(it.model||it.price!=null)){if(isAH(u)&&!(+it.price))return;
       const k=[it.make||'',it.model||'',+it.price||0].join('|');const g=groups.get(k)||{make:it.make||'',model:it.model||'',price:it.price,qty:0,tags:[],ton:ton(u)};g.qty+=q;g.tags.push(tag(u));groups.set(k,g)}
-    else{if(isAH(u))return;const k=(u.equipment_type||'Unit')+'|'+(u.tonnage||u.capacity||'');const g=need.get(k)||{type:u.equipment_type||'Unit',size:u.tonnage?(+u.tonnage)+' Ton':(u.capacity||''),qty:0,tags:[]};g.qty+=q;g.tags.push(tag(u));need.set(k,g)}});
+    else{if(isAH(u))return;const v=V(u);const k=v.type+'|'+(v.tons||u.capacity||'');const g=need.get(k)||{type:v.type,size:v.tons?(+v.tons)+' Ton':(u.capacity||''),qty:0,tags:[]};g.qty+=q;g.tags.push(tag(u));need.set(k,g)}});
   const lines=[],scope=[];
   [...groups.values()].forEach(g=>{lines.push({desc:`${g.make} ${g.ton}${g.model} (${g.tags.join(', ')})`.replace(/\s+/g,' ').trim(),qty:g.qty,cost:g.price==null?'':+g.price,kind:'equip',model:g.model,src:'From project option'});
     scope.push(`Furnish and Install (${g.qty}) ${g.make} ${g.ton}${g.model}.`.replace(/\s+/g,' '))});
@@ -427,7 +432,7 @@ async function buildProposal({opt,labor,mk,tax,dep}){const{p}=P;const units=(P.a
     scope.push(`Furnish and Install (${g.qty}) new ${g.type}${g.qty>1?'s':''}${g.size?' — '+g.size:''}.`)});
   const systems=lines.reduce((a,l)=>a+(+l.qty||0),0);
   lines.push({desc:'Labor — replacement per system (demo, recovery, piping, duct / drain / gas connections, controls, start-up, rigging)',qty:systems,cost:labor===''?'':labor,kind:'labor'});
-  const split=units.some(u=>/condens|air handler|heat pump|mini split|split/i.test(u.equipment_type||'')),wet=units.some(u=>/boiler|water heater/i.test(u.equipment_type||''));
+  const split=units.some(u=>/condens|air handler|heat pump|mini split|split/i.test(V(u).type)),wet=units.some(u=>/boiler|water heater/i.test(V(u).type));
   scope.push('Recover and Dispose of Refrigerant from old Units.','Demolish and Remove old Units.');
   if(split)scope.push('Furnish and Install All Necessary Refrigerant Piping to connect to existing Piping.','Fabricate and Install All the Necessary Ductwork to Connect to existing Ductwork.','Furnish and Install Thermostats.','Furnish and Install All Necessary Drain Piping to Connect to existing Drain.');
   if(wet)scope.push('Connect Existing Water, Gas and Venting to new Boilers / Water Heaters.');
