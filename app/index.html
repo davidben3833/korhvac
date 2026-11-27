@@ -1230,7 +1230,7 @@ function render(){
   hydratePhotos();
   if(sb&&view==='map')pollLive();
 }
-function route(){const h=location.hash.slice(1);if(h==='rebateportal'){UI.rbTab='portal';location.hash='rebates';return}if(h==='techview'){location.href='/tech/';return}view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
+function route(){const h=location.hash.slice(1);if(h.startsWith('proposal=')){const pid=h.slice(9);location.hash='estimates';let n=0;const t=setInterval(()=>{if(byId('estimates',pid)){clearInterval(t);openEst(pid)}else if(++n>60)clearInterval(t)},250);return}if(h==='rebateportal'){UI.rbTab='portal';location.hash='rebates';return}if(h==='techview'){location.href='/tech/';return}view=VIEWS.some(x=>x[0]===h)?h:'dashboard';render();window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);
 
 /* ================= DASHBOARD ================= */

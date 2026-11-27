@@ -238,7 +238,7 @@ function drawProject(){
   <div class="card"><div class="row"><div><div class="mut small">${esc(p.number||'')}</div><h2 style="margin:2px 0">${esc(p.title||'')}</h2><div class="mut">${esc(p.site||'')}${cust?' · '+esc(cust.company||cust.name):''}</div>
   <div class="small mut">${esc([p.program,p.company,p.app_no&&('App # '+p.app_no)].filter(Boolean).join(' · '))}</div></div><span class="sp"></span>${p.deleted_at?'<span class="badge" style="background:#fde8e8;color:#c0392b">Deleted</span> <button class="sm" id="rst">Restore</button>':''}<button class="sm" id="ed">Edit</button>${isAdm()&&!p.deleted_at?' <button class="sm red" id="del">Delete</button>':''}</div>
   <div class="stage" style="margin-top:10px">${STAGES.map(s=>`<span class="${s===p.stage?'on':''}" data-stage="${s}" style="cursor:pointer">${s}</span>`).join('')}</div></div>
-  <div class="tabs">${[['survey',`Survey (${units.length}) · 📷 ${files.filter(f=>f.kind==='Photo').length}`],['table','Unit table'],['options',`Options (${(P.opts||[]).length})${optIssues()?' ⚠️':''}`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['files',`Files (${files.filter(f=>f.kind!=='Photo').length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
+  <div class="tabs">${[['survey',`Survey (${units.length}) · 📷 ${files.filter(f=>f.kind==='Photo').length}`],['table','Unit table'],['options',`Options (${(P.opts||[]).length})${optIssues()?' ⚠️':''}`],['pricing',`Pricing (${reqs.length})${drafts?' · '+drafts+' to approve':''}`],['proposal','📄 Proposal'],['files',`Files (${files.filter(f=>f.kind!=='Photo').length})`],['activity','Activity']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
   <div id="tb"></div>`);
   $('#bk').onclick=e=>{e.preventDefault();location.hash=''};
   $('#ed').onclick=()=>editProject(p);
@@ -247,7 +247,7 @@ function drawProject(){
   if($('#rst'))$('#rst').onclick=async()=>{await q(sb.from('rebates').update({deleted_at:null}).eq('id',p.id));await event(p.id,'Project restored');p.deleted_at=null;toast('Restored');route()};
   document.querySelectorAll('[data-stage]').forEach(s=>s.onclick=async()=>{if(s.dataset.stage===p.stage)return;await q(sb.from('rebates').update({stage:s.dataset.stage,updated_at:new Date().toISOString()}).eq('id',p.id));await event(p.id,'Stage → '+s.dataset.stage);await loadAll();projectView()});
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{V.tab=b.dataset.tab;drawProject()});
-  ({survey:surveyTab,table:tableTab,options:optionsTab,pricing:pricingTab,files:filesTab,activity:activityTab})[tab]();
+  ({survey:surveyTab,table:tableTab,options:optionsTab,pricing:pricingTab,proposal:proposalTab,files:filesTab,activity:activityTab})[tab]();
 }
 
 /* ===== UNIT TABLE — one row per unit, everything a supplier needs to price it ===== */
@@ -369,6 +369,68 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
   document.querySelectorAll('[data-omatch]').forEach(b=>b.onclick=async()=>{const all=confirm('Replace units that already have a model too?\nOK = redo all units · Cancel = only units without a model');b.disabled=true;b.textContent='🤖 Matching…';
     try{const r=await fn('rebate-library',{action:'match',option_id:b.dataset.omatch,force:all});P.items=await q(sb.from('rebate_option_items').select('*').in('option_id',P.opts.map(o=>o.id)));P.files=await q(sb.from('rebate_files').select('*').eq('rebate_id',P.p.id).order('created_at',{ascending:false}));toast(r.note||`Matched ${r.filled} of ${r.asked} unit(s) — check the rows`);optionsTab()}catch(err){toast(err.message);b.disabled=false;b.textContent='🤖 Match from library'}});
   document.querySelectorAll('[data-open]').forEach(a=>a.onclick=ev=>{ev.preventDefault();const pth=a.dataset.open;const f=fileByPath(pth)||{path:pth,name:pth.split('/').pop()};docView(f)});}
+
+/* ===== PROPOSAL — build the customer proposal from this project (units + chosen option + supplier prices), then edit/send it in the office app ===== */
+const isOff=()=>ME&&['Admin','Office'].includes(ME.base);
+function openProposal(id){const u='/app/#proposal='+id;if(EMBED)window.top.location.href=u;else window.open(u,'_blank')}
+const stateTax=site=>/\bNJ\b|New Jersey/i.test(site||'')?6.625:/\bNY\b|New York/i.test(site||'')?8.875:/\bCT\b/i.test(site||'')?6.35:/\bMA\b/i.test(site||'')?6.25:/\bPA\b/i.test(site||'')?6:0;
+async function proposalTab(){const{p,opts}=P;
+  if(!isOff()){$('#tb').innerHTML='<div class="card mut">Proposals are made by the office. Ask the office to build the proposal for this project.</div>';return}
+  $('#tb').innerHTML='<div class="card mut">Loading…</div>';
+  let props=[];try{props=await q(sb.from('estimates').select('id,number,title,status,date,options,extra,sent_at').or(`extra->>rebateId.eq.${p.id}${p.estimate_id?',id.eq.'+p.estimate_id:''}`).order('created_at',{ascending:false}))}catch(_){}
+  const priceOf=e=>{const o=(e.options||[])[0]||{};return o.final?+o.final:null};
+  const last=JSON.parse(localStorage.getItem('rbPropDefaults')||'{}');
+  $('#tb').innerHTML=`<div class="card"><b>Proposals for this project</b>
+   ${props.length?`<table class="small" style="margin-top:8px;width:100%"><tr><th>#</th><th>Title</th><th>Date</th><th>Status</th><th></th></tr>${props.map(e=>`<tr><td><b>${esc(e.number)}</b></td><td>${esc(e.title||'')}</td><td>${esc(e.date||'')}</td><td>${esc(e.status||'')}</td><td style="text-align:right"><button class="sm pri" data-popen="${e.id}">Open / edit / send</button></td></tr>`).join('')}</table>`:'<p class="mut small">No proposal yet.</p>'}</div>
+  <div class="card"><b>＋ New proposal from this project</b><div class="mut small" style="margin:4px 0 10px">Builds a KOR HVAC proposal (our numbering) from the units in the survey. Units in the chosen option get its make/model and supplier price; units without a price are listed as “PRICE NEEDED” for you to fill in. Then it opens in the proposal editor to review and send.</div>
+   <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <label class="small">Option<br><select id="pp_opt"><option value="">Survey units only</option>${opts.map(o=>`<option value="${o.id}" ${(P.p.extra||{}).chosenOption===o.id?'selected':''}>${esc(o.name)}</option>`).join('')}</select></label>
+    <label class="small">Labor per system $<br><input id="pp_lab" value="${esc(last.labor??'')}" placeholder="e.g. 9300" style="width:100px"></label>
+    <label class="small">Markup %<br><input id="pp_mk" value="${esc(last.markup??20)}" style="width:60px"></label>
+    <label class="small">Tax on equipment %<br><input id="pp_tax" value="${stateTax(p.site)}" style="width:70px"></label>
+    <label class="small">Deposit %<br><input id="pp_dep" value="${esc(last.deposit??30)}" style="width:60px"></label>
+    <button class="pri" id="pp_go">Build proposal</button></div>
+   <div class="mut small" style="margin-top:6px">“System” = each outdoor / stand-alone unit (air handlers paired with a condensing unit are not counted twice).</div></div>`;
+  document.querySelectorAll('[data-popen]').forEach(b=>b.onclick=()=>openProposal(b.dataset.popen));
+  $('#pp_go').onclick=async()=>{const b=$('#pp_go');b.disabled=true;b.textContent='Building…';
+    try{const opt=$('#pp_opt').value,labor=+$('#pp_lab').value.replace(/[^\d.]/g,'')||'',mk=+$('#pp_mk').value||20,tax=+$('#pp_tax').value||0,dep=Math.min(100,Math.max(5,+$('#pp_dep').value||30));
+      localStorage.setItem('rbPropDefaults',JSON.stringify({labor,markup:mk,deposit:dep}));
+      const id=await buildProposal({opt,labor,mk,tax,dep});toast('Proposal created — opening the editor');openProposal(id)}
+    catch(err){toast(err.message);b.disabled=false;b.textContent='Build proposal'}}}
+async function buildProposal({opt,labor,mk,tax,dep}){const{p}=P;const units=(P.all||P.units).filter(isVis);
+  if(!p.customer_id)throw new Error('Pick the customer on this project first (Edit)');
+  const tag=u=>u.tag||u.equipment_type||'Unit',ton=u=>u.tonnage?(+u.tonnage)+'-Ton ':'';
+  const hasCU=units.some(u=>/condens|heat pump|split/i.test(u.equipment_type||''));
+  const isAH=u=>/air handler/i.test(u.equipment_type||'')&&hasCU;
+  const groups=new Map(),need=new Map();
+  units.forEach(u=>{const it=opt?(P.items||[]).find(i=>i.option_id===opt&&i.unit_id===u.id):null;const q=+u.qty||1;
+    if(it&&(it.model||it.price!=null)){if(isAH(u)&&!(+it.price))return; // AHU covered by its condensing unit's system price
+      const k=[it.make||'',it.model||'',+it.price||0].join('|');const g=groups.get(k)||{make:it.make||'',model:it.model||'',price:it.price,qty:0,tags:[],ton:ton(u)};g.qty+=q;g.tags.push(tag(u));groups.set(k,g)}
+    else{if(isAH(u))return;const k=(u.equipment_type||'Unit')+'|'+(u.tonnage||u.capacity||'');const g=need.get(k)||{type:u.equipment_type||'Unit',size:u.tonnage?(+u.tonnage)+' Ton':(u.capacity||''),qty:0,tags:[]};g.qty+=q;g.tags.push(tag(u));need.set(k,g)}});
+  const lines=[],scope=[];
+  [...groups.values()].forEach(g=>{lines.push({desc:`${g.make} ${g.ton}${g.model} (${g.tags.join(', ')})`.replace(/\s+/g,' ').trim(),qty:g.qty,cost:g.price==null?'':+g.price,kind:'equip',model:g.model,src:'From project option'});
+    scope.push(`Furnish and Install (${g.qty}) ${g.make} ${g.ton}${g.model}.`.replace(/\s+/g,' '))});
+  [...need.values()].forEach(g=>{lines.push({desc:`Replace ${g.type}${g.size?' '+g.size:''} (${g.tags.join(', ')}) — PRICE NEEDED`,qty:g.qty,cost:'',kind:'equip'});
+    scope.push(`Furnish and Install (${g.qty}) new ${g.type}${g.qty>1?'s':''}${g.size?' — '+g.size:''}.`)});
+  const systems=lines.reduce((a,l)=>a+(+l.qty||0),0);
+  lines.push({desc:'Labor — replacement per system (demo, recovery, piping, duct / drain / gas connections, controls, start-up, rigging)',qty:systems,cost:labor===''?'':labor,kind:'labor'});
+  const split=units.some(u=>/condens|air handler|heat pump|mini split|split/i.test(u.equipment_type||'')),wet=units.some(u=>/boiler|water heater/i.test(u.equipment_type||''));
+  scope.push('Recover and Dispose of Refrigerant from old Units.','Demolish and Remove old Units.');
+  if(split)scope.push('Furnish and Install All Necessary Refrigerant Piping to connect to existing Piping.','Fabricate and Install All the Necessary Ductwork to Connect to existing Ductwork.','Furnish and Install Thermostats.','Furnish and Install All Necessary Drain Piping to Connect to existing Drain.');
+  if(wet)scope.push('Connect Existing Water, Gas and Venting to new Boilers / Water Heaters.');
+  scope.push('Wire Final Connections for Controls.');if(split)scope.push('Perform system leak testing with pressure 500 PSI for 24 hours.','Perform a Vacuum to 500 microns.');
+  scope.push('Perform system Start-Up.','Provide a Tutorial to the End User on system operations.','Perform Rigging and Lifting.','1 Year Warranty.');
+  const EXCL=['Plumbing, Seismic isolation, Burglar Bars, Cutting, Chopping, painting, Patching, Core Drilling, Concrete Wall Openings','Fire stopping by others.','Roofing by others.','Access Panels for walls or ceilings by others.','Duct Cleaning in or out.','Duct Smoke Detectors','BMS (Building Management System) of any kind.','Controlled inspection, and equipment use permits.','Electric wiring of any kind','Duct Leakage Testing','3rd Party Testing.','Shop Drawings'];
+  // our numbering: yy-NNN-01, next after every proposal / agreement number this year
+  const yy=String(new Date().getFullYear()).slice(2),re=new RegExp('^'+yy+'-(\\d{3})-\\d+$');let m=0;
+  const nums=[...(await q(sb.from('estimates').select('number'))),...(await q(sb.from('agreements').select('number')).catch(()=>[]))];nums.forEach(x=>{const r=re.exec(x.number||'');if(r)m=Math.max(m,+r[1])});
+  const number=`${yy}-${String(m+1).padStart(3,'0')}-01`,today=new Date().toISOString().slice(0,10);
+  const row={number,customer_id:p.customer_id,title:p.title||'Equipment replacement',date:today,valid_days:30,status:'Draft',selected:null,
+    options:[{name:'Option 1',desc:'',items:[],lines}],
+    extra:{rebate:'Yes',rebateId:p.id,pro:{markup:mk,tax,roundTo:100,deposit:dep,depositManual:1,pay:'deposit',site:p.site||'',drawings:'N/A',dated:'N/A',jobdesc:`Rebate project ${p.number||''}. Built from the survey${opt?' and option “'+((P.opts.find(o=>o.id===opt)||{}).name||'')+'”':''}.`,scope:scope.join('\n'),exclusions:EXCL.join('\n')}}};
+  const ins=(await q(sb.from('estimates').insert(row).select('id')))[0];
+  await q(sb.from('rebates').update({estimate_id:ins.id}).eq('id',p.id));p.estimate_id=ins.id;
+  await event(p.id,`Proposal ${number} created${opt?' from '+((P.opts.find(o=>o.id===opt)||{}).name||'option'):''}`);return ins.id}
 
 /* survey — every unit is its own folder: rebate-files/<project>/units/<unit id>/ (photos + docs) */
 const unitDir=(uid)=>`units/${uid}`;
