@@ -332,6 +332,8 @@ function optionsTab(){const units=optUnits(),{opts}=P;const req=P.p.requirements
      <input data-onotes="${o.id}" value="${esc(o.notes||'')}" placeholder="Note for partner (e.g. best efficiency, 3-week lead)" style="flex:1;min-width:200px">
      ${(P.p.extra||{}).chosenOption===o.id?'<span class="badge" style="background:#e7f6ee;color:#1f9d55">✓ Partner chose this</span>':''}</div>
     <div class="small mut" style="margin-top:4px">Partner sees: your price, makes/models, ratings vs program, submittals & AHRIs. Never supplier names, supplier prices or quotes.</div>
+    ${(()=>{const by={};let tot=0;units.forEach(u=>{const it=itemOf(o.id,u.id)||{};const q=itQty(it,u);if(!q)return;const t=(it.unit_type||u.equipment_type||'Unit')+((it.tons??u.tonnage)?' '+(+(it.tons??u.tonnage))+'T':'');by[t]=(by[t]||0)+q;tot+=q});
+      return `<div class="small" style="margin-top:8px;background:#eef4ff;border-radius:8px;padding:6px 8px"><b>Unit count: ${tot}</b> — ${Object.entries(by).sort((a,b)=>a[0].localeCompare(b[0])).map(([t,n])=>`${esc(t)} <b>×${n}</b>`).join(' · ')}</div>`})()}
     ${c.missing.length?`<div class="small" style="color:var(--bad);margin-top:6px">❌ Missing ${c.missing.length} unit${c.missing.length>1?'s':''}: ${c.missing.map(esc).join(', ')}</div>`:`<div class="small" style="color:var(--ok);margin-top:6px">✓ All ${units.length} units covered</div>`}
     ${c.low.length?`<div class="small" style="color:var(--bad)">⚠️ Doesn't meet the program: ${c.low.map(esc).join(' · ')}</div>`:''}
     ${c.nodocs.length?`<div class="small" style="color:var(--warn)">📄 Missing paperwork: ${c.nodocs.map(esc).join(' · ')}</div>`:''}
